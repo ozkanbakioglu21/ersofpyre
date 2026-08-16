@@ -32,7 +32,6 @@ export type GameStats = {
 };
 
 const WORLD = 900;
-const FLIGHT_Y = 85;
 const FWD = new THREE.Vector3(0, 0, 1);
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -343,9 +342,10 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
       }
       const c = ctrl.current;
       const kx =
-        (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0) - (keys["KeyA"] || keys["ArrowLeft"] ? 1 : 0);
+        (keys["KeyA"] || keys["ArrowLeft"] ? 1 : 0) - (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0);
       const ky =
         (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) - (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0);
+      const kalt = (keys["KeyE"] ? 1 : 0) - (keys["KeyQ"] ? 1 : 0);
       const inX = Math.abs(c.x) > 0.05 ? c.x : kx;
       const inY = Math.abs(c.y) > 0.05 ? c.y : ky;
       const firing =
@@ -359,10 +359,15 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         if (boosting) state.stamina = Math.max(0, state.stamina - 16 * dt);
         else state.stamina = Math.min(100, state.stamina + 11 * dt);
 
-        // screen-space plane movement: right = +X, up/forward = +Z
+        // screen-space plane movement: A = right, D = left, W = forward; idle = hover in place
         dragon.root.position.x += inX * state.speed * dt;
         dragon.root.position.z -= inY * state.speed * dt;
-        dragon.root.position.y = FLIGHT_Y;
+        // Q = dive, E = rise
+        dragon.root.position.y = THREE.MathUtils.clamp(
+          dragon.root.position.y + kalt * 70 * dt,
+          14,
+          320,
+        );
         // strafe banking for juice
         const bank = -inX * 0.6;
         dragon.body.rotation.z += (bank - dragon.body.rotation.z) * Math.min(1, dt * 5);
