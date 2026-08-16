@@ -171,51 +171,123 @@ export function createAirship(x: number, y: number, z: number): Airship {
     roughness: 0.7,
     metalness: 0.35,
   });
+  const bandMat = new THREE.MeshStandardMaterial({
+    color: 0x8a2f22,
+    roughness: 0.8,
+    metalness: 0.15,
+  });
+  const dark = stone(0x1d1a16, 0.5);
 
-  const balloon = new THREE.Mesh(new THREE.SphereGeometry(6, 20, 14), hullMat);
-  balloon.scale.set(1, 1, 2.4);
+  // ---- balloon ----
+  const R = 6.4;
+  const HALF = R * 2.44;
+  const balloon = new THREE.Mesh(new THREE.SphereGeometry(R, 24, 18), hullMat);
+  balloon.scale.set(1, 0.8, 2.44);
   group.add(balloon);
 
-  for (let i = -1; i <= 1; i++) {
-    const rib = new THREE.Mesh(new THREE.TorusGeometry(6.05, 0.18, 6, 24), brass);
-    rib.position.z = i * 4.5;
-    rib.scale.setScalar(1 - Math.abs(i) * 0.12);
+  // nose cone (-Z = travel direction)
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(2.1, 5.5, 14), bandMat);
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.z = -HALF - 0.4;
+  group.add(nose);
+
+  // hooped ribs hugging the hull
+  for (const zp of [-12, -7, -2.5, 0, 2.5, 7, 12]) {
+    const rr = Math.sqrt(Math.max(0.001, 1 - (zp / HALF) ** 2)) * R * 1.012;
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.16, 6, 26), brass);
+    rib.position.z = zp;
+    rib.scale.y = 0.8;
     group.add(rib);
   }
 
-  const gondola = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.2, 9), stone(0x2e2822, 0.6));
-  gondola.position.y = -6.4;
-  group.add(gondola);
-  const cabinGlow = new THREE.Mesh(new THREE.BoxGeometry(3.44, 0.6, 5), litWindow);
-  cabinGlow.position.y = -6.2;
-  group.add(cabinGlow);
+  // tail fins (+Z = rear)
+  const finV = new THREE.Mesh(new THREE.BoxGeometry(0.34, 5.4, 3.6), hullMat);
+  finV.position.set(0, 2.2, HALF + 0.4);
+  group.add(finV);
+  const finH = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.34, 3.2), hullMat);
+  finH.position.set(0, 0.4, HALF + 0.6);
+  group.add(finH);
+  const finVtip = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.5, 1.4), bandMat);
+  finVtip.position.set(0, 5.1, HALF + 2.4);
+  group.add(finVtip);
+  const flag = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.6, 0.9),
+    new THREE.MeshBasicMaterial({ color: 0xd84a2a, side: THREE.DoubleSide }),
+  );
+  flag.position.set(0, 5.6, HALF + 2.9);
+  group.add(flag);
 
+  // ---- gondola ----
+  const gondola = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.2, 9.5), stone(0x2e2822, 0.6));
+  gondola.position.y = -6.6;
+  group.add(gondola);
+  const gRoof = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.5, 9.9), hullMat);
+  gRoof.position.y = -5.4;
+  group.add(gRoof);
+  const cabinGlow = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.8, 6.8), litWindow);
+  cabinGlow.position.y = -6.4;
+  group.add(cabinGlow);
+  for (let i = -2; i <= 2; i++) {
+    if (i === 0) continue;
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.9, 0.16), brass);
+    frame.position.set(0, -6.4, i * 1.35);
+    group.add(frame);
+  }
+  const lantern = new THREE.Mesh(
+    new THREE.SphereGeometry(0.42, 10, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0x2a1404,
+      emissive: 0xffb04a,
+      emissiveIntensity: 2.2,
+      roughness: 0.4,
+    }),
+  );
+  lantern.position.y = -8.1;
+  group.add(lantern);
+  const lanternCord = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.0, 5), brass);
+  lanternCord.position.y = -7.7;
+  group.add(lanternCord);
+
+  // keel cables balloon -> gondola
+  for (const [sx, sz] of [
+    [-1.6, -3.2],
+    [1.6, -3.2],
+    [-1.6, 3.2],
+    [1.6, 3.2],
+  ] as const) {
+    const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 5), dark);
+    cable.position.set(sx, -6.2, sz);
+    group.add(cable);
+  }
+
+  // ---- engine pods (rear +Z) ----
   const props: THREE.Object3D[] = [];
   for (const s of [-1, 1]) {
     const mount = new THREE.Group();
-    mount.position.set(4.6 * s, -4.2, -6);
-    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 2.4, 10), brass);
-    cyl.rotation.x = Math.PI / 2;
-    mount.add(cyl);
+    mount.position.set(5.2 * s, -3.2, 8.6);
+    const nacelle = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 3.4, 12), brass);
+    nacelle.rotation.x = Math.PI / 2;
+    nacelle.position.z = -1.2;
+    mount.add(nacelle);
+    const spinner = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.1, 10), brass);
+    spinner.rotation.x = -Math.PI / 2;
+    spinner.position.z = -2.9;
+    mount.add(spinner);
+    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 3.4, 6), dark);
+    strut.position.set(0, 2.5, -0.6);
+    mount.add(strut);
     const prop = new THREE.Group();
     for (let i = 0; i < 4; i++) {
-      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3.4, 0.5), stone(0x1d1a16, 0.5));
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.6, 0.4), dark);
       blade.rotation.z = (i * Math.PI) / 2;
-      blade.position.set(Math.sin((i * Math.PI) / 2) * 1.6, Math.cos((i * Math.PI) / 2) * 1.6, 0);
+      blade.position.set(Math.sin((i * Math.PI) / 2) * 1.25, Math.cos((i * Math.PI) / 2) * 1.25, 0);
       prop.add(blade);
     }
-    prop.position.z = -1.4;
+    prop.position.z = 1.4;
     mount.add(prop);
     props.push(prop);
     group.add(mount);
   }
-
-  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5, 4), hullMat);
-  fin.position.set(0, 3, 12);
-  group.add(fin);
-  const finH = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 3.4), hullMat);
-  finH.position.set(0, 0.5, 12.4);
-  group.add(finH);
 
   group.traverse((o) => {
     if ((o as THREE.Mesh).isMesh) o.castShadow = true;
