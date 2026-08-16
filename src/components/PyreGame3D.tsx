@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { createDragon } from "./pyre3d/dragon";
-import DragonFlightController2D from "./pyre3d/DragonFlightController2D";
 import {
   createAirship,
   createAsh,
@@ -33,10 +32,7 @@ export type GameStats = {
 };
 
 const WORLD = 900;
-const CORRIDOR_END = 3400;
-const CORRIDOR_Z = 80;
-const FLIGHT_RANGE: [number, number] = [22, 220];
-const FWD = new THREE.Vector3(1, 0, 0);
+const FWD = new THREE.Vector3(0, 0, 1);
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 type Ctrl = {
@@ -141,7 +137,7 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     );
     scene.add(sky);
 
-    scene.add(createTerrain(WORLD * 10));
+    scene.add(createTerrain(WORLD * 2.4));
     const ash = createAsh(ASH_MAX, WORLD);
     ash.geometry.setDrawRange(0, preset.ashCount);
     scene.add(ash);
@@ -164,43 +160,30 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     applyRef.current = applyQuality;
     applyQuality();
 
-    // structures along +X corridor (side-scroller layout)
+    // structures
     const structures: Structure[] = [];
     for (let i = 0; i < 78; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * WORLD * 0.8;
       const roll = Math.random();
       const kind: Structure["kind"] = roll < 0.55 ? "house" : roll < 0.85 ? "factory" : "tower";
-      const s = createStructure(kind, 150 + i * 42 + rand(-10, 10), rand(-CORRIDOR_Z, CORRIDOR_Z));
+      const s = createStructure(kind, Math.cos(a) * r, Math.sin(a) * r);
       structures.push(s);
       scene.add(s.group);
     }
 
     const airships: Airship[] = [];
     for (let i = 0; i < 6; i++) {
-      const z = createAirship(
-        200 + i * 480 + rand(-40, 40),
-        rand(40, 120),
-        rand(-CORRIDOR_Z, CORRIDOR_Z),
-      );
+      const a = Math.random() * Math.PI * 2;
+      const r = rand(180, WORLD * 0.7);
+      const z = createAirship(Math.cos(a) * r, rand(60, 130), Math.sin(a) * r);
       airships.push(z);
       scene.add(z.group);
     }
 
     const dragon = createDragon();
-    dragon.root.position.set(0, 60, 0);
-    dragon.root.rotation.y = -Math.PI / 2; // model +Z → koridor yönü +X
+    dragon.root.position.set(0, 90, 220);
     scene.add(dragon.root);
-
-    const flight = new DragonFlightController2D(dragon.root, camera, {
-      forwardSpeed: 55,
-      verticalSpeed: 85,
-      verticalRange: FLIGHT_RANGE,
-      tiltAmount: 0.55,
-      tiltSmoothing: 6,
-      cameraOffset: new THREE.Vector3(0, 14, 160),
-      cameraFollowSmoothing: 5,
-      lookAhead: 45,
-    });
-    camera.position.set(0, 30, 160);
 
     // flame breath
     const flameMat = new THREE.MeshBasicMaterial({
@@ -332,6 +315,10 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     const fwd = FWD.clone();
     const headPos = new THREE.Vector3();
     const tmp = new THREE.Vector3();
+    const camPos = new THREE.Vector3();
+    const camGoal = new THREE.Vector3();
+    const lookGoal = new THREE.Vector3();
+    camera.position.set(0, 104, 180);
 
     let last = performance.now();
     let raf = 0;
@@ -354,29 +341,41 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         fpsT = 0;
       }
       const c = ctrl.current;
-      const vert =
-        Math.abs(c.y) > 0.05
-          ? -c.y
-          : (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0) - (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0);
+      const kx =
+        (keys["KeyA"] || keys["ArrowLeft"] ? 1 : 0) - (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0);
+      const ky =
+        (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) - (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0);
+      const kalt = (keys["KeyE"] ? 1 : 0) - (keys["KeyQ"] ? 1 : 0);
+      const inX = Math.abs(c.x) > 0.05 ? c.x : kx;
+      const inY = Math.abs(c.y) > 0.05 ? c.y : ky;
       const firing =
         (c.fire || !!keys["Space"]) && state.overheat <= 0 && state.status === "playing";
 
       if (state.status === "playing") {
-        // ---- side-scroller flight (controller-driven) ----
+        // ---- flight (2.5D: fixed facing, plane movement) ----
         const boosting = (c.boost || !!keys["ShiftRight"]) && state.stamina > 0;
-        flight.forwardSpeed = boosting ? 110 : 55;
-        state.speed = flight.forwardSpeed;
+        const target = boosting ? 118 : 62;
+        state.speed += (target - state.speed) * Math.min(1, dt * 1.6);
         if (boosting) state.stamina = Math.max(0, state.stamina - 16 * dt);
         else state.stamina = Math.min(100, state.stamina + 11 * dt);
 
-        flight.setVerticalInput(vert);
-        flight.update(dt);
-        // koridor sınırı (Z sabit kalır)
-        dragon.root.position.z = THREE.MathUtils.clamp(
-          dragon.root.position.z,
-          -CORRIDOR_Z,
-          CORRIDOR_Z,
+        // screen-space plane movement: A = right, D = left, W = forward; idle = hover in place
+        dragon.root.position.x += inX * state.speed * dt;
+        dragon.root.position.z -= inY * state.speed * dt;
+        // Q = dive, E = rise
+        dragon.root.position.y = THREE.MathUtils.clamp(
+          dragon.root.position.y + kalt * 70 * dt,
+          14,
+          320,
         );
+        // strafe banking for juice
+        const bank = -inX * 0.6;
+        dragon.body.rotation.z += (bank - dragon.body.rotation.z) * Math.min(1, dt * 5);
+
+        const rr = Math.hypot(dragon.root.position.x, dragon.root.position.z);
+        if (rr > WORLD) {
+          dragon.root.position.multiplyScalar(WORLD / rr);
+        }
 
         // wing flap
         state.flap += dt * (2.2 + state.speed * 0.03);
@@ -386,11 +385,12 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         dragon.wingR.rotation.x = Math.sin(state.flap - 0.6) * 0.16;
         dragon.wingL.rotation.x = Math.sin(state.flap - 0.6) * 0.16;
         dragon.tail.forEach((t, i) => {
-          t.rotation.y = Math.sin(state.flap * 0.7 - i * 0.45) * 0.13;
+          t.rotation.y = Math.sin(state.flap * 0.7 - i * 0.45) * 0.13 - inX * 0.06;
           t.rotation.x = Math.sin(state.flap * 0.5 - i * 0.3) * 0.05;
         });
         dragon.neck.forEach((n, i) => {
-          n.rotation.z = vert * 0.09 + Math.sin(state.flap * 0.6 - i) * 0.03;
+          n.rotation.x = -inY * 0.09 + Math.sin(state.flap * 0.6 - i) * 0.03;
+          n.rotation.y = -inX * 0.08;
         });
         dragon.jaw.rotation.x = firing ? 0.45 : 0.06;
 
@@ -505,13 +505,6 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
               shots.push({ mesh: m, vel: v.clone(), life: 6 });
             }
           }
-          // geride kalan canlı yapıyı koridor başına geri dönüştür
-          if (!s.dead && s.pos.x < dragon.root.position.x - 180) {
-            s.pos.x += CORRIDOR_END;
-            s.pos.z = rand(-CORRIDOR_Z, CORRIDOR_Z);
-            s.group.position.copy(s.pos);
-            s.cool = rand(0, 3);
-          }
         }
 
         state.comboT -= dt;
@@ -520,7 +513,13 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         // ---- airships ----
         for (const z of airships) {
           if (z.dead) continue;
+          z.group.position.addScaledVector(z.dir, 12 * dt);
           z.group.position.y += Math.sin(now * 0.0004 + z.group.position.x) * 4 * dt;
+          if (Math.hypot(z.group.position.x, z.group.position.z) > WORLD * 0.85) {
+            z.dir.set(-z.group.position.x, 0, -z.group.position.z).normalize();
+          }
+          z.group.lookAt(z.group.position.clone().add(z.dir));
+          z.group.rotateY(Math.PI);
           z.props.forEach((p) => (p.rotation.z += dt * 9));
           z.cool -= dt;
           if (z.cool <= 0 && z.group.position.distanceTo(dragon.root.position) < 400) {
@@ -544,12 +543,6 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
             state.score += 700 * state.combo;
             state.embers += 260;
             burst(z.group.position, 120, 34);
-          }
-          // geride kalan hava gemisini öne geri dönüştür
-          if (z.group.position.x < dragon.root.position.x - 200) {
-            z.group.position.x += CORRIDOR_END;
-            z.group.position.y = rand(40, 120);
-            z.group.position.z = rand(-CORRIDOR_Z, CORRIDOR_Z);
           }
         }
 
@@ -608,8 +601,18 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
       sun.target.position.copy(dragon.root.position);
       sky.position.copy(dragon.root.position);
 
-      // ---- side-scroller camera: controller içinde güncellenir ----
+      // ---- fixed 2.5D camera (behind-above, locked orientation) ----
+      const back = state.status === "playing" ? 34 + state.speed * 0.16 : 40;
       fill.position.copy(camera.position);
+      camGoal.set(0, 14, -back).add(dragon.root.position);
+      camGoal.y = Math.max(10, camGoal.y);
+      camPos.copy(camera.position).lerp(camGoal, Math.min(1, dt * 4.2));
+      camera.position.copy(camPos);
+      lookGoal
+        .copy(dragon.root.position)
+        .addScaledVector(fwd, 26)
+        .add(new THREE.Vector3(0, 3, 0));
+      camera.lookAt(lookGoal);
 
       renderer.render(scene, camera);
 
