@@ -12,17 +12,52 @@ export type DragonRig = {
   maw: THREE.Mesh;
 };
 
-const scaleMat = (color: number, rough = 0.55) =>
-  new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.25, flatShading: true });
+// Materyaller modül düzeyinde paylaşılıyor: her parça için yeni materyal
+// üretmek gereksiz uniform yüklemesi ve shader varyantı demek.
+// userData.shared, sahne yıkılırken bunların dispose edilmemesini sağlar.
+const shared = <T extends THREE.Material>(m: T): T => {
+  m.userData["shared"] = true;
+  return m;
+};
 
-function magmaMat() {
-  return new THREE.MeshStandardMaterial({
+const scaleCache = new Map<string, THREE.MeshStandardMaterial>();
+const scaleMat = (color: number, rough = 0.55) => {
+  const key = `${color}:${rough}`;
+  let m = scaleCache.get(key);
+  if (!m) {
+    m = shared(
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness: rough,
+        metalness: 0.25,
+        flatShading: true,
+      }),
+    );
+    scaleCache.set(key, m);
+  }
+  return m;
+};
+
+const magma = shared(
+  new THREE.MeshStandardMaterial({
     color: 0x2a0f08,
     emissive: 0xff5a12,
     emissiveIntensity: 2.2,
     roughness: 0.4,
-  });
-}
+  }),
+);
+const eyeMat = shared(
+  new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffb347, emissiveIntensity: 3 }),
+);
+const membraneMat = shared(
+  new THREE.MeshStandardMaterial({
+    color: 0x4a1710,
+    emissive: 0x3a0a04,
+    emissiveIntensity: 0.6,
+    roughness: 0.75,
+    side: THREE.DoubleSide,
+  }),
+);
 
 function spikes(parent: THREE.Object3D, count: number, from: number, to: number, size: number) {
   const mat = scaleMat(0x1b1210, 0.8);
@@ -31,12 +66,13 @@ function spikes(parent: THREE.Object3D, count: number, from: number, to: number,
     const s = size * (0.5 + Math.sin(t * Math.PI) * 0.8);
     const spike = new THREE.Mesh(new THREE.ConeGeometry(s * 0.35, s * 1.6, 4), mat);
     spike.position.set(0, 0.55 * s + 0.6, THREE.MathUtils.lerp(from, to, t));
-    spike.castShadow = true;
     parent.add(spike);
   }
 }
 
 export function createDragon(): DragonRig {
+  /** Yalnız bu mesh'ler gölge döker (bkz. aşağıdaki traverse). */
+  const casters = new Set<THREE.Mesh>();
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
@@ -47,7 +83,7 @@ export function createDragon(): DragonRig {
   // torso
   const torso = new THREE.Mesh(new THREE.SphereGeometry(1.5, 18, 14), hide);
   torso.scale.set(1.0, 0.95, 2.0);
-  torso.castShadow = true;
+  casters.add(torso);
   body.add(torso);
 
   const chest = new THREE.Mesh(new THREE.SphereGeometry(1.25, 16, 12), belly);
@@ -57,7 +93,7 @@ export function createDragon(): DragonRig {
 
   // magma veins along back
   for (let i = 0; i < 7; i++) {
-    const vein = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), magmaMat());
+    const vein = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), magma);
     vein.position.set(Math.sin(i) * 0.25, 1.15 - i * 0.03, 1.6 - i * 0.55);
     body.add(vein);
   }
@@ -71,7 +107,7 @@ export function createDragon(): DragonRig {
     seg.position.set(0, i === 0 ? 0.35 : 0.12, i === 0 ? 2.1 : 0.85);
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.78 - i * 0.1, 14, 10), hide);
     m.scale.set(1, 0.95, 1.35);
-    m.castShadow = true;
+    casters.add(m);
     seg.add(m);
     attach.add(seg);
     neck.push(seg);
@@ -83,7 +119,7 @@ export function createDragon(): DragonRig {
   attach.add(head);
 
   const skull = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.72, 1.5), hide);
-  skull.castShadow = true;
+  casters.add(skull);
   head.add(skull);
   const snout = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.42, 0.9), hide);
   snout.position.set(0, -0.08, 1.05);
@@ -93,12 +129,20 @@ export function createDragon(): DragonRig {
   jaw.position.set(0, -0.32, 0.95);
   head.add(jaw);
 
-  const maw = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 10), magmaMat());
+  // Ağız parlaklığı her karede değiştiği için bu materyal ejderhaya özel.
+  const maw = new THREE.Mesh(
+    new THREE.SphereGeometry(0.3, 10, 10),
+    new THREE.MeshStandardMaterial({
+      color: 0x2a0f08,
+      emissive: 0xff5a12,
+      emissiveIntensity: 2.2,
+      roughness: 0.4,
+    }),
+  );
   maw.position.set(0, -0.1, 1.5);
   maw.scale.setScalar(0.6);
   head.add(maw);
 
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffb347, emissiveIntensity: 3 });
   for (const s of [-1, 1]) {
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), eyeMat);
     eye.position.set(0.3 * s, 0.16, 0.45);
@@ -114,14 +158,6 @@ export function createDragon(): DragonRig {
   head.add(glow);
 
   // wings
-  const membraneMat = new THREE.MeshStandardMaterial({
-    color: 0x4a1710,
-    emissive: 0x3a0a04,
-    emissiveIntensity: 0.6,
-    roughness: 0.75,
-    side: THREE.DoubleSide,
-  });
-
   const makeWing = (side: 1 | -1) => {
     const g = new THREE.Group();
     g.position.set(1.0 * side, 0.55, 0.25);
@@ -140,7 +176,11 @@ export function createDragon(): DragonRig {
       const f = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, len, 4, 6), boneMat);
       f.rotation.z = Math.PI / 2;
       f.rotation.y = -(0.35 + i * 0.42) * side;
-      f.position.set((len / 2) * side * Math.cos(0.35 + i * 0.42), 0, -(len / 2) * Math.sin(0.35 + i * 0.42));
+      f.position.set(
+        (len / 2) * side * Math.cos(0.35 + i * 0.42),
+        0,
+        -(len / 2) * Math.sin(0.35 + i * 0.42),
+      );
       fingers.add(f);
     }
 
@@ -152,7 +192,7 @@ export function createDragon(): DragonRig {
     const web = new THREE.Mesh(new THREE.ShapeGeometry(shape, 12), membraneMat);
     web.rotation.x = -Math.PI / 2;
     web.scale.x = side;
-    web.castShadow = true;
+    casters.add(web);
     g.add(web);
     return g;
   };
@@ -182,7 +222,7 @@ export function createDragon(): DragonRig {
     const r = 0.62 - i * 0.065;
     const m = new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.08, r), 10, 8), hide);
     m.scale.set(1, 1, 1.4);
-    m.castShadow = true;
+    if (i < 4) casters.add(m);
     seg.add(m);
     if (i % 2 === 0) {
       const fin = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.6, 4), scaleMat(0x1b1210, 0.8));
@@ -193,16 +233,19 @@ export function createDragon(): DragonRig {
     tail.push(seg);
     tAttach = seg;
   }
-  const barb = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.2, 5), magmaMat());
+  const barb = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.2, 5), magma);
   barb.rotation.x = -Math.PI / 2;
   barb.position.set(0, 0, -0.6);
   tAttach.add(barb);
 
+  // Gölge geçişi sahnenin ikinci kez çizilmesi demek. Ejderhanın ~50 küçük
+  // parçasının hepsini gölge dökücü yapmak yerine yalnız siluete katkısı olan
+  // büyük parçaları işaretliyoruz.
   root.traverse((o) => {
-    if ((o as THREE.Mesh).isMesh) {
-      o.castShadow = true;
-      o.receiveShadow = false;
-    }
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    m.castShadow = casters.has(m);
+    m.receiveShadow = false;
   });
 
   return { root, body, wingL, wingR, tail, neck, jaw, glow, maw };
