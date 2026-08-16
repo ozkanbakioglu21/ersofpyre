@@ -14,10 +14,17 @@ export type QualityPreset = {
 
 export const ASH_MAX = 2600;
 
+/**
+ * Sahnedeki ateş ışığı sayısı SABİT tutulur. Three.js, sahnedeki görünür ışık
+ * sayısı değiştiğinde tüm materyallerin shader'ını yeniden derler; bu da oyun
+ * ortasında donmalara yol açar. Bu yüzden havuz boyutu kaliteye göre değişmez.
+ */
+export const FIRE_LIGHTS = 6;
+
 export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
   low: {
     label: "Düşük",
-    ashCount: 600,
+    ashCount: 500,
     ashSize: 1.8,
     ashOpacity: 0.4,
     fogDensity: 0.0046,
@@ -27,11 +34,11 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
   },
   medium: {
     label: "Orta",
-    ashCount: 1400,
+    ashCount: 1100,
     ashSize: 1.4,
     ashOpacity: 0.5,
     fogDensity: 0.0038,
-    pixelRatio: 1.5,
+    pixelRatio: 1.25,
     shadows: true,
     shadowMapSize: 1024,
   },
@@ -41,7 +48,7 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     ashSize: 1.2,
     ashOpacity: 0.55,
     fogDensity: 0.0032,
-    pixelRatio: 2,
+    pixelRatio: 1.75,
     shadows: true,
     shadowMapSize: 2048,
   },
