@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { createDragon } from "./pyre3d/dragon";
-import { createAirship, createAsh, createStructure, createTerrain, type Airship, type Structure } from "./pyre3d/world";
+import {
+  createAirship,
+  createAsh,
+  createStructure,
+  createTerrain,
+  type Airship,
+  type Structure,
+} from "./pyre3d/world";
 import {
   ASH_MAX,
   QUALITY_PRESETS,
@@ -25,6 +32,8 @@ export type GameStats = {
 };
 
 const WORLD = 900;
+const FLIGHT_Y = 85;
+const FWD = new THREE.Vector3(0, 0, 1);
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 type Ctrl = {
@@ -70,7 +79,10 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
 
     let preset = QUALITY_PRESETS[settingsRef.current.quality];
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, preset.pixelRatio));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
     renderer.shadowMap.enabled = preset.shadows;
@@ -84,7 +96,12 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     const fog = new THREE.FogExp2(0x2a1a14, preset.fogDensity);
     scene.fog = fog;
 
-    const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.5, 2400);
+    const camera = new THREE.PerspectiveCamera(
+      66,
+      mount.clientWidth / mount.clientHeight,
+      0.5,
+      2400,
+    );
 
     scene.add(new THREE.HemisphereLight(0x50301f, 0x120a07, 0.7));
     const fill = new THREE.PointLight(0xffa860, 2.2, 120, 2);
@@ -182,7 +199,13 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     flame.position.set(0, 0, 26);
     const flameCore = new THREE.Mesh(
       new THREE.ConeGeometry(2.6, 40, 12, 1, true),
-      new THREE.MeshBasicMaterial({ color: 0xffe8a8, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
+      new THREE.MeshBasicMaterial({
+        color: 0xffe8a8,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
     );
     flameCore.rotation.x = Math.PI / 2;
     flameCore.position.set(0, 0, 22);
@@ -273,7 +296,8 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     const keys: Record<string, boolean> = {};
     const kd = (e: KeyboardEvent) => {
       keys[e.code] = true;
-      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code))
+        e.preventDefault();
     };
     const ku = (e: KeyboardEvent) => {
       keys[e.code] = false;
@@ -289,13 +313,13 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     };
     window.addEventListener("resize", resize);
 
-    const fwd = new THREE.Vector3();
+    const fwd = FWD.clone();
     const headPos = new THREE.Vector3();
     const tmp = new THREE.Vector3();
     const camPos = new THREE.Vector3();
     const camGoal = new THREE.Vector3();
     const lookGoal = new THREE.Vector3();
-    camera.position.set(0, 100, 260);
+    camera.position.set(0, 104, 180);
 
     let last = performance.now();
     let raf = 0;
@@ -318,41 +342,34 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         fpsT = 0;
       }
       const c = ctrl.current;
-      const kx = (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0) - (keys["KeyA"] || keys["ArrowLeft"] ? 1 : 0);
-      const ky = (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) - (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0);
+      const kx =
+        (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0) - (keys["KeyA"] || keys["ArrowLeft"] ? 1 : 0);
+      const ky =
+        (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) - (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0);
       const inX = Math.abs(c.x) > 0.05 ? c.x : kx;
       const inY = Math.abs(c.y) > 0.05 ? c.y : ky;
-      const firing = (c.fire || !!keys["Space"]) && state.overheat <= 0 && state.status === "playing";
+      const firing =
+        (c.fire || !!keys["Space"]) && state.overheat <= 0 && state.status === "playing";
 
       if (state.status === "playing") {
-        // ---- flight ----
-        const yaw = -inX * 1.5 * dt;
-        const pitch = -inY * 1.15 * dt;
-        dragon.root.rotateY(yaw);
-        dragon.root.rotateX(pitch);
-        // roll visual banking
-        const bank = -inX * 0.75;
-        dragon.body.rotation.z += (bank - dragon.body.rotation.z) * Math.min(1, dt * 5);
-
-        // keep upright-ish (kill accumulated z on root)
-        const e = new THREE.Euler().setFromQuaternion(dragon.root.quaternion, "YXZ");
-        e.z *= 0.9;
-        e.x = THREE.MathUtils.clamp(e.x, -1.15, 1.15);
-        dragon.root.quaternion.setFromEuler(e);
-
+        // ---- flight (2.5D: fixed facing, plane movement) ----
         const boosting = (c.boost || !!keys["ShiftRight"]) && state.stamina > 0;
         const target = boosting ? 118 : 62;
         state.speed += (target - state.speed) * Math.min(1, dt * 1.6);
         if (boosting) state.stamina = Math.max(0, state.stamina - 16 * dt);
         else state.stamina = Math.min(100, state.stamina + 11 * dt);
 
-        dragon.root.getWorldDirection(fwd);
-        dragon.root.position.addScaledVector(fwd, state.speed * dt);
-        dragon.root.position.y = THREE.MathUtils.clamp(dragon.root.position.y, 14, 320);
+        // screen-space plane movement: right = +X, up/forward = +Z
+        dragon.root.position.x += inX * state.speed * dt;
+        dragon.root.position.z -= inY * state.speed * dt;
+        dragon.root.position.y = FLIGHT_Y;
+        // strafe banking for juice
+        const bank = -inX * 0.6;
+        dragon.body.rotation.z += (bank - dragon.body.rotation.z) * Math.min(1, dt * 5);
+
         const rr = Math.hypot(dragon.root.position.x, dragon.root.position.z);
         if (rr > WORLD) {
           dragon.root.position.multiplyScalar(WORLD / rr);
-          dragon.root.position.y = Math.max(14, dragon.root.position.y);
         }
 
         // wing flap
@@ -372,19 +389,7 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         });
         dragon.jaw.rotation.x = firing ? 0.45 : 0.06;
 
-        // ---- barrel roll ----
-        state.rollCd = Math.max(0, state.rollCd - dt);
-        if ((c.roll || keys["ShiftLeft"]) && state.rollCd <= 0 && state.stamina > 14) {
-          state.rollCd = 1.7;
-          state.rollT = 0.7;
-          state.invuln = 0.75;
-          state.stamina -= 14;
-          burst(dragon.root.position, 26, 10);
-        }
-        if (state.rollT > 0) {
-          state.rollT -= dt;
-          dragon.body.rotation.z += Math.PI * 2 * (dt / 0.7);
-        }
+        // ---- barrel roll removed in 2.5D ----
         state.invuln = Math.max(0, state.invuln - dt);
 
         // ---- shockwave ----
@@ -419,7 +424,6 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
           flame.scale.set(1 + Math.random() * 0.12, 1, 1 + Math.random() * 0.12);
           burst(headPos, 3, 5);
 
-          dragon.root.getWorldDirection(fwd);
           const hit = (p: THREE.Vector3, extra: number) => {
             tmp.copy(p).sub(headPos);
             const dist = tmp.length();
@@ -445,7 +449,8 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
           flameMat.opacity += (0 - flameMat.opacity) * Math.min(1, dt * 10);
           (flameCore.material as THREE.MeshBasicMaterial).opacity *= 0.85;
         }
-        (dragon.maw.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.5 + state.heat * 0.06;
+        (dragon.maw.material as THREE.MeshStandardMaterial).emissiveIntensity =
+          1.5 + state.heat * 0.06;
 
         // ---- structures burn / destroy / towers ----
         for (const s of structures) {
@@ -454,7 +459,11 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
             s.hp -= s.burn * 16 * dt;
             s.fireLight.intensity = 20 + s.burn * 55 + Math.sin(now * 0.01 + s.pos.x) * 10;
             if (Math.random() < s.burn * 0.7) {
-              tmp.set(s.pos.x + rand(-s.radius, s.radius), rand(2, 12), s.pos.z + rand(-s.radius, s.radius));
+              tmp.set(
+                s.pos.x + rand(-s.radius, s.radius),
+                rand(2, 12),
+                s.pos.z + rand(-s.radius, s.radius),
+              );
               burst(tmp, 1, 3);
             }
             if (Math.random() < 0.4 * dt) {
@@ -482,7 +491,11 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
               s.cool = 2.2;
               const m = new THREE.Mesh(shotGeo, shotMat);
               m.position.copy(s.pos).setY(s.pos.y + 22);
-              const v = tmp.copy(dragon.root.position).sub(m.position).normalize().multiplyScalar(85);
+              const v = tmp
+                .copy(dragon.root.position)
+                .sub(m.position)
+                .normalize()
+                .multiplyScalar(85);
               scene.add(m);
               shots.push({ mesh: m, vel: v.clone(), life: 6 });
             }
@@ -508,7 +521,11 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
             z.cool = 1.6;
             const m = new THREE.Mesh(shotGeo, shotMat);
             m.position.copy(z.group.position).setY(z.group.position.y - 6);
-            const v = tmp.copy(dragon.root.position).sub(m.position).normalize().multiplyScalar(100);
+            const v = tmp
+              .copy(dragon.root.position)
+              .sub(m.position)
+              .normalize()
+              .multiplyScalar(100);
             scene.add(m);
             shots.push({ mesh: m, vel: v.clone(), life: 6 });
           }
@@ -579,14 +596,17 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
       sun.target.position.copy(dragon.root.position);
       sky.position.copy(dragon.root.position);
 
-      // ---- TPS camera ----
-      const back = state.status === "playing" ? 30 + state.speed * 0.16 : 34;
+      // ---- fixed 2.5D camera (behind-above, locked orientation) ----
+      const back = state.status === "playing" ? 34 + state.speed * 0.16 : 40;
       fill.position.copy(camera.position);
-      camGoal.set(0, 11, -back).applyQuaternion(dragon.root.quaternion).add(dragon.root.position);
-      camGoal.y = Math.max(6, camGoal.y);
+      camGoal.set(0, 14, -back).add(dragon.root.position);
+      camGoal.y = Math.max(10, camGoal.y);
       camPos.copy(camera.position).lerp(camGoal, Math.min(1, dt * 4.2));
       camera.position.copy(camPos);
-      lookGoal.copy(dragon.root.position).addScaledVector(fwd, 26).add(new THREE.Vector3(0, 3, 0));
+      lookGoal
+        .copy(dragon.root.position)
+        .addScaledVector(fwd, 26)
+        .add(new THREE.Vector3(0, 3, 0));
       camera.lookAt(lookGoal);
 
       renderer.render(scene, camera);
@@ -681,19 +701,28 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         <div className="flex items-center gap-2">
           <span className="w-8 text-[10px] uppercase tracking-widest text-foreground/70">HP</span>
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-background/50 backdrop-blur">
-            <div className="h-full rounded-full bg-destructive transition-all" style={{ width: pct(s?.hp ?? 100) }} />
+            <div
+              className="h-full rounded-full bg-destructive transition-all"
+              style={{ width: pct(s?.hp ?? 100) }}
+            />
           </div>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-8 text-[10px] uppercase tracking-widest text-foreground/70">STM</span>
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-background/50 backdrop-blur">
-            <div className="h-full rounded-full bg-accent transition-all" style={{ width: pct(s?.stamina ?? 100) }} />
+            <div
+              className="h-full rounded-full bg-accent transition-all"
+              style={{ width: pct(s?.stamina ?? 100) }}
+            />
           </div>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-8 text-[10px] uppercase tracking-widest text-foreground/70">HEAT</span>
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-background/50 backdrop-blur">
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: pct(s?.heat ?? 0) }} />
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{ width: pct(s?.heat ?? 0) }}
+            />
           </div>
         </div>
       </div>
@@ -719,7 +748,9 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         {showSettings && (
           <div className="w-44 space-y-3 rounded-lg border border-foreground/20 bg-background/80 p-3 backdrop-blur">
             <div>
-              <p className="mb-1 text-[9px] uppercase tracking-widest text-muted-foreground">Grafik Kalitesi</p>
+              <p className="mb-1 text-[9px] uppercase tracking-widest text-muted-foreground">
+                Grafik Kalitesi
+              </p>
               <div className="flex gap-1">
                 {(["low", "medium", "high"] as QualityLevel[]).map((q) => (
                   <button
@@ -740,7 +771,9 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
               </div>
             </div>
             <div>
-              <p className="mb-1 text-[9px] uppercase tracking-widest text-muted-foreground">FPS Hedefi</p>
+              <p className="mb-1 text-[9px] uppercase tracking-widest text-muted-foreground">
+                FPS Hedefi
+              </p>
               <div className="flex gap-1">
                 {([30, 60, 0] as FpsTarget[]).map((f) => (
                   <button
@@ -787,20 +820,12 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
 
       {/* Action buttons */}
       <div className="absolute bottom-8 right-6 flex items-end gap-3">
-        <div className="flex flex-col gap-3">
-          <button
-            {...hold("shock")}
-            className="h-16 w-16 touch-none rounded-full border border-accent/50 bg-accent/15 text-[10px] font-bold uppercase tracking-widest text-accent backdrop-blur active:bg-accent/40"
-          >
-            Şok
-          </button>
-          <button
-            {...hold("roll")}
-            className="h-16 w-16 touch-none rounded-full border border-foreground/30 bg-foreground/10 text-[10px] font-bold uppercase tracking-widest text-foreground backdrop-blur active:bg-foreground/25"
-          >
-            Roll
-          </button>
-        </div>
+        <button
+          {...hold("shock")}
+          className="h-16 w-16 touch-none rounded-full border border-accent/50 bg-accent/15 text-[10px] font-bold uppercase tracking-widest text-accent backdrop-blur active:bg-accent/40"
+        >
+          Şok
+        </button>
         <button
           {...hold("fire")}
           className="h-24 w-24 touch-none rounded-full border-2 border-primary/70 bg-primary/25 text-xs font-black uppercase tracking-widest text-primary backdrop-blur active:bg-primary/50"
