@@ -34,6 +34,7 @@ export type GameStats = {
 const WORLD = 900;
 const FWD = new THREE.Vector3(0, 0, 1);
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+const burnColor = new THREE.Color(0x1a0c06);
 
 type Ctrl = {
   x: number;
@@ -185,21 +186,31 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     dragon.root.position.set(0, 90, 220);
     scene.add(dragon.root);
 
-    // flame breath
+    // flame breath (layered cones + particle jet)
     const flameMat = new THREE.MeshBasicMaterial({
-      color: 0xff8a1e,
+      color: 0xff7a1a,
       transparent: true,
       opacity: 0,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
-    const flame = new THREE.Mesh(new THREE.ConeGeometry(7, 46, 14, 1, true), flameMat);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(6.5, 48, 14, 1, true), flameMat);
     flame.rotation.x = Math.PI / 2;
     flame.position.set(0, 0, 26);
+    const flameMidMat = new THREE.MeshBasicMaterial({
+      color: 0xffc83c,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const flameMid = new THREE.Mesh(new THREE.ConeGeometry(3.8, 44, 12, 1, true), flameMidMat);
+    flameMid.rotation.x = Math.PI / 2;
+    flameMid.position.set(0, 0, 22);
     const flameCore = new THREE.Mesh(
-      new THREE.ConeGeometry(2.6, 40, 12, 1, true),
+      new THREE.ConeGeometry(1.7, 38, 10, 1, true),
       new THREE.MeshBasicMaterial({
-        color: 0xffe8a8,
+        color: 0xfff6d0,
         transparent: true,
         opacity: 0,
         depthWrite: false,
@@ -207,10 +218,13 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
       }),
     );
     flameCore.rotation.x = Math.PI / 2;
-    flameCore.position.set(0, 0, 22);
+    flameCore.position.set(0, 0, 19);
     const flameRig = new THREE.Group();
-    flameRig.add(flame, flameCore);
+    flameRig.add(flame, flameMid, flameCore);
     dragon.root.add(flameRig);
+    const flameLight = new THREE.PointLight(0xff7a1a, 0, 55, 2);
+    flameLight.position.set(0, 0.4, 3);
+    dragon.root.add(flameLight);
 
     // shockwave ring
     const shockMat = new THREE.MeshBasicMaterial({
@@ -262,6 +276,58 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     for (let i = 0; i < EM; i++) {
       emLife[i] = 0;
       emPos[i * 3 + 1] = -9999;
+    }
+
+    // fire jet particle pool (per-vertex gradient for realistic color fade)
+    const FM = 340;
+    const fpPos = new Float32Array(FM * 3);
+    const fpCol = new Float32Array(FM * 3);
+    const fpVel = new Float32Array(FM * 3);
+    const fpLife = new Float32Array(FM);
+    const fpMax = new Float32Array(FM);
+    const fpGeo = new THREE.BufferGeometry();
+    fpGeo.setAttribute("position", new THREE.BufferAttribute(fpPos, 3));
+    fpGeo.setAttribute("color", new THREE.BufferAttribute(fpCol, 3));
+    const flamePts = new THREE.Points(
+      fpGeo,
+      new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 3.4,
+        transparent: true,
+        opacity: 0.9,
+        vertexColors: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    scene.add(flamePts);
+    let fpIdx = 0;
+    const fpA = new THREE.Color(0xfff6d0);
+    const fpB = new THREE.Color(0xffc83c);
+    const fpC = new THREE.Color(0xff6a1a);
+    const fpD = new THREE.Color(0x5a1200);
+    const fpColTmp = new THREE.Color();
+    const spawnFlame = (p: THREE.Vector3, n: number) => {
+      for (let i = 0; i < n; i++) {
+        const i3 = fpIdx * 3;
+        fpPos[i3] = p.x + rand(-0.7, 0.7);
+        fpPos[i3 + 1] = p.y + rand(-0.7, 0.7);
+        fpPos[i3 + 2] = p.z + rand(-0.7, 0.7);
+        fpVel[i3] = rand(-4, 4);
+        fpVel[i3 + 1] = rand(3, 12);
+        fpVel[i3 + 2] = rand(52, 96);
+        const life = rand(0.35, 0.85);
+        fpLife[fpIdx] = life;
+        fpMax[fpIdx] = life;
+        fpCol[i3] = fpA.r;
+        fpCol[i3 + 1] = fpA.g;
+        fpCol[i3 + 2] = fpA.b;
+        fpIdx = (fpIdx + 1) % FM;
+      }
+    };
+    for (let i = 0; i < FM; i++) {
+      fpLife[i] = 0;
+      fpPos[i * 3 + 1] = -9999;
     }
 
     // enemy projectiles
@@ -424,9 +490,20 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
           state.heat = Math.min(100, state.heat + 30 * dt);
           if (state.heat >= 100) state.overheat = 3.2;
           dragon.glow.intensity = 26 + Math.sin(now * 0.03) * 8;
-          flameMat.opacity = 0.5 + Math.random() * 0.25;
-          (flameCore.material as THREE.MeshBasicMaterial).opacity = 0.7;
-          flame.scale.set(1 + Math.random() * 0.12, 1, 1 + Math.random() * 0.12);
+          flameLight.intensity = 22 + Math.random() * 24;
+          // layered flicker
+          const len = 0.9 + Math.random() * 0.22 + Math.sin(now * 0.05) * 0.05;
+          flameMat.opacity = 0.42 + Math.random() * 0.18;
+          flameMidMat.opacity = 0.6 + Math.random() * 0.2;
+          (flameCore.material as THREE.MeshBasicMaterial).opacity = 0.7 + Math.random() * 0.2;
+          flame.scale.set(1 + Math.random() * 0.16, 1, len);
+          flameMid.scale.set(1 + Math.random() * 0.1, 1, len * (0.8 + Math.random() * 0.2));
+          flameCore.scale.set(1 + Math.random() * 0.08, 1, len * 0.72);
+          flame.rotation.z = rand(-0.05, 0.05);
+          flameMid.rotation.z = rand(-0.04, 0.04);
+          flameCore.rotation.z = rand(-0.03, 0.03);
+          // particle jet streaming from the mouth
+          spawnFlame(headPos, 7);
           burst(headPos, 3, 5);
 
           const hit = (p: THREE.Vector3, extra: number) => {
@@ -446,12 +523,17 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
           }
           for (const z of airships) {
             if (z.dead) continue;
-            if (hit(z.pos, 12)) z.hp -= 95 * dt;
+            if (hit(z.pos, 12)) {
+              z.hp -= 95 * dt;
+              z.burn = Math.min(1, z.burn + 2 * dt);
+            }
           }
         } else {
           state.heat = Math.max(0, state.heat - 24 * dt);
           dragon.glow.intensity += (0 - dragon.glow.intensity) * Math.min(1, dt * 6);
+          flameLight.intensity += (0 - flameLight.intensity) * Math.min(1, dt * 10);
           flameMat.opacity += (0 - flameMat.opacity) * Math.min(1, dt * 10);
+          flameMidMat.opacity += (0 - flameMidMat.opacity) * Math.min(1, dt * 10);
           (flameCore.material as THREE.MeshBasicMaterial).opacity *= 0.85;
         }
         (dragon.maw.material as THREE.MeshStandardMaterial).emissiveIntensity =
@@ -513,16 +595,43 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         // ---- airships ----
         for (const z of airships) {
           if (z.dead) continue;
-          z.group.position.addScaledVector(z.dir, 12 * dt);
-          z.group.position.y += Math.sin(now * 0.0004 + z.group.position.x) * 4 * dt;
-          if (Math.hypot(z.group.position.x, z.group.position.z) > WORLD * 0.85) {
-            z.dir.set(-z.group.position.x, 0, -z.group.position.z).normalize();
+          if (z.burn > 0) {
+            z.hp -= z.burn * 30 * dt;
+            z.fireLight.intensity =
+              25 + z.burn * 45 + Math.sin(now * 0.012 + z.group.position.x) * 12;
+            z.hullMat.color.copy(z.hullColor).lerp(burnColor, Math.min(1, z.burn * 1.4));
+            z.hullMat.emissive.set(0xff4000);
+            z.hullMat.emissiveIntensity = z.burn * 1.8 + Math.random() * 0.5;
+            if (Math.random() < z.burn * 0.55) {
+              tmp.set(
+                z.group.position.x + rand(-5, 5),
+                z.group.position.y + rand(0, 9),
+                z.group.position.z + rand(-5, 5),
+              );
+              burst(tmp, 1, 5);
+            }
+            // yanınca alçalır
+            z.group.position.y -= z.burn * 7 * dt;
+          } else {
+            z.fireLight.intensity *= 0.85;
+            z.hullMat.emissiveIntensity *= 0.85;
           }
-          z.group.lookAt(z.group.position.clone().add(z.dir));
-          z.group.rotateY(Math.PI);
+          z.group.position.y += Math.sin(now * 0.0004 + z.group.position.x) * 4 * dt;
+          if (z.burn < 0.3) {
+            z.group.position.addScaledVector(z.dir, 12 * dt);
+            if (Math.hypot(z.group.position.x, z.group.position.z) > WORLD * 0.85) {
+              z.dir.set(-z.group.position.x, 0, -z.group.position.z).normalize();
+            }
+            z.group.lookAt(z.group.position.clone().add(z.dir));
+            z.group.rotateY(Math.PI);
+          }
           z.props.forEach((p) => (p.rotation.z += dt * 9));
           z.cool -= dt;
-          if (z.cool <= 0 && z.group.position.distanceTo(dragon.root.position) < 400) {
+          if (
+            z.burn < 0.15 &&
+            z.cool <= 0 &&
+            z.group.position.distanceTo(dragon.root.position) < 400
+          ) {
             z.cool = 1.6;
             const m = new THREE.Mesh(shotGeo, shotMat);
             m.position.copy(z.group.position).setY(z.group.position.y - 6);
@@ -537,6 +646,7 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
           if (z.hp <= 0) {
             z.dead = true;
             z.group.visible = false;
+            z.fireLight.intensity = 0;
             state.destroyed++;
             state.comboT = 5;
             state.combo = Math.min(5, state.combo + 1);
@@ -591,6 +701,32 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         if (emLife[i]! <= 0) emPos[i3 + 1] = -9999;
       }
       (emGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
+
+      // fire jet particles update (rise, turbulence, color fade)
+      for (let i = 0; i < FM; i++) {
+        if (fpLife[i]! <= 0) continue;
+        fpLife[i] = fpLife[i]! - dt;
+        const i3 = i * 3;
+        fpVel[i3 + 1] = fpVel[i3 + 1]! + 14 * dt;
+        const drag = Math.max(0, 1 - 1.2 * dt);
+        fpVel[i3] = fpVel[i3]! * drag;
+        fpVel[i3 + 1] = fpVel[i3 + 1]! * drag;
+        fpVel[i3 + 2] = fpVel[i3 + 2]! * drag;
+        fpVel[i3] = fpVel[i3]! + Math.sin(now * 0.02 + i) * 10 * dt;
+        fpPos[i3] = fpPos[i3]! + fpVel[i3]! * dt;
+        fpPos[i3 + 1] = fpPos[i3 + 1]! + fpVel[i3 + 1]! * dt;
+        fpPos[i3 + 2] = fpPos[i3 + 2]! + fpVel[i3 + 2]! * dt;
+        const age = 1 - Math.max(0, fpLife[i]!) / Math.max(1e-5, fpMax[i]!);
+        if (age < 0.25) fpColTmp.lerpColors(fpA, fpB, age / 0.25);
+        else if (age < 0.6) fpColTmp.lerpColors(fpB, fpC, (age - 0.25) / 0.35);
+        else fpColTmp.lerpColors(fpC, fpD, Math.min(1, (age - 0.6) / 0.4));
+        fpCol[i3] = fpColTmp.r;
+        fpCol[i3 + 1] = fpColTmp.g;
+        fpCol[i3 + 2] = fpColTmp.b;
+        if (fpLife[i]! <= 0) fpPos[i3 + 1] = -9999;
+      }
+      (fpGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
+      (fpGeo.attributes["color"] as THREE.BufferAttribute).needsUpdate = true;
 
       // ash drift follows dragon
       ash.position.x = dragon.root.position.x;

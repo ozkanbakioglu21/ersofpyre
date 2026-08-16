@@ -21,7 +21,11 @@ export type Airship = {
   maxHp: number;
   cool: number;
   dead: boolean;
+  burn: number;
   props: THREE.Object3D[];
+  hullMat: THREE.MeshStandardMaterial;
+  hullColor: THREE.Color;
+  fireLight: THREE.PointLight;
 };
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -65,7 +69,10 @@ export function createStructure(kind: Structure["kind"], x: number, z: number): 
     const base = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), stone(0x4a3527));
     base.position.y = h / 2;
     group.add(base);
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.8, 2.6, 4), stone(0x2c1c14));
+    const roof = new THREE.Mesh(
+      new THREE.ConeGeometry(Math.max(w, d) * 0.8, 2.6, 4),
+      stone(0x2c1c14),
+    );
     roof.position.y = h + 1.3;
     roof.rotation.y = Math.PI / 4;
     group.add(roof);
@@ -83,12 +90,23 @@ export function createStructure(kind: Structure["kind"], x: number, z: number): 
     base.position.y = h / 2;
     group.add(base);
     for (let i = 0; i < 3; i++) {
-      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.2, rand(6, 11), 10), stone(0x2b241e, 0.9));
-      st.position.set(-w / 3 + i * (w / 3), h + (st.geometry as THREE.CylinderGeometry).parameters.height / 2, rand(-d / 4, d / 4));
+      const st = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.9, 1.2, rand(6, 11), 10),
+        stone(0x2b241e, 0.9),
+      );
+      st.position.set(
+        -w / 3 + i * (w / 3),
+        h + (st.geometry as THREE.CylinderGeometry).parameters.height / 2,
+        rand(-d / 4, d / 4),
+      );
       group.add(st);
       const ring = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.14, 6, 14), brass);
       ring.rotation.x = Math.PI / 2;
-      ring.position.set(st.position.x, st.position.y + (st.geometry as THREE.CylinderGeometry).parameters.height / 2 - 0.7, st.position.z);
+      ring.position.set(
+        st.position.x,
+        st.position.y + (st.geometry as THREE.CylinderGeometry).parameters.height / 2 - 0.7,
+        st.position.z,
+      );
       group.add(ring);
     }
     const tank = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 5, 14), brass);
@@ -105,12 +123,15 @@ export function createStructure(kind: Structure["kind"], x: number, z: number): 
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 2.2, 2.2, 8), brass);
     cap.position.y = h + 0.8;
     group.add(cap);
-    const coil = new THREE.Mesh(new THREE.SphereGeometry(1.2, 12, 10), new THREE.MeshStandardMaterial({
-      color: 0x0a1a22,
-      emissive: 0x39c6ff,
-      emissiveIntensity: 2.4,
-      roughness: 0.3,
-    }));
+    const coil = new THREE.Mesh(
+      new THREE.SphereGeometry(1.2, 12, 10),
+      new THREE.MeshStandardMaterial({
+        color: 0x0a1a22,
+        emissive: 0x39c6ff,
+        emissiveIntensity: 2.4,
+        roughness: 0.3,
+      }),
+    );
     coil.position.y = h + 2.5;
     group.add(coil);
     radius = 3.4;
@@ -145,7 +166,11 @@ export function createStructure(kind: Structure["kind"], x: number, z: number): 
 export function createAirship(x: number, y: number, z: number): Airship {
   const group = new THREE.Group();
   group.position.set(x, y, z);
-  const hullMat = new THREE.MeshStandardMaterial({ color: 0x5c5145, roughness: 0.7, metalness: 0.35 });
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: 0x5c5145,
+    roughness: 0.7,
+    metalness: 0.35,
+  });
 
   const balloon = new THREE.Mesh(new THREE.SphereGeometry(6, 20, 14), hullMat);
   balloon.scale.set(1, 1, 2.4);
@@ -196,6 +221,10 @@ export function createAirship(x: number, y: number, z: number): Airship {
     if ((o as THREE.Mesh).isMesh) o.castShadow = true;
   });
 
+  const fireLight = new THREE.PointLight(0xff6a1a, 0, 45, 2);
+  fireLight.position.set(0, 2, 0);
+  group.add(fireLight);
+
   return {
     group,
     pos: group.position,
@@ -204,7 +233,11 @@ export function createAirship(x: number, y: number, z: number): Airship {
     maxHp: 320,
     cool: rand(0, 3),
     dead: false,
+    burn: 0,
     props,
+    hullMat,
+    hullColor: hullMat.color.clone(),
+    fireLight,
   };
 }
 
@@ -228,7 +261,11 @@ export function createTerrain(size: number): THREE.Group {
   g.add(ground);
 
   // distant jagged peaks
-  const peakMat = new THREE.MeshStandardMaterial({ color: 0x150e0b, roughness: 1, flatShading: true });
+  const peakMat = new THREE.MeshStandardMaterial({
+    color: 0x150e0b,
+    roughness: 1,
+    flatShading: true,
+  });
   for (let i = 0; i < 40; i++) {
     const a = (i / 40) * Math.PI * 2;
     const r = size * 0.44 + rand(-40, 40);
