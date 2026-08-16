@@ -489,6 +489,21 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
       const lookGoal = new THREE.Vector3();
       camera.position.set(0, 104, 180);
 
+      /**
+       * Düşman mermisi ejderhanın o anki konumuna nişan alıyor. 2.5D
+       * kontrollerde boşta durmak "havada asılı kal" demek olduğu için tam
+       * nişanlı mermi sabit hedefi %100 vuruyordu — kaçış yoktu. Hafif açısal
+       * sapma, yakında isabetli kalırken uzakta ıskalamayı mümkün kılıyor.
+       */
+      const AIM_SPREAD = 0.045;
+      const aimAtDragon = (from: THREE.Vector3, speed: number) => {
+        tmp.copy(dragon.root.position).sub(from).normalize();
+        tmp.x += rand(-AIM_SPREAD, AIM_SPREAD);
+        tmp.y += rand(-AIM_SPREAD, AIM_SPREAD);
+        tmp.z += rand(-AIM_SPREAD, AIM_SPREAD);
+        return tmp.normalize().multiplyScalar(speed).clone();
+      };
+
       let last = performance.now();
       let pushT = 0;
       let frames = 0;
@@ -710,17 +725,14 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
             }
             if (s.kind === "tower" && !s.dead) {
               s.cool -= dt;
-              if (s.cool <= 0 && s.pos.distanceTo(dragon.root.position) < 320) {
-                s.cool = 2.2;
+              // Alev menzili 70; kule 320'den atınca oyuncu karşılık veremeden
+              // tüm yaklaşmayı ateş altında geçiyordu.
+              if (s.cool <= 0 && s.pos.distanceTo(dragon.root.position) < 150) {
+                s.cool = 3;
                 const m = new THREE.Mesh(shotGeo, shotMat);
                 m.position.copy(s.pos).setY(s.pos.y + 22);
-                const v = tmp
-                  .copy(dragon.root.position)
-                  .sub(m.position)
-                  .normalize()
-                  .multiplyScalar(85);
                 scene.add(m);
-                shots.push({ mesh: m, vel: v.clone(), life: 6 });
+                shots.push({ mesh: m, vel: aimAtDragon(m.position, 85), life: 6 });
               }
             }
           }
@@ -764,18 +776,13 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
             if (
               z.burn < 0.15 &&
               z.cool <= 0 &&
-              z.group.position.distanceTo(dragon.root.position) < 400
+              z.group.position.distanceTo(dragon.root.position) < 220
             ) {
               z.cool = 1.6;
               const m = new THREE.Mesh(shotGeo, shotMat);
               m.position.copy(z.group.position).setY(z.group.position.y - 6);
-              const v = tmp
-                .copy(dragon.root.position)
-                .sub(m.position)
-                .normalize()
-                .multiplyScalar(100);
               scene.add(m);
-              shots.push({ mesh: m, vel: v.clone(), life: 6 });
+              shots.push({ mesh: m, vel: aimAtDragon(m.position, 100), life: 6 });
             }
             if (z.hp <= 0) {
               z.dead = true;
