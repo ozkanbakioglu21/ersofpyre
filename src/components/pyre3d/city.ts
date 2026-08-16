@@ -1,0 +1,491 @@
+import * as THREE from "three";
+import { cityMat, lanternMat, streetMat } from "./materials";
+import { mulberry32, type Rng } from "./rng";
+import { buildStructure, FLAMMABILITY } from "./structures";
+import type { Target, TargetKind, TowerKind } from "./types";
+import {
+  bake,
+  bakeTagged,
+  terrainHeight,
+  writeState,
+  type TagRange,
+  type TerrainMod,
+} from "./world";
+
+/**
+ * Kül Şehri.
+ *
+ * Eskiden 78 bina 900 yarıçaplı boş bir dairenin içine rastgele saçılıyordu:
+ * ne bir yer hissi vardı ne de hedefleri bulmanın bir yolu. Onun yerine
+ * halkalı bölge planı kuruyoruz — merkez meydandan sur kapılarına giden
+ * radyal caddeler, halka yolları ve bunların arasında kalan bloklar.
+ *
+ * Üretim tohumlanmış: aynı bölüm her açılışta aynı şehri kurar, "en iyi skor"
+ * adil kalır, hata ayıklama tekrarlanabilir olur.
+ *
+ * Performans sözleşmesi:
+ *  - Binalar BLOK başına tek mesh'e birleştirilir (draw call ~30 × materyal).
+ *  - Yıkım geometriyi değiştirmez: `aState` niteliğine yazılır, shader yaması
+ *    vertex'i klip dışına iter (bkz. materials.ts).
+ *  - Şehir binaları gölge DÖKMEZ; yoğun şehir üzerinde gölge geçişi tek en
+ *    büyük maliyet ve vertex çökertme hilesi ayrıca yamalı bir depth
+ *    materyali gerektirirdi.
+ */
+
+export type District = "core" | "residential" | "market" | "industrial" | "docks";
+
+export type CitySpec = {
+  seed: number;
+  cx: number;
+  cz: number;
+  radius: number;
+  density: "small" | "medium" | "large";
+  wall: boolean;
+  masts: number;
+  elevators: number;
+};
+
+export type CityBlock = {
+  id: number;
+  district: District;
+  center: THREE.Vector3;
+  radius: number;
+  buildings: Target[];
+  alive: number;
+};
+
+export type CityHandle = {
+  group: THREE.Group;
+  blocks: CityBlock[];
+  targets: Target[];
+  spec: CitySpec;
+  /** Cadde/meydan testi — yangının blok atlamasını zorlaştırır. */
+  streetAt(x: number, z: number): boolean;
+  dispose(): void;
+};
+
+const SECTORS = 8;
+const AVENUE_HALF = 9;
+const RING_ROAD_HALF = 7;
+/** Parsel kenarından binaya bırakılan pay. */
+const GUTTER = 1.3;
+
+const DENSITY_DEPTH: Record<CitySpec["density"], number> = { small: 2, medium: 3, large: 4 };
+const DENSITY_MIN_AREA: Record<CitySpec["density"], number> = {
+  small: 320,
+  medium: 150,
+  large: 84,
+};
+
+/** Halka sınırları, yarıçapın oranı olarak. */
+const RINGS = [0.13, 0.3, 0.52, 0.76, 1.0];
+
+const DISTRICT_WEIGHTS: Record<District, Partial<Record<TargetKind, number>>> = {
+  core: { factory: 0.28, workshop: 0.3, tenement: 0.32, warehouse: 0.1 },
+  residential: { tenement: 0.58, house: 0.32, workshop: 0.1 },
+  market: { house: 0.34, workshop: 0.3, tenement: 0.26, warehouse: 0.1 },
+  industrial: { factory: 0.44, workshop: 0.3, warehouse: 0.26 },
+  docks: { warehouse: 0.54, workshop: 0.24, house: 0.22 },
+};
+
+const DISTRICT_SCALE: Record<District, [number, number]> = {
+  core: [1.05, 1.5],
+  residential: [0.85, 1.2],
+  market: [0.7, 1.05],
+  industrial: [0.95, 1.35],
+  docks: [0.7, 1.0],
+};
+
+function districtOf(ring: number, sector: number): District {
+  if (ring === 0) return "core";
+  if (ring === 1) return "residential";
+  if (ring === 2) return "market";
+  return sector >= 2 && sector <= 4 ? "industrial" : sector >= 6 ? "docks" : "residential";
+}
+
+/** Şehrin oturduğu araziyi düzleştiren biçimlendirme. */
+export function cityFlattenMod(spec: CitySpec): TerrainMod {
+  return {
+    t: "flatten",
+    x: spec.cx,
+    z: spec.cz,
+    radius: spec.radius * 1.05,
+    feather: spec.radius * 0.35,
+    // Merkez yüksekliğini araziden alıyoruz ki şehir manzaraya gömülmesin.
+    height: 0,
+  };
+}
+
+type Lot = { r0: number; r1: number; a0: number; a1: number };
+
+function subdivide(lot: Lot, depth: number, minArea: number, rng: Rng, out: Lot[]): void {
+  const rc = (lot.r0 + lot.r1) / 2;
+  const w = rc * (lot.a1 - lot.a0);
+  const d = lot.r1 - lot.r0;
+  if (w <= 0 || d <= 0) return;
+  if (depth <= 0 || w * d < minArea || (w < 9 && d < 9)) {
+    out.push(lot);
+    return;
+  }
+  const t = rng.range(0.36, 0.64);
+  if (w > d) {
+    const am = lot.a0 + (lot.a1 - lot.a0) * t;
+    subdivide({ r0: lot.r0, r1: lot.r1, a0: lot.a0, a1: am }, depth - 1, minArea, rng, out);
+    subdivide({ r0: lot.r0, r1: lot.r1, a0: am, a1: lot.a1 }, depth - 1, minArea, rng, out);
+  } else {
+    const rm = lot.r0 + d * t;
+    subdivide({ r0: lot.r0, r1: rm, a0: lot.a0, a1: lot.a1 }, depth - 1, minArea, rng, out);
+    subdivide({ r0: rm, r1: lot.r1, a0: lot.a0, a1: lot.a1 }, depth - 1, minArea, rng, out);
+  }
+}
+
+/** Kaldırım/cadde kaplaması ve sur — tek mesh'e birleşen dekor. */
+function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
+  const parts = new THREE.Group();
+  const R = spec.radius;
+
+  const plate = new THREE.Mesh(new THREE.CircleGeometry(R * 1.04, 48), streetMat);
+  plate.rotation.x = -Math.PI / 2;
+  plate.position.set(spec.cx, baseY + 0.05, spec.cz);
+  parts.add(plate);
+
+  // Radyal caddeler: havadan şehir planını okutan asıl çizgiler.
+  const paleStreet = cityMat(0x33291f, 1);
+  for (let j = 0; j < SECTORS; j++) {
+    const a = (j / SECTORS) * Math.PI * 2;
+    const len = R * 1.02 - R * RINGS[0]!;
+    const strip = new THREE.Mesh(new THREE.PlaneGeometry(len, AVENUE_HALF * 2), paleStreet);
+    strip.rotation.x = -Math.PI / 2;
+    strip.rotation.z = -a;
+    strip.position.set(
+      spec.cx + Math.cos(a) * (R * RINGS[0]! + len / 2),
+      baseY + 0.12,
+      spec.cz + Math.sin(a) * (R * RINGS[0]! + len / 2),
+    );
+    parts.add(strip);
+  }
+
+  // Halka yolları.
+  for (const f of RINGS) {
+    const rr = R * f;
+    if (rr < 4) continue;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(rr - RING_ROAD_HALF, rr + RING_ROAD_HALF, 48),
+      paleStreet,
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(spec.cx, baseY + 0.1, spec.cz);
+    parts.add(ring);
+  }
+
+  // Kazan Meydanı: merkez, köz damarından beslenen bir ızgara.
+  const plaza = new THREE.Mesh(
+    new THREE.CircleGeometry(R * RINGS[0]! * 0.85, 24),
+    cityMat(0x3a2d20, 1),
+  );
+  plaza.rotation.x = -Math.PI / 2;
+  plaza.position.set(spec.cx, baseY + 0.16, spec.cz);
+  parts.add(plaza);
+  const vent = new THREE.Mesh(new THREE.CircleGeometry(R * RINGS[0]! * 0.3, 18), lanternMat);
+  vent.rotation.x = -Math.PI / 2;
+  vent.position.set(spec.cx, baseY + 0.2, spec.cz);
+  parts.add(vent);
+
+  if (spec.wall) {
+    const wallR = R * 1.06;
+    const wallMat = cityMat(0x2f2820, 1);
+    const seg = 40;
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * Math.PI * 2;
+      // Kapılar caddelerin geldiği yerde: 8 sektör sınırında boşluk bırak.
+      const da = (Math.PI * 2) / SECTORS;
+      const m = ((a % da) + da) % da;
+      if (Math.min(m, da - m) * wallR < AVENUE_HALF + 6) continue;
+      const w = new THREE.Mesh(
+        new THREE.BoxGeometry(2.6, 13, (Math.PI * 2 * wallR) / seg + 1),
+        wallMat,
+      );
+      w.position.set(spec.cx + Math.cos(a) * wallR, baseY + 6.5, spec.cz + Math.sin(a) * wallR);
+      w.rotation.y = -a;
+      parts.add(w);
+      if (i % 5 === 0) {
+        const merlon = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3, 3.6), wallMat);
+        merlon.position.set(
+          spec.cx + Math.cos(a) * wallR,
+          baseY + 14,
+          spec.cz + Math.sin(a) * wallR,
+        );
+        merlon.rotation.y = -a;
+        parts.add(merlon);
+        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 6, 5), lanternMat);
+        lamp.position.set(spec.cx + Math.cos(a) * wallR, baseY + 16, spec.cz + Math.sin(a) * wallR);
+        parts.add(lamp);
+      }
+    }
+    void rng;
+  }
+
+  const g = new THREE.Group();
+  for (const m of bake(parts, { castShadow: false, receiveShadow: true })) g.add(m);
+  return g;
+}
+
+export type StepFn = (pct: number, label: string) => Promise<void>;
+
+export async function createCity(
+  spec: CitySpec,
+  step: StepFn,
+  fromPct: number,
+  toPct: number,
+  isCancelled: () => boolean,
+  nextId: () => number,
+): Promise<CityHandle | null> {
+  const rng = mulberry32(spec.seed);
+  const group = new THREE.Group();
+  const blocks: CityBlock[] = [];
+  const targets: Target[] = [];
+  const R = spec.radius;
+  const baseY = terrainHeight(spec.cx, spec.cz);
+  const maxDepth = DENSITY_DEPTH[spec.density];
+  const minArea = DENSITY_MIN_AREA[spec.density];
+
+  group.add(buildPavement(spec, baseY, rng));
+
+  const da = (Math.PI * 2) / SECTORS;
+  const cells: { ring: number; sector: number }[] = [];
+  for (let ring = 0; ring < RINGS.length - 1; ring++) {
+    for (let sector = 0; sector < SECTORS; sector++) cells.push({ ring, sector });
+  }
+
+  let blockId = 0;
+  const span = toPct - fromPct;
+
+  for (let ci = 0; ci < cells.length; ci++) {
+    const { ring, sector } = cells[ci]!;
+    const district = districtOf(ring, sector);
+    const r0 = R * RINGS[ring]! + RING_ROAD_HALF;
+    const r1 = R * RINGS[ring + 1]! - RING_ROAD_HALF;
+    if (r1 - r0 < 10) continue;
+    // Cadde genişliği açısal değil metrik: iç yarıçapta daha geniş bir açı kaplar.
+    const aPad0 = AVENUE_HALF / Math.max(1, r0);
+    const aPad1 = AVENUE_HALF / Math.max(1, r0);
+    const a0 = sector * da + aPad0;
+    const a1 = (sector + 1) * da - aPad1;
+    if (a1 - a0 <= 0.02) continue;
+
+    const lots: Lot[] = [];
+    subdivide({ r0, r1, a0, a1 }, maxDepth, minArea, rng, lots);
+
+    const blockParts = new THREE.Group();
+    const blockBuildings: Target[] = [];
+    const [sMin, sMax] = DISTRICT_SCALE[district];
+    const weights = DISTRICT_WEIGHTS[district] as Record<TargetKind, number>;
+
+    for (const lot of lots) {
+      const rc = (lot.r0 + lot.r1) / 2;
+      const ac = (lot.a0 + lot.a1) / 2;
+      const lotW = rc * (lot.a1 - lot.a0) - GUTTER * 2;
+      const lotD = lot.r1 - lot.r0 - GUTTER * 2;
+      if (lotW < 3.5 || lotD < 3.5) continue;
+      // Bazı parseller boş kalsın: avlu, yıkıntı, meydan artığı.
+      if (rng.chance(0.08)) continue;
+
+      const kind = rng.weighted(weights);
+      const fit = Math.min(lotW, lotD) / 8;
+      const scale = Math.min(sMax, Math.max(sMin * 0.7, Math.min(fit, sMax)));
+      const spec2 = buildStructure(kind, rng, scale);
+
+      const id = nextId();
+      const x = spec.cx + Math.cos(ac) * rc;
+      const z = spec.cz + Math.sin(ac) * rc;
+      const y = terrainHeight(x, z);
+      spec2.parts.position.set(x, y, z);
+      // Cepheler caddeye baksın: bina, bulunduğu yarıçapın teğetine hizalanır.
+      spec2.parts.rotation.y = -ac + rng.range(-0.05, 0.05);
+      spec2.parts.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) m.userData["tag"] = id;
+      });
+      blockParts.add(spec2.parts);
+
+      const target: Target = {
+        id,
+        kind,
+        pos: new THREE.Vector3(x, y, z),
+        burn: 0,
+        dead: false,
+        lightY: Math.min(14, spec2.height * 0.45),
+        radius: spec2.radius,
+        height: spec2.height,
+        hp: spec2.hp,
+        maxHp: spec2.hp,
+        flammable: spec2.flammable,
+        score: spec2.score,
+        cool: 0,
+        tower: null,
+        rig: null,
+        wrote: -1,
+        // Aralıklar aşağıda bakeTagged'dan sonra bağlanıyor.
+        apply: () => {},
+      };
+      blockBuildings.push(target);
+      targets.push(target);
+    }
+
+    if (!blockBuildings.length) continue;
+
+    const { meshes, ranges } = bakeTagged(
+      blockParts,
+      (m) => (m.userData["tag"] as number | undefined) ?? -1,
+      { castShadow: false, receiveShadow: true },
+    );
+    for (const m of meshes) group.add(m);
+
+    for (const t of blockBuildings) {
+      const list: TagRange[] = ranges.get(t.id) ?? [];
+      t.apply = (self) => writeState(list, self.dead ? 2 : Math.min(1, self.burn));
+    }
+
+    const center = new THREE.Vector3();
+    for (const t of blockBuildings) center.add(t.pos);
+    center.divideScalar(blockBuildings.length);
+    let br = 0;
+    for (const t of blockBuildings) br = Math.max(br, center.distanceTo(t.pos) + t.radius);
+
+    blocks.push({
+      id: blockId++,
+      district,
+      center,
+      radius: br,
+      buildings: blockBuildings,
+      alive: blockBuildings.length,
+    });
+
+    if (ci % 3 === 2) {
+      await step(Math.round(fromPct + (span * (ci + 1)) / cells.length), "Kül Şehri kuruluyor");
+      if (isCancelled()) return null;
+    }
+  }
+
+  /* ---- işaret yapıları: kule, direk, asansör ---- */
+  const landmarks: { kind: TargetKind; x: number; z: number; tower: TowerKind | null }[] = [];
+
+  // Savunma kuleleri sur hattında ve halka yollarının kesişimlerinde.
+  const towerCount = spec.wall ? SECTORS : Math.max(3, Math.round(SECTORS / 2));
+  for (let i = 0; i < towerCount; i++) {
+    const a = (i / towerCount) * Math.PI * 2 + da / 2;
+    const rr = R * (spec.wall ? 1.02 : 0.82);
+    landmarks.push({
+      kind: "tower",
+      x: spec.cx + Math.cos(a) * rr,
+      z: spec.cz + Math.sin(a) * rr,
+      tower: null,
+    });
+  }
+  // Köz madeni asansörleri sanayi bölgesinde.
+  for (let i = 0; i < spec.elevators; i++) {
+    const a = rng.range(2 * da, 5 * da);
+    const rr = rng.range(R * 0.78, R * 0.98);
+    landmarks.push({
+      kind: "elevator",
+      x: spec.cx + Math.cos(a) * rr,
+      z: spec.cz + Math.sin(a) * rr,
+      tower: null,
+    });
+  }
+  // Bağlama direkleri dok bölgesinde.
+  for (let i = 0; i < spec.masts; i++) {
+    const a = rng.range(6 * da, 8 * da);
+    const rr = rng.range(R * 0.8, R * 1.0);
+    landmarks.push({
+      kind: "mast",
+      x: spec.cx + Math.cos(a) * rr,
+      z: spec.cz + Math.sin(a) * rr,
+      tower: null,
+    });
+  }
+
+  const lmParts = new THREE.Group();
+  const lmTargets: Target[] = [];
+  for (const lm of landmarks) {
+    const s = buildStructure(lm.kind, rng, 1);
+    const id = nextId();
+    const y = terrainHeight(lm.x, lm.z);
+    s.parts.position.set(lm.x, y, lm.z);
+    s.parts.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) m.userData["tag"] = id;
+    });
+    lmParts.add(s.parts);
+    const t: Target = {
+      id,
+      kind: lm.kind,
+      pos: new THREE.Vector3(lm.x, y, lm.z),
+      burn: 0,
+      dead: false,
+      lightY: Math.min(16, s.height * 0.5),
+      radius: s.radius,
+      height: s.height,
+      hp: s.hp,
+      maxHp: s.hp,
+      flammable: FLAMMABILITY[lm.kind],
+      score: s.score,
+      cool: rng.range(0, 3),
+      tower: s.tower,
+      rig: null,
+      wrote: -1,
+      apply: () => {},
+    };
+    lmTargets.push(t);
+    targets.push(t);
+  }
+  if (lmTargets.length) {
+    // İşaret yapıları siluetin bel kemiği: bunlar gölge döksün.
+    const { meshes, ranges } = bakeTagged(
+      lmParts,
+      (m) => (m.userData["tag"] as number | undefined) ?? -1,
+      { castShadow: true, receiveShadow: true },
+    );
+    for (const m of meshes) group.add(m);
+    for (const t of lmTargets) {
+      const list: TagRange[] = ranges.get(t.id) ?? [];
+      t.apply = (self) => writeState(list, self.dead ? 2 : Math.min(1, self.burn));
+    }
+  }
+
+  await step(toPct, "Kül Şehri kuruluyor");
+  if (isCancelled()) return null;
+
+  const plazaR = R * RINGS[0]! * 0.9;
+
+  return {
+    group,
+    blocks,
+    targets,
+    spec,
+    /**
+     * Analitik cadde testi — maske dizisi tutmaya gerek yok, O(1).
+     * Yangın yayılmada iki bina arasındaki orta nokta caddeye düşüyorsa
+     * sıçrama olasılığı düşüyor: caddeler yangın duvarı gibi çalışıyor.
+     */
+    streetAt(x, z) {
+      const dx = x - spec.cx;
+      const dz = z - spec.cz;
+      const r = Math.hypot(dx, dz);
+      if (r < plazaR) return true;
+      if (r > R * 1.02) return true;
+      for (const f of RINGS) {
+        if (Math.abs(r - R * f) < RING_ROAD_HALF) return true;
+      }
+      const a = Math.atan2(dz, dx);
+      const m = ((a % da) + da) % da;
+      return Math.min(m, da - m) * r < AVENUE_HALF;
+    },
+    dispose() {
+      group.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.geometry) m.geometry.dispose();
+      });
+    },
+  };
+}

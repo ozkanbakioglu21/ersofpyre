@@ -1,0 +1,328 @@
+import * as THREE from "three";
+import { bandMat, brass, flagMat, lanternMat, litWindow, stone } from "./materials";
+import type { Rng } from "./rng";
+import { bake } from "./world";
+import type { Airship, AirshipRole, WeakPoint, WeakPointEffect, WeakPointId } from "./types";
+
+/**
+ * Ashkeep zeplinleri.
+ *
+ * GDD'nin "zayıf nokta sistemi"ni taşıyorlar: gövde tek mesh'e birleştirilmiş
+ * olsa da her modül kendi grubu, kendi canı ve kendi yıkım sonucu olan ayrı
+ * bir nesne. Bunun emsali zaten kodda vardı — pervaneler dönebilsinler diye
+ * birleştirmenin dışında tutuluyorlardı; modüller de aynı yolu izliyor.
+ */
+
+const ROLE_SCALE: Record<AirshipRole, number> = { scout: 0.6, frigate: 1.35, flagship: 2.2 };
+const ROLE_HP: Record<AirshipRole, number> = { scout: 190, frigate: 900, flagship: 2400 };
+
+const WP_LABEL: Record<WeakPointId, string> = {
+  balonOn: "Ön Balon Hücresi",
+  balonArka: "Arka Balon Hücresi",
+  motorSol: "Sol Motor Podu",
+  motorSag: "Sağ Motor Podu",
+  batarya: "Yan Batarya",
+  kopru: "Köprü",
+  cekirdek: "Çekirdek Kazanı",
+};
+
+function makeWeakPoint(
+  id: WeakPointId,
+  parts: THREE.Group,
+  local: THREE.Vector3,
+  radius: number,
+  hp: number,
+  onDestroy: WeakPointEffect,
+): WeakPoint {
+  const group = new THREE.Group();
+  group.position.copy(local);
+  for (const m of bake(parts, { castShadow: false, receiveShadow: false })) group.add(m);
+  return {
+    id,
+    label: WP_LABEL[id],
+    group,
+    local: local.clone(),
+    world: local.clone(),
+    radius,
+    hp,
+    maxHp: hp,
+    dead: false,
+    onDestroy,
+  };
+}
+
+/** Balon hücresi: kaburgalar arasına gerilmiş şişkin bir gaz bölmesi. */
+function balloonCell(s: number): THREE.Group {
+  const g = new THREE.Group();
+  const cell = new THREE.Mesh(new THREE.SphereGeometry(2.5 * s, 12, 10), bandMat);
+  cell.scale.set(1, 0.85, 1.5);
+  g.add(cell);
+  const strap = new THREE.Mesh(new THREE.TorusGeometry(2.6 * s, 0.16 * s, 5, 14), brass);
+  strap.rotation.y = Math.PI / 2;
+  g.add(strap);
+  const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * s, 0.7 * s, 1.2 * s, 8), brass);
+  valve.position.y = 2.2 * s;
+  g.add(valve);
+  return g;
+}
+
+function gunBattery(s: number): THREE.Group {
+  const g = new THREE.Group();
+  const mount = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2 * s, 1.6 * s, 5.4 * s),
+    stone(0x2e2822, 0.6),
+  );
+  g.add(mount);
+  for (let i = -1; i <= 1; i++) {
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * s, 0.3 * s, 3.4 * s, 6), brass);
+    barrel.rotation.z = Math.PI / 2;
+    barrel.position.set(1.6 * s, 0, i * 1.7 * s);
+    g.add(barrel);
+  }
+  const glow = new THREE.Mesh(new THREE.BoxGeometry(0.4 * s, 0.5 * s, 4 * s), lanternMat);
+  glow.position.set(-1.1 * s, 0, 0);
+  g.add(glow);
+  return g;
+}
+
+function enginePod(s: number): THREE.Group {
+  const g = new THREE.Group();
+  const nacelle = new THREE.Mesh(new THREE.CylinderGeometry(0.9 * s, 0.65 * s, 4 * s, 10), brass);
+  nacelle.rotation.x = Math.PI / 2;
+  g.add(nacelle);
+  const spinner = new THREE.Mesh(new THREE.ConeGeometry(0.55 * s, 1.2 * s, 8), brass);
+  spinner.rotation.x = -Math.PI / 2;
+  spinner.position.z = -2.4 * s;
+  g.add(spinner);
+  const vent = new THREE.Mesh(new THREE.TorusGeometry(0.95 * s, 0.14 * s, 5, 12), lanternMat);
+  vent.position.z = 1.6 * s;
+  g.add(vent);
+  return g;
+}
+
+function bridgeModule(s: number): THREE.Group {
+  const g = new THREE.Group();
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(3.4 * s, 2.2 * s, 4.4 * s),
+    stone(0x241f1a, 0.6),
+  );
+  g.add(box);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(3.0 * s, 1.0 * s, 4.0 * s), litWindow);
+  glass.position.y = 0.3 * s;
+  g.add(glass);
+  const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.6 * s, 0.8 * s, 2.4 * s, 8), brass);
+  funnel.position.y = 2 * s;
+  g.add(funnel);
+  return g;
+}
+
+export function createAirship(
+  x: number,
+  y: number,
+  z: number,
+  rng: Rng,
+  opts: { role?: AirshipRole; id?: string; weakPoints?: boolean } = {},
+): Airship {
+  const role = opts.role ?? "scout";
+  const s = ROLE_SCALE[role];
+  const group = new THREE.Group();
+  group.position.set(x, y, z);
+
+  // Gövde yanınca renk değiştiği için bu materyal zeplin başına özel.
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: role === "frigate" ? 0x4d4438 : 0x5c5145,
+    roughness: 0.7,
+    metalness: 0.35,
+  });
+  const dark = stone(0x1d1a16, 0.5);
+  const parts = new THREE.Group();
+
+  // ---- balloon ----
+  const R = 6.4 * s;
+  const HALF = R * 2.44;
+  const balloon = new THREE.Mesh(new THREE.SphereGeometry(R, 20, 14), hullMat);
+  balloon.scale.set(1, 0.8, 2.44);
+  parts.add(balloon);
+
+  // nose cone (-Z = travel direction)
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(2.1 * s, 5.5 * s, 12), bandMat);
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.z = -HALF - 0.4 * s;
+  parts.add(nose);
+
+  // hooped ribs hugging the hull
+  for (const f of [-0.77, -0.45, -0.16, 0, 0.16, 0.45, 0.77]) {
+    const zp = f * HALF;
+    const rr = Math.sqrt(Math.max(0.001, 1 - f * f)) * R * 1.012;
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.16 * s, 6, 20), brass);
+    rib.position.z = zp;
+    rib.scale.y = 0.8;
+    parts.add(rib);
+  }
+
+  // tail fins (+Z = rear)
+  const finV = new THREE.Mesh(new THREE.BoxGeometry(0.34 * s, 5.4 * s, 3.6 * s), hullMat);
+  finV.position.set(0, 2.2 * s, HALF + 0.4 * s);
+  parts.add(finV);
+  const finH = new THREE.Mesh(new THREE.BoxGeometry(7.6 * s, 0.34 * s, 3.2 * s), hullMat);
+  finH.position.set(0, 0.4 * s, HALF + 0.6 * s);
+  parts.add(finH);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.6 * s, 0.9 * s), flagMat);
+  flag.position.set(0, 5.6 * s, HALF + 2.9 * s);
+  parts.add(flag);
+
+  // ---- gondola ----
+  const gondola = new THREE.Mesh(
+    new THREE.BoxGeometry(3.6 * s, 2.2 * s, 9.5 * s),
+    stone(0x2e2822, 0.6),
+  );
+  gondola.position.y = -6.6 * s;
+  parts.add(gondola);
+  const gRoof = new THREE.Mesh(new THREE.BoxGeometry(3.9 * s, 0.5 * s, 9.9 * s), hullMat);
+  gRoof.position.y = -5.4 * s;
+  parts.add(gRoof);
+  const cabinGlow = new THREE.Mesh(new THREE.BoxGeometry(2.9 * s, 0.8 * s, 6.8 * s), litWindow);
+  cabinGlow.position.y = -6.4 * s;
+  parts.add(cabinGlow);
+  const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.42 * s, 8, 6), lanternMat);
+  lantern.position.y = -8.1 * s;
+  parts.add(lantern);
+
+  // keel cables balloon -> gondola
+  for (const [sx, sz] of [
+    [-1.6, -3.2],
+    [1.6, -3.2],
+    [-1.6, 3.2],
+    [1.6, 3.2],
+  ] as const) {
+    const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * s, 0.06 * s, 2.2 * s, 4), dark);
+    cable.position.set(sx * s, -6.2 * s, sz * s);
+    parts.add(cable);
+  }
+
+  // ---- engine pods / props ----
+  // Pervaneler dönüyor: birleştirilmiş gövdenin dışında kalmalılar.
+  const props: THREE.Object3D[] = [];
+  const blade = new THREE.BoxGeometry(0.2 * s, 2.6 * s, 0.4 * s);
+  const weakPoints: WeakPoint[] = [];
+  const wantWeak = opts.weakPoints ?? role !== "scout";
+
+  for (const side of [-1, 1] as const) {
+    const mx = 5.2 * s * side;
+    const my = -3.2 * s;
+    const mz = 8.6 * s;
+
+    if (wantWeak) {
+      // Motor podu modülü: imhası gemiyi yavaşlatır.
+      weakPoints.push(
+        makeWeakPoint(
+          side < 0 ? "motorSol" : "motorSag",
+          enginePod(s),
+          new THREE.Vector3(mx, my, mz - 1.2 * s),
+          2.6 * s,
+          160,
+          "disableEngine",
+        ),
+      );
+    } else {
+      const nacelle = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.75 * s, 0.55 * s, 3.4 * s, 10),
+        brass,
+      );
+      nacelle.rotation.x = Math.PI / 2;
+      nacelle.position.set(mx, my, mz - 1.2 * s);
+      parts.add(nacelle);
+    }
+
+    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.13 * s, 0.13 * s, 3.4 * s, 5), dark);
+    strut.position.set(mx, my + 2.5 * s, mz - 0.6 * s);
+    parts.add(strut);
+
+    const bladeParts = new THREE.Group();
+    for (let i = 0; i < 4; i++) {
+      const b = new THREE.Mesh(blade, dark);
+      b.rotation.z = (i * Math.PI) / 2;
+      b.position.set(
+        Math.sin((i * Math.PI) / 2) * 1.25 * s,
+        Math.cos((i * Math.PI) / 2) * 1.25 * s,
+        0,
+      );
+      bladeParts.add(b);
+    }
+    // Pervane dönerken tek mesh olarak dönsün: 4 çizim yerine 1.
+    const prop = new THREE.Group();
+    for (const mesh of bake(bladeParts, { castShadow: false, receiveShadow: false }))
+      prop.add(mesh);
+    prop.position.set(mx, my, mz + 1.4 * s);
+    props.push(prop);
+    group.add(prop);
+  }
+
+  if (wantWeak) {
+    weakPoints.push(
+      makeWeakPoint(
+        "balonOn",
+        balloonCell(s),
+        new THREE.Vector3(0, R * 0.55, -HALF * 0.5),
+        3.4 * s,
+        220,
+        "sink",
+      ),
+      makeWeakPoint(
+        "balonArka",
+        balloonCell(s),
+        new THREE.Vector3(0, R * 0.55, HALF * 0.4),
+        3.4 * s,
+        220,
+        "sink",
+      ),
+      makeWeakPoint(
+        "batarya",
+        gunBattery(s),
+        new THREE.Vector3(R * 0.92, -3.4 * s, 0),
+        3.2 * s,
+        200,
+        "disableGuns",
+      ),
+      makeWeakPoint(
+        "kopru",
+        bridgeModule(s),
+        new THREE.Vector3(0, -9.6 * s, -3.4 * s),
+        3 * s,
+        260,
+        "phase",
+      ),
+    );
+    for (const wp of weakPoints) group.add(wp.group);
+  }
+
+  for (const mesh of bake(parts)) group.add(mesh);
+
+  const hp = ROLE_HP[role];
+  return {
+    id: opts.id ?? `ship-${Math.round(x)}-${Math.round(z)}`,
+    role,
+    group,
+    pos: group.position,
+    dir: new THREE.Vector3(rng() < 0.5 ? 1 : -1, 0, rng.range(-0.4, 0.4)).normalize(),
+    hp,
+    maxHp: hp,
+    cool: rng.range(0, 3),
+    gunsDisabled: false,
+    dead: false,
+    burn: 0,
+    props,
+    hullMat,
+    hullColor: hullMat.color.clone(),
+    weakPoints,
+    lightY: 2,
+  };
+}
+
+/** Modül konumlarını dünya uzayına taşır — yalnız yakındaki gemiler için. */
+export function refreshWeakPoints(ship: Airship): void {
+  for (const wp of ship.weakPoints) {
+    if (wp.dead) continue;
+    wp.group.getWorldPosition(wp.world);
+  }
+}

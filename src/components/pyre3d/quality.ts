@@ -21,6 +21,16 @@ export const ASH_MAX = 2600;
  */
 export const FIRE_LIGHTS = 6;
 
+/**
+ * Sahnedeki TOPLAM ışık sayısı. Derlemeden sonra asla değişmez.
+ *
+ * hemisphere + güneş + dolgu + ejderha ağzı + alev + ateş havuzu + patlama.
+ * Yeni bir efekt ışığı eklemek isteyen: eklemeyin — kalıcı bir ışık kurup
+ * yoğunluğunu 0'da bekletin. Işıldak konisi ve tesla yayı bu yüzden
+ * SpotLight değil, additive mesh.
+ */
+export const SCENE_LIGHT_BUDGET = 1 + 1 + 1 + 1 + 1 + FIRE_LIGHTS + 1;
+
 export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
   low: {
     label: "Düşük",
