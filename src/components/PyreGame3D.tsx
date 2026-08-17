@@ -117,7 +117,7 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
       if (e.repeat) return;
       keys[e.code] = true;
       const c = ctrlRef.current;
-      if (e.code === "KeyF") c.fireball = true;
+      if (e.code === "KeyM") c.fireball = true;
       if (e.code === "KeyR") c.dodge = c.roll >= 0 ? 1 : -1;
       if (e.code === "KeyC") c.shock = true;
       if (e.code === "KeyG") c.rage = true;
