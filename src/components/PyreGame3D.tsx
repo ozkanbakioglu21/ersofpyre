@@ -106,7 +106,7 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
       // A/D = yaw (pure direction), Q/E = roll (bank)
       c.roll = (keys["KeyQ"] ? -1 : 0) + (keys["KeyE"] ? 1 : 0);
       c.yaw =
-        (keys["KeyA"] || keys["ArrowLeft"] ? -1 : 0) + (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0);
+        (keys["KeyD"] || keys["ArrowRight"] ? -1 : 0) + (keys["KeyA"] || keys["ArrowLeft"] ? 1 : 0);
       c.fire = !!keys["Space"];
       c.hover = !!keys["ControlLeft"] || !!keys["ControlRight"];
     };
