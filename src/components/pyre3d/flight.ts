@@ -251,7 +251,6 @@ export function updateFlight(g: Game, dt: number): void {
     // Yaw → heading biriktirmesi (ejderhanın gerçek yönü).
     // Input bırakılınca heading sabit kalır — ejderha döndüğü yönde uçar.
     a.heading += a.yaw * FLIGHT.headingRate * dt;
-    a.heading = THREE.MathUtils.clamp(a.heading, -Math.PI * 0.85, Math.PI * 0.85);
 
     // Hız vektörü: heading açısına göre.
     const goalX = Math.sin(a.heading) * s.speed;
