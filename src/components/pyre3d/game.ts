@@ -366,7 +366,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
-    const mesh = new THREE.Mesh(new THREE.ConeGeometry(r, h, seg, 1, true), mat);
+    const geo = new THREE.ConeGeometry(r, h, seg, 1, true);
+    geo.translate(0, h / 2, 0);
+    const mesh = new THREE.Mesh(geo, mat);
     mesh.rotation.x = Math.PI / 2;
     mesh.position.set(0, 0, z);
     return { mesh, mat };
