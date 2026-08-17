@@ -891,7 +891,13 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           const vy = Math.sin(elev) * FIREBALL.speed;
           const vz = Math.cos(elev) * FIREBALL.speed;
           const vx = best < Infinity ? THREE.MathUtils.clamp(aimX * 0.35, -46, 46) : 0;
-          fireballs.spawn(headPos, tmp.set(vx, vy, vz));
+          // Hız vektörünü heading'e göre döndür.
+          const h = g.flightAxes.heading;
+          const cosH = Math.cos(h);
+          const sinH = Math.sin(h);
+          const rvx = vx * cosH + vz * sinH;
+          const rvz = -vx * sinH + vz * cosH;
+          fireballs.spawn(headPos, tmp.set(rvx, vy, rvz));
           audio.fireball();
           fx.ember(headPos, 8, 6);
         }
