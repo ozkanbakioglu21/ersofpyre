@@ -275,6 +275,9 @@ export function updateFlight(g: Game, dt: number): void {
   d.root.position.x += g.vel.x * dt;
   d.root.position.z += g.vel.z * dt;
 
+  /* ---- fwd vektörü: ateş ve hedefleme yönü ---- */
+  g.fwd.set(Math.sin(a.heading), 0, Math.cos(a.heading)).normalize();
+
   /* ---- irtifa (pitch + hover) ---- */
   const altInput = hover
     ? FLIGHT.hoverLift * (0.3 + 0.7 * c.throttle)
