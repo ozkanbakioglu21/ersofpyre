@@ -169,7 +169,7 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
   const ry = g.dragon.root.rotation.y;
   camOff.set(0, 14, -back).applyAxisAngle(UP, ry);
   camGoal.copy(camOff).add(g.dragon.root.position);
-  camPos.copy(g.camera.position).lerp(camGoal, Math.min(1, dt * 4.2));
+  camPos.copy(g.camera.position).lerp(camGoal, Math.min(1, dt * 9));
 
   if (s.shakeT > 0) {
     s.shakeT = Math.max(0, s.shakeT - dt);
