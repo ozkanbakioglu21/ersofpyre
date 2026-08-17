@@ -133,6 +133,7 @@ export type Game = {
   autoForward: boolean;
   infinite: InfinitePath | null;
   flightAxes: FlightAxes;
+  fireT: number;
 
   timeScale: number;
   paused: boolean;
@@ -494,6 +495,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     autoForward: isInfinite,
     infinite: null,
     flightAxes: createFlightAxes(),
+    fireT: 0,
     timeScale: 1,
     paused: false,
   };
@@ -817,6 +819,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       /* ---- alev ---- */
       state.overheat = Math.max(0, state.overheat - dt);
       const firing = c.fire && g.abilities.flame && state.overheat <= 0;
+      g.fireT += ((firing ? 1 : 0) - g.fireT) * Math.min(1, dt * 8);
       if (firing && !firedOnce) {
         firedOnce = true;
         g.mission.emit({ kind: "firstFlame" });

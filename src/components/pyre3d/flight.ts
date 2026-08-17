@@ -334,7 +334,8 @@ export function updateFlight(g: Game, dt: number): void {
     t.rotation.x = Math.sin(s.flap * 0.5 - i * 0.3) * 0.05;
   });
   d.neck.forEach((n, i) => {
-    n.rotation.x = -a.pitch * 0.12 + Math.sin(s.flap * 0.6 - i) * 0.03;
+    const fireTilt = g.fireT * 0.35 * (1 - i * 0.15);
+    n.rotation.x = -a.pitch * 0.12 + fireTilt + Math.sin(s.flap * 0.6 - i) * 0.03;
     n.rotation.y = -a.yaw * 0.08 - a.roll * 0.05;
   });
 }
