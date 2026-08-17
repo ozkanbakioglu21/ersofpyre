@@ -100,17 +100,15 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     const keys: Record<string, boolean> = {};
     const sync = () => {
       const c = ctrlRef.current;
-      // W = throttle (sprint/boost), S = pitch up (ascend)
-      c.throttle = keys["KeyW"] || keys["ArrowUp"] ? 1 : 0;
-      c.pitch =
-        (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) -
-        (keys["ControlLeft"] || keys["ControlRight"] ? 1 : 0);
+      // W = dive (pitch down), S = ascend (pitch up)
+      c.pitch = (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) - (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0);
+      c.throttle = keys["ShiftLeft"] || keys["ShiftRight"] ? 1 : 0;
       // A/D = roll (bank), Q/E = yaw (pure direction)
       c.roll =
         (keys["KeyA"] || keys["ArrowLeft"] ? -1 : 0) + (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0);
       c.yaw = (keys["KeyQ"] ? -1 : 0) + (keys["KeyE"] ? 1 : 0);
       c.fire = !!keys["Space"];
-      c.hover = !!keys["ShiftLeft"] || !!keys["ShiftRight"];
+      c.hover = !!keys["ControlLeft"] || !!keys["ControlRight"];
     };
     const kd = (e: KeyboardEvent) => {
       if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
