@@ -37,6 +37,9 @@ export type RollState = { t: number; dir: -1 | 1; perfect: boolean } | null;
 const camGoal = new THREE.Vector3();
 const camPos = new THREE.Vector3();
 const lookGoal = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+const camOff = new THREE.Vector3();
+const fwdRot = new THREE.Vector3();
 
 export function tryRoll(g: Game, dir: -1 | 1): boolean {
   const s = g.state;
@@ -158,11 +161,13 @@ export function updateFlight(g: Game, dt: number): void {
   });
 }
 
-/** Sabit yönelimli, arkadan-üstten takip kamerası. */
+/** Ejderhanın yönüyle dönen, arkadan-üstten takip kamerası. */
 export function updateCamera(g: Game, dt: number, playing: boolean): void {
   const s = g.state;
   const back = (playing ? 34 + s.speed * 0.16 : 40) + (s.rageT > 0 ? 8 : 0);
-  camGoal.set(0, 14, -back).add(g.dragon.root.position);
+  const ry = g.dragon.root.rotation.y;
+  camOff.set(0, 14, -back).applyAxisAngle(UP, ry);
+  camGoal.copy(camOff).add(g.dragon.root.position);
   camPos.copy(g.camera.position).lerp(camGoal, Math.min(1, dt * 4.2));
 
   if (s.shakeT > 0) {
@@ -174,7 +179,8 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
   // Kamerayı arazinin altına sokma.
   camPos.y = Math.max(terrainHeight(camPos.x, camPos.z) + 8, camPos.y);
   g.camera.position.copy(camPos);
-  lookGoal.copy(g.dragon.root.position).addScaledVector(g.fwd, 26);
+  fwdRot.set(0, 0, 26).applyAxisAngle(UP, ry);
+  lookGoal.copy(g.dragon.root.position).add(fwdRot);
   lookGoal.y += 3;
   g.camera.lookAt(lookGoal);
 }
