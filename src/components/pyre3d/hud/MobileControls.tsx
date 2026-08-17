@@ -62,9 +62,9 @@ export function MobileControls({
     const k = Math.min(1, len) / len;
     const x = dx * k;
     const y = dy * k;
-    ctrl.current.x = x;
-    ctrl.current.y = y;
-    ctrl.current.boost = Math.hypot(x, y) > 0.88;
+    ctrl.current.roll = x;
+    ctrl.current.pitch = y;
+    ctrl.current.throttle = Math.hypot(x, y) > 0.88 ? 1 : 0;
     if (knobRef.current) {
       knobRef.current.style.transform = `translate(calc(-50% + ${x * RADIUS}px), calc(-50% + ${y * RADIUS}px))`;
     }
@@ -72,9 +72,9 @@ export function MobileControls({
 
   const endJoy = () => {
     joyId.current = null;
-    ctrl.current.x = 0;
-    ctrl.current.y = 0;
-    ctrl.current.boost = false;
+    ctrl.current.roll = 0;
+    ctrl.current.pitch = 0;
+    ctrl.current.throttle = 0;
     if (knobRef.current) knobRef.current.style.transform = "translate(-50%, -50%)";
   };
 
@@ -84,7 +84,7 @@ export function MobileControls({
     const r = el.getBoundingClientRect();
     const t = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
     const v = Math.max(-1, Math.min(1, -t));
-    ctrl.current.alt = Math.abs(v) < 0.14 ? 0 : v;
+    ctrl.current.yaw = Math.abs(v) < 0.14 ? 0 : v;
     if (altKnob.current) {
       altKnob.current.style.transform = `translate(-50%, calc(-50% + ${-v * 46}px))`;
     }
@@ -92,7 +92,7 @@ export function MobileControls({
 
   const endAlt = () => {
     altId.current = null;
-    ctrl.current.alt = 0;
+    ctrl.current.yaw = 0;
     if (altKnob.current) altKnob.current.style.transform = "translate(-50%, -50%)";
   };
 
@@ -144,7 +144,7 @@ export function MobileControls({
         />
       </div>
 
-      {/* irtifa pedi — iki butondan daha iyi uçuş hissi veriyor */}
+      {/* yaw pedi — kamerayı bozmadan döner */}
       <div
         ref={altRef}
         onPointerDown={(e) => {
@@ -202,7 +202,7 @@ export function MobileControls({
         <div className="flex flex-col gap-2.5">
           {abilities.roll && (
             <button
-              {...tap(() => (ctrl.current.roll = ctrl.current.x >= 0 ? 1 : -1))}
+              {...tap(() => (ctrl.current.dodge = ctrl.current.roll >= 0 ? 1 : -1))}
               className={`${btn} h-14 w-14 border-foreground/40 bg-foreground/10 text-[10px] text-foreground/85 active:bg-foreground/25`}
             >
               Takla

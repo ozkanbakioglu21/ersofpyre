@@ -100,12 +100,17 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     const keys: Record<string, boolean> = {};
     const sync = () => {
       const c = ctrlRef.current;
-      c.x =
-        (keys["KeyA"] || keys["ArrowLeft"] ? 1 : 0) - (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0);
-      c.y = (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) - (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0);
-      c.alt = (keys["KeyE"] ? 1 : 0) - (keys["KeyQ"] ? 1 : 0);
+      // W = throttle (sprint/boost), S = pitch up (ascend)
+      c.throttle = keys["KeyW"] || keys["ArrowUp"] ? 1 : 0;
+      c.pitch =
+        (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) -
+        (keys["ControlLeft"] || keys["ControlRight"] ? 1 : 0);
+      // A/D = roll (bank), Q/E = yaw (pure direction)
+      c.roll =
+        (keys["KeyA"] || keys["ArrowLeft"] ? -1 : 0) + (keys["KeyD"] || keys["ArrowRight"] ? 1 : 0);
+      c.yaw = (keys["KeyQ"] ? -1 : 0) + (keys["KeyE"] ? 1 : 0);
       c.fire = !!keys["Space"];
-      c.boost = !!keys["ShiftLeft"] || !!keys["ShiftRight"];
+      c.hover = !!keys["ShiftLeft"] || !!keys["ShiftRight"];
     };
     const kd = (e: KeyboardEvent) => {
       if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
@@ -115,7 +120,7 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
       keys[e.code] = true;
       const c = ctrlRef.current;
       if (e.code === "KeyF") c.fireball = true;
-      if (e.code === "KeyR") c.roll = c.x >= 0 ? 1 : -1;
+      if (e.code === "KeyR") c.dodge = c.roll >= 0 ? 1 : -1;
       if (e.code === "KeyC") c.shock = true;
       if (e.code === "KeyG") c.rage = true;
       if (e.code === "Escape") togglePause();

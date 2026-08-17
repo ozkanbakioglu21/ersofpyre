@@ -5,40 +5,53 @@ import type * as THREE from "three";
  * ------------------------------------------------------------------ */
 
 /**
- * Oyuncu girdisi. React tarafındaki tuş/dokunmatik işleyicileri buraya
- * yazar, oyun döngüsü buradan okur — arada state yok, dolayısıyla render yok.
+ * Oyuncu girdisi — 5 eksenli uçuş kontrolü.
+ *
+ * Eksenler:
+ *   throttle  → İleri hız (0..1; 0=boşlukta, 1=maks hız/sprint)
+ *   pitch     → Burun yukarı/aşağı (-1=dalma, 0=düz, +1=yukarı)
+ *   roll      → Yatay banking (-1=sol, 0=merkez, +1=sağ)
+ *   yaw       → Saf kamera-dönüşlü yön (-1=sol, 0=merkez, +1=sağ)
+ *   hover     → Askıda kalma modu (stamina tüketir)
+ *
+ * Kenar tetikli inputlar: dodge, fireball, shock, rage.
+ * Sürekli inputlar: fire (basılı tutulur).
  */
 export type Ctrl = {
-  /** -1 sol, +1 sağ (yana kayma). */
-  x: number;
-  /** -1 ileri, +1 geri. */
-  y: number;
-  /** -1 alçal, +1 yüksel (mobil irtifa pedi; klavyede Q/E). */
-  alt: number;
+  /** İleri hız kontrolü: 0 boşluk, 1 sprint. */
+  throttle: number;
+  /** Burun pitch: -1 dalma, +1 yükselif. */
+  pitch: number;
+  /** Yatay bank/roll: -1 sol, +1 sağ. */
+  roll: number;
+  /** Saf yaw: kamerayı bozmadan döner. -1 sol, +1 sağ. */
+  yaw: number;
+  /** Hover modu: yerde/alçakta askı. */
+  hover: boolean;
   /** Konik alev — basılı tutulur. */
   fire: boolean;
   /** Köz Mermisi — kenar tetikli, döngü tükettikten sonra sıfırlanır. */
   fireball: boolean;
-  /** Takla yönü: -1 sol, +1 sağ, 0 yok. Döngü tükettikten sonra sıfırlanır. */
-  roll: number;
+  /** Barrel roll yönü: -1 sol, +1 sağ, 0 yok. Kenar tetikli. */
+  dodge: number;
   /** Kanat şoku — kenar tetikli. */
   shock: boolean;
   /** Ejderha Öfkesi — kenar tetikli. */
   rage: boolean;
-  boost: boolean;
 };
 
 export function createCtrl(): Ctrl {
   return {
-    x: 0,
-    y: 0,
-    alt: 0,
+    throttle: 0,
+    pitch: 0,
+    roll: 0,
+    yaw: 0,
+    hover: false,
     fire: false,
     fireball: false,
-    roll: 0,
+    dodge: 0,
     shock: false,
     rage: false,
-    boost: false,
   };
 }
 

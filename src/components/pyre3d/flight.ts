@@ -3,34 +3,100 @@ import { terrainHeight } from "./world";
 import type { Game } from "./game";
 
 /**
- * Uçuş modeli — 2.5D: kamera yönelimi sabit, hareket düzlemsel.
+ * 5 Ekseni Momentum Tabanlı Uçuş Modeli
  *
- * GDD "ağır ama tatmin edici arcade fizik, hız korunumu sistemin kalbi" diyor.
- * Girdi doğrudan konuma değil hıza uygulanıyor; ejderha savrulmayı ve
- * duruşa geçmeyi hissettiriyor. Dalış hız biriktiriyor, çıkışta bu hız
- * "slingshot" ivmesine dönüşüyor.
+ * Eksenler:
+ *   throttle  → İleri hız (auto-forward + boost)
+ *   pitch     → Burun yukarı/aşağı (momentum ile)
+ *   roll      → Yatay bank/kanat yatması
+ *   yaw       → Saf yön dönme (kamera bozulmaz)
+ *   hover     → Askıda kalma (stamina tüketir, momentum sıfırlar)
+ *
+ * Fizik: Girdi hedefe değil ivmeye uygulanır. Hız ve açısal momentum
+ * kademeli olarak hedefe yaklaşır, böylece ejderha "ağır ama tatmin
+ * edici" bir his verir. Dalışta biriken hız çıkışta slingshot'a dönüşür.
  */
 
 export const FLIGHT = {
+  /* ---- hız ---- */
   baseSpeed: 62,
   boostSpeed: 118,
   accel: 3.6,
   altSpeed: 70,
   minClearance: 12,
   maxAltitude: 320,
-  /** Dalışta biriken ekstra hız ve sönümü. */
+
+  /* ---- pitch (burun yukarı/aşağı) ---- */
+  pitchRate: 2.4,
+  pitchDamping: 0.88,
+  pitchReturn: 2.8,
+  maxPitch: 0.7,
+
+  /* ---- roll (yatay bank/kanat) ---- */
+  rollRate: 3.2,
+  rollDamping: 0.9,
+  maxRoll: 0.65,
+  rollReturn: 1.8,
+
+  /* ---- yaw (saf yön) ---- */
+  yawRate: 1.8,
+  yawDamping: 0.88,
+  maxYaw: 0.5,
+  yawReturn: 1.4,
+
+  /* ---- hover ---- */
+  hoverStaminaDrain: 22,
+  hoverLift: 24,
+  hoverDamping: 0.82,
+
+  /* ---- dalma ---- */
   diveGain: 46,
   diveDecay: 0.75,
-  staminaDrain: 16,
+
+  /* ---- barrel roll (takla) ---- */
   rollDuration: 0.55,
   rollInvuln: 0.4,
   rollImpulse: 42,
   rollStamina: 18,
   rollCooldown: 0.9,
-  /** Kusursuz kaçınma penceresi: mermi bu süre içinde en yakın noktaya gelecekse. */
   perfectWindow: 0.22,
   emberRush: 2.5,
+
+  /** Yaw input'unun heading'e ne kadar hızlı eklendiği (radyan/saniye). */
+  headingRate: 1.6,
+  /** Heading ne kadar hızlı merkeze döner (input yokken). */
+  headingReturn: 0.6,
 } as const;
+
+/** Açısal momentum durumu: pitch, roll ve yaw için bağımsız state. */
+export type FlightAxes = {
+  pitch: number;
+  pitchVel: number;
+  roll: number;
+  rollVel: number;
+  yaw: number;
+  yawVel: number;
+  /** Mevcut irtifa momentumu (pozitif=yükselme, negatif=dalma). */
+  altMomentum: number;
+  /** Dalma ile biriken ekstra hız skoru (0..1). */
+  diveAccum: number;
+  /** Ejderhanın yatay yön açısı (radyan). Yaw input'u bu açıya birikir. */
+  heading: number;
+};
+
+export function createFlightAxes(): FlightAxes {
+  return {
+    pitch: 0,
+    pitchVel: 0,
+    roll: 0,
+    rollVel: 0,
+    yaw: 0,
+    yawVel: 0,
+    altMomentum: 0,
+    diveAccum: 0,
+    heading: 0,
+  };
+}
 
 export type RollState = { t: number; dir: -1 | 1; perfect: boolean } | null;
 
@@ -40,6 +106,7 @@ const lookGoal = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 const camOff = new THREE.Vector3();
 const fwdRot = new THREE.Vector3();
+const tmpVec = new THREE.Vector3();
 
 export function tryRoll(g: Game, dir: -1 | 1): boolean {
   const s = g.state;
@@ -49,7 +116,7 @@ export function tryRoll(g: Game, dir: -1 | 1): boolean {
   s.invuln = Math.max(s.invuln, FLIGHT.rollInvuln);
 
   // Kusursuz kaçınma: yaklaşan mermi tam da bu pencerede en yakın noktaya
-  // gelecekse ödül. GDD: stamina iadesi + "Ember Rush".
+  // gelecekse ödül. Stamina iadesi + "Ember Rush".
   const perfect = s.threatT > 0 && s.threatT < FLIGHT.perfectWindow;
   if (perfect) {
     s.stamina = Math.min(100, s.stamina + 30);
@@ -61,17 +128,32 @@ export function tryRoll(g: Game, dir: -1 | 1): boolean {
   } else {
     g.audio.roll();
   }
-  // Harpun bağı takla ile kopuyor — GDD'nin "barrel roll spam'i" çözümü.
+  // Harpun bağı takla ile kopuyor.
   if (s.snared > 0) s.snared = Math.max(0, s.snared - 1.6);
   g.roll = { t: 0, dir, perfect };
   return true;
+}
+
+/** Hedefe yumuşak yaklaşma (momentum damping). */
+function lerpDamp(
+  current: number,
+  target: number,
+  dt: number,
+  rate: number,
+  damping: number,
+): [number, number] {
+  const k = Math.min(1, dt * rate);
+  const vel = (target - current) * k;
+  return [current + vel, vel * damping];
 }
 
 export function updateFlight(g: Game, dt: number): void {
   const s = g.state;
   const c = g.ctrl;
   const d = g.dragon;
+  const a = g.flightAxes;
 
+  /* ---- cooldown / timer düşüşü ---- */
   s.invuln = Math.max(0, s.invuln - dt);
   s.rollCd = Math.max(0, s.rollCd - dt);
   s.fireballCd = Math.max(0, s.fireballCd - dt);
@@ -80,56 +162,138 @@ export function updateFlight(g: Game, dt: number): void {
   s.snared = Math.max(0, s.snared - dt);
   s.marked = Math.max(0, s.marked - dt);
 
-  if (c.roll !== 0) {
-    tryRoll(g, c.roll > 0 ? 1 : -1);
-    c.roll = 0;
+  /* ---- barrel roll (dodge) ---- */
+  if (c.dodge !== 0) {
+    tryRoll(g, c.dodge > 0 ? 1 : -1);
+    c.dodge = 0;
   }
 
-  const boosting = c.boost && s.stamina > 0;
-  if (boosting) s.stamina = Math.max(0, s.stamina - FLIGHT.staminaDrain * dt);
-  else s.stamina = Math.min(100, s.stamina + g.buffs.staminaRegen * dt);
+  /* ---- stamina ---- */
+  const hover = c.hover && s.stamina > 0 && !g.roll;
+  if (hover) {
+    s.stamina = Math.max(0, s.stamina - FLIGHT.hoverStaminaDrain * dt);
+  } else {
+    s.stamina = Math.min(100, s.stamina + g.buffs.staminaRegen * dt);
+  }
 
-  // Dalış hız biriktirir; yükselirken bu birikim geri veriliyor.
-  if (c.alt < -0.1) g.dive = Math.min(1, g.dive + dt * 0.8);
-  else g.dive = Math.max(0, g.dive - dt * FLIGHT.diveDecay);
+  /* ---- pitch momentum ---- */
+  const pitchTarget = c.pitch * FLIGHT.maxPitch;
+  const [newPitch, pitchVel] = lerpDamp(
+    a.pitch,
+    hover ? 0 : pitchTarget,
+    dt,
+    FLIGHT.pitchRate,
+    FLIGHT.pitchDamping,
+  );
+  a.pitchVel = pitchVel;
+  a.pitch = THREE.MathUtils.clamp(newPitch, -FLIGHT.maxPitch, FLIGHT.maxPitch);
 
+  // Pitch sıfıra dönerken daha hızlı (doğal stabilizasyon).
+  if (Math.abs(c.pitch) < 0.1) {
+    a.pitch += (0 - a.pitch) * Math.min(1, dt * FLIGHT.pitchReturn);
+  }
+
+  /* ---- roll momentum ---- */
+  const rollTarget = c.roll * FLIGHT.maxRoll;
+  const [newRoll, rollVel] = lerpDamp(
+    a.roll,
+    hover ? 0 : rollTarget,
+    dt,
+    FLIGHT.rollRate,
+    FLIGHT.rollDamping,
+  );
+  a.rollVel = rollVel;
+  a.roll = THREE.MathUtils.clamp(newRoll, -FLIGHT.maxRoll, FLIGHT.maxRoll);
+
+  if (Math.abs(c.roll) < 0.1) {
+    a.roll += (0 - a.roll) * Math.min(1, dt * FLIGHT.rollReturn);
+  }
+
+  /* ---- yaw momentum ---- */
+  const yawTarget = c.yaw * FLIGHT.maxYaw;
+  const [newYaw, yawVel] = lerpDamp(
+    a.yaw,
+    hover ? 0 : yawTarget,
+    dt,
+    FLIGHT.yawRate,
+    FLIGHT.yawDamping,
+  );
+  a.yawVel = yawVel;
+  a.yaw = THREE.MathUtils.clamp(newYaw, -FLIGHT.maxYaw, FLIGHT.maxYaw);
+
+  if (Math.abs(c.yaw) < 0.1) {
+    a.yaw += (0 - a.yaw) * Math.min(1, dt * FLIGHT.yawReturn);
+  }
+
+  /* ---- dalma hız biriktirme ---- */
+  if (a.pitch < -0.15) {
+    a.diveAccum = Math.min(1, a.diveAccum + dt * 0.8);
+  } else {
+    a.diveAccum = Math.max(0, a.diveAccum - dt * FLIGHT.diveDecay);
+  }
+  g.dive = a.diveAccum;
+
+  /* ---- hız hesapla ---- */
   const rushMul = s.emberRush > 0 ? 1.35 : 1;
   const snareMul = s.snared > 0 ? 0.6 : 1;
-  const target =
-    (boosting ? FLIGHT.boostSpeed : FLIGHT.baseSpeed + g.dive * FLIGHT.diveGain) *
-    rushMul *
-    snareMul;
-  s.speed += (target - s.speed) * Math.min(1, dt * 1.6);
+  const throttleBoost = c.throttle * (FLIGHT.boostSpeed - FLIGHT.baseSpeed);
+  const diveBoost = a.diveAccum * FLIGHT.diveGain;
+  const targetSpeed = (FLIGHT.baseSpeed + throttleBoost + diveBoost) * rushMul * snareMul;
+  s.speed += (targetSpeed - s.speed) * Math.min(1, dt * 1.6);
 
-  // Girdi hıza uygulanıyor: ani duruş yok, savrulma var.
-  const goalX = c.x * s.speed;
-  const goalZ = g.autoForward
-    ? s.speed * (1 - c.y * 0.3)
-    : -c.y * s.speed;
-  const k = Math.min(1, dt * FLIGHT.accel);
-  g.vel.x += (goalX - g.vel.x) * k;
-  g.vel.z += (goalZ - g.vel.z) * k;
+  /* ---- yatay hız vektörü ---- */
+  if (hover) {
+    // Hover: pozisyon sabit, yalnız küçük kaymalar.
+    g.vel.x *= FLIGHT.hoverDamping;
+    g.vel.z *= FLIGHT.hoverDamping;
+  } else {
+    // Yaw → heading biriktirmesi (ejderhanın gerçek yönü).
+    a.heading += a.yaw * FLIGHT.headingRate * dt;
+    // Input yokken heading merkeze döner (yumuşak).
+    if (Math.abs(c.yaw) < 0.1) {
+      a.heading += (0 - a.heading) * Math.min(1, dt * FLIGHT.headingReturn);
+    }
+    a.heading = THREE.MathUtils.clamp(a.heading, -Math.PI * 0.85, Math.PI * 0.85);
 
+    // Hız vektörü: heading açısına göre.
+    const goalX = Math.sin(a.heading) * s.speed;
+    const goalZ = Math.cos(a.heading) * s.speed;
+    // Roll hafifçe yan hız ekler (görsel banking + çok hafif drift).
+    const rollDrift = a.roll * s.speed * 0.08;
+    const k = Math.min(1, dt * FLIGHT.accel);
+    g.vel.x += (goalX + rollDrift - g.vel.x) * k;
+    g.vel.z += (goalZ - g.vel.z) * k;
+  }
+
+  /* ---- barrel roll itki ---- */
   if (g.roll) {
-    // Takla yanal bir itki taşıyor — sadece görsel değil, kaçınma hareketi.
     g.roll.t += dt;
     const p = g.roll.t / FLIGHT.rollDuration;
     d.root.position.x += g.roll.dir * FLIGHT.rollImpulse * (1 - p) * dt;
     if (g.roll.t >= FLIGHT.rollDuration) g.roll = null;
   }
 
+  /* ---- pozisyon güncelle ---- */
   d.root.position.x += g.vel.x * dt;
   d.root.position.z += g.vel.z * dt;
 
+  /* ---- irtifa (pitch + hover) ---- */
+  const altInput = hover
+    ? FLIGHT.hoverLift * (0.3 + 0.7 * c.throttle)
+    : a.pitch * FLIGHT.altSpeed + c.throttle * FLIGHT.altSpeed * 0.15;
+
+  // Hover'da irtifa momentumu daha yumuşak.
+  const altLerp = hover ? 2.5 : 5;
+  a.altMomentum += (altInput - a.altMomentum) * Math.min(1, dt * altLerp);
+
   const groundY = terrainHeight(d.root.position.x, d.root.position.z);
   d.root.position.y = THREE.MathUtils.clamp(
-    d.root.position.y + c.alt * FLIGHT.altSpeed * dt,
+    d.root.position.y + a.altMomentum * dt,
     groundY + FLIGHT.minClearance,
     FLIGHT.maxAltitude,
   );
 
-  // Sınır dışına çıkınca yalnız yatay yarıçap kısılır; irtifa korunur.
-  // Sonsuz modda yalnızca X ekseni sınırlanır.
+  /* ---- sınır kontrolü ---- */
   if (g.autoForward) {
     if (Math.abs(d.root.position.x) > 180) {
       d.root.position.x = Math.sign(d.root.position.x) * 180;
@@ -147,37 +311,48 @@ export function updateFlight(g: Game, dt: number): void {
   }
 
   /* ---- gövde animasyonu ---- */
-  const bank = g.roll
-    ? // Takla süresince gövde tam tur atıyor.
-      g.roll.dir * Math.PI * 2 * (g.roll.t / FLIGHT.rollDuration)
-    : -c.x * 0.6;
+  // Ejderhanın gerçek yönü: heading doğrudan root.rotation.y olur.
+  const headingSmooth = g.roll ? a.heading : a.heading;
+  d.root.rotation.y += (headingSmooth - d.root.rotation.y) * Math.min(1, dt * 10);
+
+  // Bank (gövde yatması): roll input'u + takla animasyonu.
+  const bank = g.roll ? g.roll.dir * Math.PI * 2 * (g.roll.t / FLIGHT.rollDuration) : a.roll * 0.8;
   const lerpK = g.roll ? 1 : Math.min(1, dt * 5);
   d.body.rotation.z += (bank - d.body.rotation.z) * lerpK;
-  const yawGoal = g.roll ? 0 : (c.x * Math.PI) / 2;
-  d.root.rotation.y += (yawGoal - d.root.rotation.y) * Math.min(1, dt * 10);
 
+  // Kanat çırpma
   s.flap += dt * (2.2 + s.speed * 0.03);
-  const flapAmt = Math.sin(s.flap) * (boosting ? 0.75 : 0.5);
+  const flapAmt = Math.sin(s.flap) * (c.throttle ? 0.75 : 0.5);
   d.wingR.rotation.z = -flapAmt - 0.1;
   d.wingL.rotation.z = flapAmt + 0.1;
   d.wingR.rotation.x = Math.sin(s.flap - 0.6) * 0.16;
   d.wingL.rotation.x = Math.sin(s.flap - 0.6) * 0.16;
+
+  // Kuyruk ve boyun animasyonu
   d.tail.forEach((t, i) => {
-    t.rotation.y = Math.sin(s.flap * 0.7 - i * 0.45) * 0.13 - c.x * 0.06;
+    t.rotation.y = Math.sin(s.flap * 0.7 - i * 0.45) * 0.13 - a.roll * 0.08;
     t.rotation.x = Math.sin(s.flap * 0.5 - i * 0.3) * 0.05;
   });
   d.neck.forEach((n, i) => {
-    n.rotation.x = -c.y * 0.09 + Math.sin(s.flap * 0.6 - i) * 0.03;
-    n.rotation.y = -c.x * 0.08;
+    n.rotation.x = -a.pitch * 0.12 + Math.sin(s.flap * 0.6 - i) * 0.03;
+    n.rotation.y = -a.yaw * 0.08 - a.roll * 0.05;
   });
 }
 
 /** Ejderhanın yönüyle dönen, arkadan-üstten takip kamerası. */
 export function updateCamera(g: Game, dt: number, playing: boolean): void {
   const s = g.state;
-  const back = (playing ? 34 + s.speed * 0.16 : 40) + (s.rageT > 0 ? 8 : 0);
+  const a = g.flightAxes;
   const ry = g.dragon.root.rotation.y;
-  camOff.set(0, 14, -back).applyAxisAngle(UP, ry);
+
+  // Kamera geri mesafesi: pitch yukarı çıktıkça biraz uzar.
+  const pitchBackOffset = Math.max(0, a.pitch) * 6;
+  const back = (playing ? 34 + s.speed * 0.16 : 40) + (s.rageT > 0 ? 8 : 0) + pitchBackOffset;
+
+  // Kamera yüksekliği: pitch yukarı çıkınca biraz yukarı.
+  const pitchHeightOffset = a.pitch * 8;
+
+  camOff.set(0, 14 + pitchHeightOffset, -back).applyAxisAngle(UP, ry);
   camGoal.copy(camOff).add(g.dragon.root.position);
   camPos.copy(g.camera.position).lerp(camGoal, Math.min(1, dt * 9));
 
@@ -187,12 +362,18 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
     camPos.x += (Math.random() - 0.5) * amp;
     camPos.y += (Math.random() - 0.5) * amp;
   }
-  // Kamerayı arazinin altına sokma.
   camPos.y = Math.max(terrainHeight(camPos.x, camPos.z) + 8, camPos.y);
   g.camera.position.copy(camPos);
+
+  // Look-at noktası: pitch ve yaw etkisiyle hafifçe kaydır.
   fwdRot.set(0, 0, 26).applyAxisAngle(UP, ry);
   lookGoal.copy(g.dragon.root.position).add(fwdRot);
-  lookGoal.y += 3;
+  lookGoal.y += 3 + a.pitch * 5;
+
+  // Yaw: kameranın baktığı yönü de hafifçe döndür.
+  tmpVec.set(a.yaw * 8, 0, 0).applyAxisAngle(UP, ry);
+  lookGoal.add(tmpVec);
+
   g.camera.lookAt(lookGoal);
 }
 

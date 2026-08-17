@@ -30,7 +30,16 @@ import {
 import { createFireLights } from "./firelights";
 import { createFx, type FxSystem } from "./fx";
 import { createGrid, type Grid } from "./grid";
-import { FLIGHT, shake, tryRoll, updateCamera, updateFlight, type RollState } from "./flight";
+import {
+  FLIGHT,
+  shake,
+  tryRoll,
+  updateCamera,
+  updateFlight,
+  createFlightAxes,
+  type RollState,
+  type FlightAxes,
+} from "./flight";
 import {
   createInfinitePath,
   initInfinitePath,
@@ -123,6 +132,7 @@ export type Game = {
   streetAt(x: number, z: number): boolean;
   autoForward: boolean;
   infinite: InfinitePath | null;
+  flightAxes: FlightAxes;
 
   timeScale: number;
   paused: boolean;
@@ -481,6 +491,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     streetAt: city ? (x, z) => city!.streetAt(x, z) : () => false,
     autoForward: isInfinite,
     infinite: null,
+    flightAxes: createFlightAxes(),
     timeScale: 1,
     paused: false,
   };
@@ -840,8 +851,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         if (g.abilities.fireball && state.fireballCd <= 0 && state.overheat <= 0) {
           state.fireballCd = FIREBALL.cooldown;
           if (state.rageT <= 0) state.heat = Math.min(state.maxHeat, state.heat + FIREBALL.heat);
-          // Nişan yardımı: 2.5D'de ve dokunmatikte dikey nişan yok.
-          let elev = 0.12 + c.y * 0.12;
+          // Nişan yardımı: pitch etkisiyle hafif dikey kayma.
+          let elev = 0.12 + g.flightAxes.pitch * 0.18;
           let aimX = 0;
           let best = Infinity;
           const near: Target[] = [];
