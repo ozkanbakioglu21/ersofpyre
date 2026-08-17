@@ -64,8 +64,6 @@ export const FLIGHT = {
 
   /** Yaw input'unun heading'e ne kadar hızlı eklendiği (radyan/saniye). */
   headingRate: 1.6,
-  /** Heading ne kadar hızlı merkeze döner (input yokken). */
-  headingReturn: 0.6,
 } as const;
 
 /** Açısal momentum durumu: pitch, roll ve yaw için bağımsız state. */
@@ -248,11 +246,8 @@ export function updateFlight(g: Game, dt: number): void {
     g.vel.z *= FLIGHT.hoverDamping;
   } else {
     // Yaw → heading biriktirmesi (ejderhanın gerçek yönü).
+    // Input bırakılınca heading sabit kalır — ejderha döndüğü yönde uçar.
     a.heading += a.yaw * FLIGHT.headingRate * dt;
-    // Input yokken heading merkeze döner (yumuşak).
-    if (Math.abs(c.yaw) < 0.1) {
-      a.heading += (0 - a.heading) * Math.min(1, dt * FLIGHT.headingReturn);
-    }
     a.heading = THREE.MathUtils.clamp(a.heading, -Math.PI * 0.85, Math.PI * 0.85);
 
     // Hız vektörü: heading açısına göre.
