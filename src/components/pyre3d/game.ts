@@ -32,6 +32,12 @@ import { createFx, type FxSystem } from "./fx";
 import { createGrid, type Grid } from "./grid";
 import { FLIGHT, shake, tryRoll, updateCamera, updateFlight, type RollState } from "./flight";
 import {
+  createInfinitePath,
+  initInfinitePath,
+  updateInfinitePath,
+  type InfinitePath,
+} from "./infinitePath";
+import {
   createFireballPool,
   createShotPool,
   FIREBALL,
@@ -115,6 +121,8 @@ export type Game = {
   roll: RollState;
   worldRadius: number;
   streetAt(x: number, z: number): boolean;
+  autoForward: boolean;
+  infinite: InfinitePath | null;
 
   timeScale: number;
   paused: boolean;
@@ -233,7 +241,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   setTerrainMods(terrainMods);
   cleanups.push(() => setTerrainMods([]));
 
-  scene.add(createTerrain(worldRadius * 2.4));
+  const isInfinite = chapter.world.mode === "infinite";
+  scene.add(createTerrain(isInfinite ? 20000 : worldRadius * 2.4, isInfinite ? 140 : 72));
   const ash = createAsh(ASH_MAX, worldRadius);
   ash.geometry.setDrawRange(0, preset.ashCount);
   scene.add(ash);
@@ -470,9 +479,18 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     roll: null,
     worldRadius,
     streetAt: city ? (x, z) => city!.streetAt(x, z) : () => false,
+    autoForward: isInfinite,
+    infinite: null,
     timeScale: 1,
     paused: false,
   };
+
+  /* ---------------- sonsuz yol ---------------- */
+  if (isInfinite) {
+    const inf = createInfinitePath(chapter.world.city?.seed ?? 1337);
+    g.infinite = inf;
+    initInfinitePath(g, inf);
+  }
 
   /* ---------------- görev ---------------- */
   const spawnWave = (name: string) => {
@@ -780,6 +798,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
 
       /* ---- uçuş ---- */
       updateFlight(g, dt);
+      if (g.infinite) updateInfinitePath(g, g.infinite, dt);
       dragon.maw.getWorldPosition(headPos);
 
       /* ---- alev ---- */
@@ -1044,7 +1063,12 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         z.group.position.y += Math.sin(now * 0.0004 + z.group.position.x) * 4 * dt;
         if (z.burn < 0.3) {
           z.group.position.addScaledVector(z.dir, 12 * dt);
-          if (Math.hypot(z.group.position.x, z.group.position.z) > worldRadius * 0.85) {
+          if (g.autoForward) {
+            tmp.copy(dp).sub(z.group.position);
+            tmp.y = 0;
+            tmp.normalize();
+            z.dir.lerp(tmp, Math.min(1, dt * 0.5));
+          } else if (Math.hypot(z.group.position.x, z.group.position.z) > worldRadius * 0.85) {
             z.dir.set(-z.group.position.x, 0, -z.group.position.z).normalize();
           }
           z.group.lookAt(tmp2.copy(z.group.position).add(z.dir));

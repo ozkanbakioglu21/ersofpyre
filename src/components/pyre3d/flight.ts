@@ -103,7 +103,9 @@ export function updateFlight(g: Game, dt: number): void {
 
   // Girdi hıza uygulanıyor: ani duruş yok, savrulma var.
   const goalX = c.x * s.speed;
-  const goalZ = -c.y * s.speed;
+  const goalZ = g.autoForward
+    ? s.speed * (1 - c.y * 0.3)
+    : -c.y * s.speed;
   const k = Math.min(1, dt * FLIGHT.accel);
   g.vel.x += (goalX - g.vel.x) * k;
   g.vel.z += (goalZ - g.vel.z) * k;
@@ -127,13 +129,21 @@ export function updateFlight(g: Game, dt: number): void {
   );
 
   // Sınır dışına çıkınca yalnız yatay yarıçap kısılır; irtifa korunur.
-  const rr = Math.hypot(d.root.position.x, d.root.position.z);
-  if (rr > g.worldRadius) {
-    const f = g.worldRadius / rr;
-    d.root.position.x *= f;
-    d.root.position.z *= f;
-    g.vel.x *= 0.4;
-    g.vel.z *= 0.4;
+  // Sonsuz modda yalnızca X ekseni sınırlanır.
+  if (g.autoForward) {
+    if (Math.abs(d.root.position.x) > 180) {
+      d.root.position.x = Math.sign(d.root.position.x) * 180;
+      g.vel.x *= 0.4;
+    }
+  } else {
+    const rr = Math.hypot(d.root.position.x, d.root.position.z);
+    if (rr > g.worldRadius) {
+      const f = g.worldRadius / rr;
+      d.root.position.x *= f;
+      d.root.position.z *= f;
+      g.vel.x *= 0.4;
+      g.vel.z *= 0.4;
+    }
   }
 
   /* ---- gövde animasyonu ---- */

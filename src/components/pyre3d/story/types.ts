@@ -60,6 +60,8 @@ export type WorldSpec = {
   wind: { dir: number; strength: number };
   fogScale?: number;
   start?: { x: number; y: number; z: number };
+  /** Sonsuz ileri yol modu: ejderha otomatik +Z'ye uçar, chunk'lar oluşturulur. */
+  mode?: "infinite";
 };
 
 export type ObjectiveBase = { id: string; label: string; optional?: boolean; hidden?: boolean };
