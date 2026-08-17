@@ -234,9 +234,12 @@ export function updateFlight(g: Game, dt: number): void {
   /* ---- hız hesapla ---- */
   const rushMul = s.emberRush > 0 ? 1.35 : 1;
   const snareMul = s.snared > 0 ? 0.6 : 1;
+  const pitchActive = Math.abs(c.pitch) > 0.05;
   const throttleBoost = c.throttle * (FLIGHT.boostSpeed - FLIGHT.baseSpeed);
   const diveBoost = a.diveAccum * FLIGHT.diveGain;
-  const targetSpeed = (FLIGHT.baseSpeed + throttleBoost + diveBoost) * rushMul * snareMul;
+  const targetSpeed = pitchActive
+    ? (FLIGHT.baseSpeed + throttleBoost + diveBoost) * rushMul * snareMul
+    : 0;
   s.speed += (targetSpeed - s.speed) * Math.min(1, dt * 1.6);
 
   /* ---- yatay hız vektörü ---- */
