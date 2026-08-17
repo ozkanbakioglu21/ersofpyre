@@ -143,8 +143,14 @@ export function updateFlight(g: Game, dt: number): void {
     : -c.x * 0.6;
   const lerpK = g.roll ? 1 : Math.min(1, dt * 5);
   d.body.rotation.z += (bank - d.body.rotation.z) * lerpK;
-  const yawGoal = g.roll ? 0 : (c.x * Math.PI) / 2;
-  d.root.rotation.y += (yawGoal - d.root.rotation.y) * Math.min(1, dt * 10);
+  // Sağa/sola tam 180° dönüş
+  if (!g.roll) {
+    if (c.x > 0.1) g.yawTarget = 0;
+    else if (c.x < -0.1) g.yawTarget = Math.PI;
+  } else {
+    g.yawTarget = 0;
+  }
+  d.root.rotation.y += (g.yawTarget - d.root.rotation.y) * Math.min(1, dt * 5);
 
   s.flap += dt * (2.2 + s.speed * 0.03);
   const flapAmt = Math.sin(s.flap) * (boosting ? 0.75 : 0.5);

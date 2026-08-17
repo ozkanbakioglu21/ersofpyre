@@ -113,6 +113,7 @@ export type Game = {
   vel: THREE.Vector3;
   dive: number;
   roll: RollState;
+  yawTarget: number;
   worldRadius: number;
   streetAt(x: number, z: number): boolean;
 
@@ -468,6 +469,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     vel: new THREE.Vector3(),
     dive: 0,
     roll: null,
+    yawTarget: 0,
     worldRadius,
     streetAt: city ? (x, z) => city!.streetAt(x, z) : () => false,
     timeScale: 1,
