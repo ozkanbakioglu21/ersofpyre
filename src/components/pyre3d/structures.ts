@@ -1196,3 +1196,89 @@ export function buildVehicle(kind: VehicleKind, rng: Rng): THREE.Group {
   g.rotation.y = rng.range(0, Math.PI * 2);
   return g;
 }
+
+/** Ağaç — gövde + dallı taç. Çeşitli tipler: yuvarlak, konik, uzun gövdeli. */
+export function buildTree(rng: Rng): THREE.Group {
+  const g = new THREE.Group();
+  const type = rng.int(0, 3);
+
+  const trunkH = rng.range(1.8, 4.0);
+  const trunkR = rng.range(0.15, 0.35);
+  const barkCol = rng.chance(0.5) ? 0x3d2b1f : rng.chance(0.5) ? 0x4a3728 : 0x2e1e14;
+  const trunkMat = cityMat(barkCol, 0.9, 0.05);
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(trunkR * 0.6, trunkR, trunkH, 7), trunkMat);
+  trunk.position.y = trunkH / 2;
+  g.add(trunk);
+
+  const leafDark = rng.chance(0.3) ? 0x2d4a1a : rng.chance(0.5) ? 0x3a5c22 : 0x4a6e2c;
+  const leafMid = rng.chance(0.5) ? 0x4e7a30 : 0x5a8a38;
+  const leafMat = cityMat(leafDark, 0.92, 0.02);
+  const leafMat2 = cityMat(leafMid, 0.88, 0.02);
+
+  if (type === 0) {
+    // Yuvarlak taç — bir büyük küre + birkaç küçük
+    const crownR = rng.range(1.8, 3.2);
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(crownR, 8, 7), leafMat);
+    crown.position.y = trunkH + crownR * 0.6;
+    g.add(crown);
+    for (let i = 0; i < 3; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const d = rng.range(0.8, 1.8);
+      const s = crownR * rng.range(0.35, 0.55);
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(s, 6, 5), i % 2 === 0 ? leafMat2 : leafMat);
+      puff.position.set(Math.cos(a) * d, trunkH + crownR * 0.3 + rng.range(-0.5, 0.8), Math.sin(a) * d);
+      g.add(puff);
+    }
+  } else if (type === 1) {
+    // Konik — çam ağacı
+    const layers = rng.int(2, 4);
+    for (let i = 0; i < layers; i++) {
+      const t = i / (layers - 1);
+      const coneH = rng.range(1.5, 2.5) * (1 - t * 0.3);
+      const coneR = rng.range(1.2, 2.2) * (1 - t * 0.25);
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(coneR, coneH, 7),
+        i % 2 === 0 ? leafMat : leafMat2,
+      );
+      cone.position.y = trunkH - 0.3 + i * coneH * 0.55;
+      g.add(cone);
+    }
+  } else {
+    // Uzun gövdeli, geniş taç — meşe benzeri
+    const crownR = rng.range(2.2, 3.8);
+    const crownH = rng.range(1.5, 2.5);
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(crownR, 8, 6), leafMat);
+    crown.scale.y = crownH / crownR;
+    crown.position.y = trunkH + crownH * 0.3;
+    g.add(crown);
+    // Dallar
+    for (let i = 0; i < 4; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const branchL = rng.range(0.8, 1.8);
+      const branch = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06, 0.1, branchL, 5),
+        trunkMat,
+      );
+      branch.position.set(
+        Math.cos(a) * crownR * 0.6,
+        trunkH + rng.range(-0.5, 0.5),
+        Math.sin(a) * crownR * 0.6,
+      );
+      branch.rotation.z = rng.range(0.4, 0.9) * (rng.chance(0.5) ? 1 : -1);
+      branch.rotation.y = a;
+      g.add(branch);
+      const leafPuff = new THREE.Mesh(
+        new THREE.SphereGeometry(rng.range(0.6, 1.2), 5, 4),
+        leafMat2,
+      );
+      leafPuff.position.set(
+        Math.cos(a) * (crownR * 0.6 + branchL * 0.4),
+        trunkH + rng.range(0, 1),
+        Math.sin(a) * (crownR * 0.6 + branchL * 0.4),
+      );
+      g.add(leafPuff);
+    }
+  }
+
+  return g;
+}
