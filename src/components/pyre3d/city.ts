@@ -83,11 +83,11 @@ const DENSITY_MIN_AREA: Record<CitySpec["density"], number> = {
 const RINGS = [0.13, 0.3, 0.52, 0.76, 1.0];
 
 const DISTRICT_WEIGHTS: Record<District, Partial<Record<TargetKind, number>>> = {
-  core: { factory: 0.28, workshop: 0.3, tenement: 0.32, warehouse: 0.1 },
-  residential: { tenement: 0.58, house: 0.32, workshop: 0.1 },
-  market: { house: 0.34, workshop: 0.3, tenement: 0.26, warehouse: 0.1 },
-  industrial: { factory: 0.44, workshop: 0.3, warehouse: 0.26 },
-  docks: { warehouse: 0.54, workshop: 0.24, house: 0.22 },
+  core: { factory: 0.2, workshop: 0.25, tenement: 0.25, warehouse: 0.08, command_post: 0.12, barracks: 0.1 },
+  residential: { tenement: 0.5, house: 0.3, workshop: 0.08, barracks: 0.07, watchtower: 0.05 },
+  market: { house: 0.3, workshop: 0.25, tenement: 0.2, warehouse: 0.1, armory: 0.08, ammo_depot: 0.07 },
+  industrial: { factory: 0.35, workshop: 0.22, warehouse: 0.18, armory: 0.1, ammo_depot: 0.08, command_post: 0.07 },
+  docks: { warehouse: 0.45, workshop: 0.2, house: 0.15, barracks: 0.12, watchtower: 0.08 },
 };
 
 const DISTRICT_SCALE: Record<District, [number, number]> = {

@@ -48,6 +48,11 @@ const SCORE: Record<TargetKind, number> = {
   elevator: 340,
   bridge: 300,
   gate: 0,
+  barracks: 280,
+  armory: 320,
+  command_post: 400,
+  ammo_depot: 350,
+  watchtower: 240,
 };
 
 export const FLAMMABILITY: Record<TargetKind, number> = {
@@ -61,6 +66,11 @@ export const FLAMMABILITY: Record<TargetKind, number> = {
   factory: 0.25,
   tower: 0.1,
   gate: 0,
+  barracks: 0.7,
+  armory: 0.5,
+  command_post: 0.4,
+  ammo_depot: 0.9,
+  watchtower: 0.6,
 };
 
 /**
@@ -976,6 +986,273 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     radius = 3.4;
     height = h + 3;
     hp = 130;
+  }
+
+  /* ---- Askeri yapılar ---- */
+
+  if (kind === "barracks") {
+    // Kışla — geniş dikdörtgen bina, avlu, nöbet kulübesi
+    const w = rng.range(8, 12) * scale;
+    const h = rng.range(5, 7) * scale;
+    const d = rng.range(6, 9) * scale;
+    const wallCol = rng.chance(0.5) ? 0x4a4035 : 0x3d352b;
+    const wallMat = cityMat(wallCol, 0.9, 0.1);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+    body.position.y = h / 2;
+    parts.add(body);
+    // Çatı — eğimli
+    const roof = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 0.6, 0.5, d + 0.6),
+      cityMat(0x2a221a, 0.85),
+    );
+    roof.position.y = h + 0.25;
+    parts.add(roof);
+    // Pencereler — askeri-USP
+    for (let i = 0; i < Math.floor(w / 2.5); i++) {
+      const wx = -w / 2 + 1.2 + i * 2.5;
+      const win = new THREE.Mesh(
+        new THREE.BoxGeometry(1.0, 1.4, 0.15),
+        cityMat(0x1a1612, 0.7, 0.3),
+      );
+      win.position.set(wx, h * 0.55, d / 2 + 0.08);
+      parts.add(win);
+    }
+    // Nöbet kulübesi
+    const booth = new THREE.Mesh(
+      new THREE.BoxGeometry(1.8, 2.5, 1.8),
+      cityMat(0x3a3028),
+    );
+    booth.position.set(w / 2 + 1.5, 1.25, 0);
+    parts.add(booth);
+    const boothRoof = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 0.3, 2.2),
+      cityMat(0x2a221a),
+    );
+    boothRoof.position.set(w / 2 + 1.5, 2.65, 0);
+    parts.add(boothRoof);
+    radius = Math.max(w, d) / 2 + 1;
+    height = h;
+    hp = 160;
+  } else if (kind === "armory") {
+    // Cephanelik — kalın duvarlı, kapı geniş, patlayabilir
+    const w = rng.range(5, 7) * scale;
+    const h = rng.range(4, 5.5) * scale;
+    const d = rng.range(5, 7) * scale;
+    const wallMat = cityMat(0x3a3228, 0.85, 0.15);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+    body.position.y = h / 2;
+    parts.add(body);
+    // Kalın duvar hissi — dış paneller
+    for (const sx of [-1, 1]) {
+      const panel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, h * 0.9, d * 0.8),
+        cityMat(0x2e2620, 0.9, 0.2),
+      );
+      panel.position.set(sx * (w / 2 + 0.2), h * 0.45, 0);
+      parts.add(panel);
+    }
+    // Demir kapı
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(2.0, 2.8, 0.2),
+      cityMat(0x2b241e, 0.6, 0.7),
+    );
+    door.position.set(0, 1.4, d / 2 + 0.1);
+    parts.add(door);
+    // Kapı perçinleri
+    for (const dy of [0.8, 1.8, 2.6]) {
+      for (const dx of [-0.5, 0.5]) {
+        const rivet = new THREE.Mesh(
+          new THREE.SphereGeometry(0.08, 5, 4),
+          cityMat(0x8a6b32, 0.4, 0.8),
+        );
+        rivet.position.set(dx, dy, d / 2 + 0.22);
+        parts.add(rivet);
+      }
+    }
+    // Üzerinde "CEPHANELİK" tabelası (kırmızı şerit)
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 0.6, 0.25, 0.05),
+      cityMat(0x8a2020, 0.7),
+    );
+    stripe.position.set(0, h * 0.7, d / 2 + 0.1);
+    parts.add(stripe);
+    radius = Math.max(w, d) / 2 + 0.5;
+    height = h;
+    hp = 200;
+  } else if (kind === "command_post") {
+    // Komuta merkezi — yüksek, anten, harita odası
+    const w = rng.range(6, 9) * scale;
+    const h = rng.range(8, 12) * scale;
+    const d = rng.range(6, 9) * scale;
+    const wallCol = rng.chance(0.5) ? 0x3d3830 : 0x4a4235;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), cityMat(wallCol, 0.88, 0.12));
+    body.position.y = h / 2;
+    parts.add(body);
+    // Komuta katı — üstte daha geniş
+    const cmdFloor = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 1.0, 1.2, d + 1.0),
+      cityMat(0x2a2520, 0.85, 0.2),
+    );
+    cmdFloor.position.y = h - 0.6;
+    parts.add(cmdFloor);
+    // Anten direği
+    const antenna = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.12, 5, 5),
+      cityMat(0x2b241e, 0.5, 0.6),
+    );
+    antenna.position.set(w * 0.25, h + 2.5, 0);
+    parts.add(antenna);
+    // Anten topu
+    const antTop = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 6, 5),
+      cityMat(0x8a6b32, 0.3, 0.8),
+    );
+    antTop.position.set(w * 0.25, h + 5.2, 0);
+    parts.add(antTop);
+    // Sinyal ışığı
+    const sigLight = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 5, 4),
+      lanternMat,
+    );
+    sigLight.position.set(w * 0.25, h + 5.5, 0);
+    parts.add(sigLight);
+    // Pencereler — geniş komuta pencereleri
+    for (let i = 0; i < 3; i++) {
+      const wx = -w / 2 + 1.5 + i * (w / 3);
+      const win = new THREE.Mesh(
+        new THREE.BoxGeometry(w / 4.5, 1.8, 0.15),
+        cityMat(0x1a1612, 0.6, 0.4),
+      );
+      win.position.set(wx, h * 0.65, d / 2 + 0.08);
+      parts.add(win);
+    }
+    // Dış merdiven
+    const stairs = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, h * 0.4, 2.5),
+      cityMat(0x2e2620, 0.9, 0.1),
+    );
+    stairs.position.set(w / 2 + 0.6, h * 0.2, 0);
+    parts.add(stairs);
+    radius = Math.max(w, d) / 2 + 1;
+    height = h + 5;
+    hp = 240;
+  } else if (kind === "ammo_depot") {
+    // Mühimmat deposu — yuvarlak, silindirik, barikatlı
+    const r = rng.range(3.5, 5) * scale;
+    const h = rng.range(4, 6) * scale;
+    // Ana gövde — silindir
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(r, r * 1.05, h, 10),
+      cityMat(0x3a3228, 0.85, 0.15),
+    );
+    body.position.y = h / 2;
+    parts.add(body);
+    // Kubbemsi çatı
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(r, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+      cityMat(0x2e2620, 0.8, 0.2),
+    );
+    dome.position.y = h;
+    parts.add(dome);
+    // Barikatlar — etrafında
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const bx = Math.cos(a) * (r + 1.5);
+      const bz = Math.sin(a) * (r + 1.5);
+      const bar = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 1.0, 0.3),
+        cityMat(0x2b241e, 0.9, 0.1),
+      );
+      bar.position.set(bx, 0.5, bz);
+      bar.rotation.y = a + Math.PI / 2;
+      parts.add(bar);
+    }
+    // Kapı
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(1.8, 2.4, 0.2),
+      cityMat(0x2b241e, 0.6, 0.6),
+    );
+    door.position.set(0, 1.2, r + 0.1);
+    parts.add(door);
+    // Patlama uyarısı — sarı şerit
+    const warnStripe = new THREE.Mesh(
+      new THREE.BoxGeometry(r * 1.2, 0.2, 0.05),
+      cityMat(0xc8a820, 0.7),
+    );
+    warnStripe.position.set(0, h * 0.65, r + 0.08);
+    parts.add(warnStripe);
+    radius = r + 2;
+    height = h + r * 0.5;
+    hp = 180;
+  } else if (kind === "watchtower") {
+    // Gözetleme kulesi — yüksek, dar, gözlem platformu
+    const base = rng.range(3, 4) * scale;
+    const h = rng.range(12, 18) * scale;
+    // Temel
+    const foundation = new THREE.Mesh(
+      new THREE.BoxGeometry(base + 1, 1.5, base + 1),
+      cityMat(0x3a3228, 0.9, 0.1),
+    );
+    foundation.position.y = 0.75;
+    parts.add(foundation);
+    // Direk gövdesi
+    const pole = new THREE.Mesh(
+      new THREE.BoxGeometry(base, h, base),
+      cityMat(0x4a4035, 0.88, 0.1),
+    );
+    pole.position.y = h / 2 + 1.5;
+    parts.add(pole);
+    // Platform — üstte geniş
+    const platform = new THREE.Mesh(
+      new THREE.BoxGeometry(base + 2, 0.4, base + 2),
+      cityMat(0x2e2620, 0.85, 0.15),
+    );
+    platform.position.y = h + 1.7;
+    parts.add(platform);
+    // Korkuluk
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const post = new THREE.Mesh(
+          new THREE.BoxGeometry(0.15, 1.2, 0.15),
+          cityMat(0x2b241e, 0.9),
+        );
+        post.position.set(sx * (base / 2 + 0.8), h + 2.5, sz * (base / 2 + 0.8));
+        parts.add(post);
+      }
+    }
+    // Siper duvarı
+    for (const side of ["front", "back", "left", "right"]) {
+      const isX = side === "front" || side === "back";
+      const s = side === "front" || side === "right" ? 1 : -1;
+      const wall = new THREE.Mesh(
+        new THREE.BoxGeometry(isX ? base + 2 : 0.2, 0.8, isX ? 0.2 : base + 2),
+        cityMat(0x3a3228, 0.85),
+      );
+      wall.position.set(
+        isX ? 0 : s * (base / 2 + 0.9),
+        h + 2.5,
+        isX ? s * (base / 2 + 0.9) : 0,
+      );
+      parts.add(wall);
+    }
+    // Tüfek slotları
+    for (let i = 0; i < 3; i++) {
+      const slotAngle = (i / 3) * Math.PI * 2;
+      const slot = new THREE.Mesh(
+        new THREE.BoxGeometry(0.6, 0.4, 0.15),
+        cityMat(0x1a1612, 0.7, 0.3),
+      );
+      slot.position.set(
+        Math.cos(slotAngle) * (base / 2 + 0.5),
+        h + 2.2,
+        Math.sin(slotAngle) * (base / 2 + 0.5),
+      );
+      slot.rotation.y = slotAngle;
+      parts.add(slot);
+    }
+    radius = base / 2 + 2;
+    height = h + 3;
+    hp = 150;
   }
 
   return { parts, radius, height, hp, flammable: FLAMMABILITY[kind], score: SCORE[kind], tower };

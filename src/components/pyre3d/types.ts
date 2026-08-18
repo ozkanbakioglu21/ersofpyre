@@ -74,7 +74,12 @@ export type TargetKind =
   | "mast"
   | "elevator"
   | "bridge"
-  | "gate";
+  | "gate"
+  | "barracks"
+  | "armory"
+  | "command_post"
+  | "ammo_depot"
+  | "watchtower";
 
 export type TowerKind = "tesla" | "flak" | "isildak";
 
