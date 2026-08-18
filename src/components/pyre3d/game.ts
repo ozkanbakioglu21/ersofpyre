@@ -194,13 +194,13 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   renderer.shadowMap.enabled = preset.shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.45;
   if (renderer.domElement.parentElement !== mount) mount.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1210);
   const fogScale = chapter.world.fogScale ?? 1;
-  const fog = new THREE.FogExp2(0x2a1a14, preset.fogDensity * fogScale);
+  const fog = new THREE.FogExp2(0x3a2518, preset.fogDensity * fogScale);
   scene.fog = fog;
 
   const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.5, 2400);
@@ -209,10 +209,10 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
    * Sahnedeki ışık SAYISI derlemeden sonra asla değişmez (bkz. quality.ts).
    * Hepsi burada doğuyor, kullanılmayan yoğunluğu 0'da bekliyor.
    */
-  scene.add(new THREE.HemisphereLight(0x50301f, 0x120a07, 0.7));
-  const fill = new THREE.PointLight(0xffa860, 2.2, 120, 2);
+  scene.add(new THREE.HemisphereLight(0x7a5030, 0x1a0e08, 0.9));
+  const fill = new THREE.PointLight(0xffa860, 2.8, 140, 2);
   scene.add(fill);
-  const sun = new THREE.DirectionalLight(0xff8a3c, 1.5);
+  const sun = new THREE.DirectionalLight(0xff8a3c, 1.8);
   sun.position.set(-160, 190, -120);
   sun.castShadow = true;
   sun.shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
