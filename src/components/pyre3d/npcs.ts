@@ -34,7 +34,7 @@ export type NpcHandle = {
   dispose(): void;
 };
 
-const MAX_NPC = 300;
+const MAX_NPC = 400;
 const CIVILIAN_SPEED = 14;
 const SOLDIER_SHOOT_INTERVAL = 2.2;
 const FLEE_DISTANCE = 60;
@@ -160,7 +160,7 @@ export function createNpcSystem(
     const z = cz + Math.sin(a) * r;
     if (!streetAt(x, z)) continue;
 
-    const kind: NpcKind = rng.chance(0.3) ? "soldier" : "civilian";
+    const kind: NpcKind = rng.chance(0.75) ? "soldier" : "civilian";
     const npc = createNpc(kind, x, 0.1, z, rng);
     // Yer yüksekliği
     npc.group.position.y = 0.1;
