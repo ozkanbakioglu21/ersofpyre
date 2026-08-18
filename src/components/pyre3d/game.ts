@@ -194,13 +194,13 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   renderer.shadowMap.enabled = preset.shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.7;
+  renderer.toneMappingExposure = 1.85;
   if (renderer.domElement.parentElement !== mount) mount.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x2a1c14);
+  scene.background = new THREE.Color(0x3a2828);
   const fogScale = chapter.world.fogScale ?? 1;
-  const fog = new THREE.FogExp2(0x4a3020, preset.fogDensity * fogScale * 0.85);
+  const fog = new THREE.FogExp2(0x5a3838, preset.fogDensity * fogScale * 0.8);
   scene.fog = fog;
 
   const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.5, 2400);
@@ -209,11 +209,11 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
    * Sahnedeki ışık SAYISI derlemeden sonra asla değişmez (bkz. quality.ts).
    * Hepsi burada doğuyor, kullanılmayan yoğunluğu 0'da bekliyor.
    */
-  scene.add(new THREE.HemisphereLight(0x9a7050, 0x2a1a10, 1.1));
-  const fill = new THREE.PointLight(0xffb870, 3.4, 160, 2);
+  scene.add(new THREE.HemisphereLight(0xb08868, 0x3a2020, 1.2));
+  const fill = new THREE.PointLight(0xff9070, 3.6, 180, 2);
   scene.add(fill);
-  const sun = new THREE.DirectionalLight(0xffa050, 2.2);
-  sun.position.set(-160, 190, -120);
+  const sun = new THREE.DirectionalLight(0xffb070, 2.4);
+  sun.position.set(-180, 80, -140);
   sun.castShadow = true;
   sun.shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
   sun.shadow.camera.left = -140;
@@ -967,11 +967,11 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       }
       if (state.rageT > 0) {
         state.rageT = Math.max(0, state.rageT - dt);
-        fill.color.setHex(0xff5a1a);
-        fog.density = preset.fogDensity * fogScale * 0.75;
+        fill.color.setHex(0xff7050);
+        fog.density = preset.fogDensity * fogScale * 0.7;
       } else {
-        fill.color.setHex(0xffb870);
-        fog.density = preset.fogDensity * fogScale * 0.85;
+        fill.color.setHex(0xff9070);
+        fog.density = preset.fogDensity * fogScale * 0.8;
         if (state.time > 1) state.rage = Math.max(0, state.rage - 0.5 * dt);
       }
 
