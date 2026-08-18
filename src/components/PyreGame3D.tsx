@@ -139,7 +139,7 @@ export default function PyreGame3D({
       const c = ctrlRef.current;
       // W = dive (pitch down), S = ascend (pitch up)
       c.pitch =
-        (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) - (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0);
+        (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0) - (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0);
       c.throttle = keys["ShiftLeft"] || keys["ShiftRight"] ? 1 : 0;
       // A/D = yaw (pure direction), Q/E = roll (bank)
       c.roll = (keys["KeyQ"] ? -1 : 0) + (keys["KeyE"] ? 1 : 0);
