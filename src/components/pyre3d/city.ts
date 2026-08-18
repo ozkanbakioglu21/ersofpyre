@@ -163,6 +163,33 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       spec.cz + Math.sin(a) * (R * RINGS[0]! + len / 2),
     );
     parts.add(strip);
+
+    // Cadde kenarları (kerb) — her iki taraf
+    const kerbMat = cityMat(0x2a2018, 0.95);
+    for (const side of [-1, 1]) {
+      const kerb = new THREE.Mesh(
+        new THREE.BoxGeometry(len, 0.35, 0.4),
+        kerbMat,
+      );
+      kerb.rotation.x = -Math.PI / 2;
+      kerb.rotation.z = -a;
+      kerb.position.set(
+        spec.cx + Math.cos(a) * (R * RINGS[0]! + len / 2),
+        baseY + 0.18,
+        spec.cz + Math.sin(a) * (R * RINGS[0]! + len / 2) + side * AVENUE_HALF,
+      );
+      parts.add(kerb);
+    }
+
+    // Cadde lambaları — her 12 birimde bir
+    const lampCount = Math.max(1, Math.floor(len / 12));
+    for (let k = 0; k < lampCount; k++) {
+      const t = (k + 0.5) / lampCount;
+      const lx = spec.cx + Math.cos(a) * (R * RINGS[0]! + len * t);
+      const lz = spec.cz + Math.sin(a) * (R * RINGS[0]! + len * t);
+      const side = k % 2 === 0 ? 1 : -1;
+      addStreetLamp(parts, lx + Math.cos(a + Math.PI / 2) * side * (AVENUE_HALF - 1.5), baseY, lz + Math.sin(a + Math.PI / 2) * side * (AVENUE_HALF - 1.5), rng);
+    }
   }
 
   // Halka yolları.
@@ -176,6 +203,34 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(spec.cx, baseY + 0.1, spec.cz);
     parts.add(ring);
+
+    // Halka yolu kenarları (kerb)
+    const kerbMat = cityMat(0x2a2018, 0.95);
+    for (const side of [-1, 1]) {
+      const rKerb = new THREE.Mesh(
+        new THREE.TorusGeometry(rr + side * RING_ROAD_HALF, 0.2, 4, 48),
+        kerbMat,
+      );
+      rKerb.rotation.x = Math.PI / 2;
+      rKerb.position.set(spec.cx, baseY + 0.18, spec.cz);
+      parts.add(rKerb);
+    }
+
+    // Halka yolu lambaları
+    const lampInterval = 18;
+    const circumference = 2 * Math.PI * rr;
+    const lCount = Math.max(4, Math.floor(circumference / lampInterval));
+    for (let k = 0; k < lCount; k++) {
+      const a = (k / lCount) * Math.PI * 2;
+      const side = k % 2 === 0 ? 1 : -1;
+      addStreetLamp(
+        parts,
+        spec.cx + Math.cos(a) * (rr + side * (RING_ROAD_HALF - 1.5)),
+        baseY,
+        spec.cz + Math.sin(a) * (rr + side * (RING_ROAD_HALF - 1.5)),
+        rng,
+      );
+    }
   }
 
   // Kazan Meydanı: merkez, köz damarından beslenen bir ızgara.
@@ -190,6 +245,19 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
   vent.rotation.x = -Math.PI / 2;
   vent.position.set(spec.cx, baseY + 0.2, spec.cz);
   parts.add(vent);
+
+  // Meydan etrafında fenerler
+  const plazaR = R * RINGS[0]! * 0.75;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    addStreetLamp(
+      parts,
+      spec.cx + Math.cos(a) * plazaR,
+      baseY,
+      spec.cz + Math.sin(a) * plazaR,
+      rng,
+    );
+  }
 
   if (spec.wall) {
     const wallR = R * 1.06;
@@ -228,6 +296,31 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
   const g = new THREE.Group();
   for (const m of bake(parts, { castShadow: true, receiveShadow: true })) g.add(m);
   return g;
+}
+
+/** Sokak lambası — demir direk, köz feneri. */
+function addStreetLamp(parent: THREE.Object3D, x: number, y: number, z: number, _rng: Rng) {
+  const lampMat = cityMat(0x1a1410, 0.8, 0.6);
+  // Direk
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 5.5, 6), lampMat);
+  pole.position.set(x, y + 2.75, z);
+  parent.add(pole);
+  // Üst bükülme (dirsek)
+  const elbow = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 1.2, 5), lampMat);
+  elbow.position.set(x, y + 5.8, z);
+  elbow.rotation.z = 0.3;
+  parent.add(elbow);
+  // Fener kutusu
+  const lantern = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.6, 0.5),
+    cityMat(0x8a6b32, 0.35, 0.9),
+  );
+  lantern.position.set(x + 0.4, y + 6.3, z);
+  parent.add(lantern);
+  // Işık topu
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), lanternMat);
+  glow.position.set(x + 0.4, y + 6.0, z);
+  parent.add(glow);
 }
 
 export type StepFn = (pct: number, label: string) => Promise<void>;

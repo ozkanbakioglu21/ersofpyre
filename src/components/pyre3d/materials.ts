@@ -83,10 +83,80 @@ export const woodMat = shared(
   new THREE.MeshStandardMaterial({ color: 0x4a3118, roughness: 0.95, flatShading: true }),
 );
 
+/** Kaldırım taş dokusu — cadde ve sokak yüzeyleri için. */
+function makeCobblestoneTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 256;
+  const ctx = c.getContext("2d")!;
+  // Koyu temel
+  ctx.fillStyle = "#1a1310";
+  ctx.fillRect(0, 0, 256, 256);
+  // Rastgele kaldırımtaşları
+  const stoneW = 28;
+  const stoneH = 18;
+  const gap = 2;
+  for (let row = 0; row < 14; row++) {
+    const offset = row % 2 === 0 ? 0 : stoneW / 2 + 1;
+    for (let col = -1; col < 11; col++) {
+      const x = col * (stoneW + gap) + offset + (Math.random() - 0.5) * 3;
+      const y = row * (stoneH + gap) + (Math.random() - 0.5) * 2;
+      const base = 25 + Math.floor(Math.random() * 18);
+      const r = base + Math.floor(Math.random() * 8);
+      const g = base + Math.floor(Math.random() * 6);
+      const b = base - 3 + Math.floor(Math.random() * 8);
+      // Taş yüzeyi
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.beginPath();
+      ctx.roundRect(x, y, stoneW - 1, stoneH - 1, 3);
+      ctx.fill();
+      // Üst kenar ışığı
+      ctx.fillStyle = `rgba(180,160,140,${0.04 + Math.random() * 0.04})`;
+      ctx.fillRect(x + 2, y + 1, stoneW - 5, 1.5);
+      // Alt kenar gölgesi
+      ctx.fillStyle = `rgba(0,0,0,${0.15 + Math.random() * 0.1})`;
+      ctx.fillRect(x + 2, y + stoneH - 3, stoneW - 5, 1.5);
+    }
+  }
+  // Harç çizgileri (daha koyu)
+  ctx.strokeStyle = "rgba(8,5,3,0.5)";
+  ctx.lineWidth = 1.5;
+  for (let row = 0; row <= 14; row++) {
+    const y = row * (stoneH + gap) - gap / 2;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(256, y);
+    ctx.stroke();
+  }
+  // Rastgele çatlaklar
+  ctx.strokeStyle = "rgba(5,3,2,0.3)";
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 12; i++) {
+    const sx = Math.random() * 256;
+    const sy = Math.random() * 256;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + (Math.random() - 0.5) * 20, sy + (Math.random() - 0.5) * 15);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.repeat.set(8, 8);
+  tex.userData["shared"] = true;
+  return tex;
+}
+
+let _cobbleTex: THREE.CanvasTexture | null = null;
+export function cobblestoneTexture(): THREE.CanvasTexture {
+  return (_cobbleTex ??= makeCobblestoneTexture());
+}
+
 /** Cadde/meydan zemini — şehir bloklarının altına serilen koyu kaplama. */
 export const streetMat = shared(
   new THREE.MeshStandardMaterial({
     color: 0x1c1410,
+    map: cobblestoneTexture(),
     roughness: 1,
     polygonOffset: true,
     polygonOffsetFactor: -1,
