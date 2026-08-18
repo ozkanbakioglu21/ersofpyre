@@ -117,14 +117,14 @@ const c02: ChapterDef = {
   },
   world: {
     radius: 620,
-    scatter: { house: 26, workshop: 8, warehouse: 5 },
+    scatter: { house: 42, workshop: 10, warehouse: 6 },
     props: [{ t: "structure", kind: "bridge", x: 0, z: 120, scale: 1.35, id: "kopru" }],
     wind: { dir: 1.1, strength: 0.45 },
     start: { x: 0, y: 70, z: -140 },
   },
   objectives: [
     { id: "kopru", type: "destroyKind", kind: "bridge", count: 1, label: "Madenci köprüsünü yak" },
-    { id: "kamp", type: "destroyPercent", pct: 0.5, label: "Kampı küle çevir" },
+    { id: "kamp", type: "destroyPercent", pct: 0.1, label: "Kampı küle çevir" },
   ],
   fail: [{ type: "death" }],
   abilities: { ...ALL_OFF, flame: true },
@@ -197,7 +197,7 @@ const c03: ChapterDef = {
   },
   world: {
     radius: 700,
-    scatter: { house: 14, tower: 6, workshop: 6 },
+    scatter: { house: 28, tower: 6, workshop: 8 },
     airships: [
       { x: 180, y: 120, z: 60, role: "scout" },
       { x: -220, y: 140, z: -80, role: "scout" },
@@ -212,6 +212,7 @@ const c03: ChapterDef = {
   objectives: [
     { id: "wasp", type: "killEnemies", enemy: "wasp", count: 8, label: "Wasp avcılarını düşür" },
     { id: "kacinma", type: "perfectDodges", count: 3, label: "Kusursuz kaçınma" },
+    { id: "yikim", type: "destroyPercent", pct: 0.2, label: "Yerleşimi yak" },
   ],
   fail: [{ type: "death" }],
   abilities: { ...ALL_OFF, flame: true, roll: true, shock: true },
@@ -289,7 +290,7 @@ const c04: ChapterDef = {
       cx: 0,
       cz: 0,
       radius: 430,
-      density: "medium",
+      density: "large",
       wall: true,
       masts: 4,
       elevators: 4,
@@ -304,7 +305,7 @@ const c04: ChapterDef = {
     start: { x: 0, y: 120, z: -520 },
   },
   objectives: [
-    { id: "yikim", type: "destroyPercent", pct: 0.6, label: "Şehri küle çevir" },
+    { id: "yikim", type: "destroyPercent", pct: 0.3, label: "Şehri küle çevir" },
     {
       id: "asansor",
       type: "destroyKind",
@@ -396,7 +397,7 @@ const c05: ChapterDef = {
   },
   world: {
     radius: 760,
-    scatter: { tower: 8, factory: 6, house: 10 },
+    scatter: { tower: 8, factory: 6, house: 22 },
     airships: [
       { x: 0, y: 150, z: 260, role: "frigate", id: "bulwark", weakPoints: true },
       { x: 220, y: 130, z: 320, role: "scout" },
@@ -415,6 +416,7 @@ const c05: ChapterDef = {
       label: "Bulwark modülleri",
     },
     { id: "gemi", type: "killAirships", role: "frigate", count: 1, label: "Firkateyni düşür" },
+    { id: "yikim", type: "destroyPercent", pct: 0.4, label: "Yerleşimi yak" },
   ],
   fail: [{ type: "death" }],
   abilities: { flame: true, fireball: true, roll: true, shock: true, rage: true },
@@ -474,7 +476,7 @@ const c06: ChapterDef = {
   },
   world: {
     radius: 820,
-    scatter: { tower: 14, factory: 8 },
+    scatter: { tower: 14, factory: 8, house: 16 },
     airships: [
       { x: 260, y: 160, z: 180, role: "scout" },
       { x: -280, y: 150, z: 120, role: "scout" },
@@ -494,6 +496,7 @@ const c06: ChapterDef = {
   objectives: [
     { id: "hayatta", type: "survive", seconds: 90, label: "Hayatta kal" },
     { id: "kacis", type: "reachZone", zone: "kacis", label: "Kül Vadisi'ne kaç", hidden: true },
+    { id: "yikim", type: "destroyPercent", pct: 0.5, label: "Yerleşimi yak" },
   ],
   fail: [{ type: "death" }],
   abilities: { flame: true, fireball: true, roll: true, shock: true, rage: true },
@@ -572,7 +575,7 @@ export function makeSandbox(seed: number): ChapterDef {
         cx: 0,
         cz: 0,
         radius: 440,
-        density: "medium",
+        density: "large",
         wall: true,
         masts: 5,
         elevators: 3,
@@ -586,7 +589,7 @@ export function makeSandbox(seed: number): ChapterDef {
       wind: { dir: Math.random() * Math.PI * 2, strength: 0.5 },
       start: { x: 0, y: 120, z: -520 },
     },
-    objectives: [{ id: "yikim", type: "destroyPercent", pct: 0.6, label: "Şehri küle çevir" }],
+    objectives: [{ id: "yikim", type: "destroyPercent", pct: 0.7, label: "Şehri küle çevir" }],
     fail: [{ type: "death" }],
     abilities: { flame: true, fireball: true, roll: true, shock: true, rage: true },
     par: { time: 420, score: 24000 },
