@@ -361,27 +361,54 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   if (cancelled) return null;
 
   /* ---------------- alev donanımı ---------------- */
-  const mkFlame = (color: number, r: number, h: number, seg: number, z: number) => {
+  /**
+   * Alev konisi.
+   *
+   * Üç şey birden yanlıştı ve üçü de "alev görünmüyor" olarak çıkıyordu:
+   *
+   *  - Koni ejderhanın 26 birim ÖNÜNDE, kök yüksekliğinde duruyordu; ağız
+   *    ise 5 birim önde ve 3 birim aşağıda. Arada ~20 birimlik boşluk vardı,
+   *    alev ağızdan çıkmıyor havada asılı duruyordu.
+   *  - Koninin geniş ucu ağızda, sivri ucu ileridedeydi — jet değil mızrak.
+   *  - Boy animasyonu `scale.z`'ye yazıyordu; ama geometri yerel +Y boyunca
+   *    uzanıyor, Z ise YARIÇAP ekseni. Yani alev hiç uzayıp kısalmıyor,
+   *    sadece şişip iniyordu.
+   *
+   * Şimdi: tepe noktası ağızda, ileri doğru açılıyor, boy `scale.y` ile
+   * nefesle birlikte uzuyor.
+   */
+  const mkFlame = (color: number, r: number, h: number, seg: number) => {
     const mat = new THREE.MeshBasicMaterial({
       color,
       transparent: true,
       opacity: 0,
       depthWrite: false,
+      side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
     });
     const geo = new THREE.ConeGeometry(r, h, seg, 1, true);
+    // Tepe noktasını başlangıca al: rotateX ile ucu -Y'ye çevirip yukarı ötele.
+    geo.rotateX(Math.PI);
     geo.translate(0, h / 2, 0);
     const mesh = new THREE.Mesh(geo, mat);
+    // Yerel +Y (koninin boyu) ejderhanın ileri yönü olan +Z'ye bakıyor.
     mesh.rotation.x = Math.PI / 2;
-    mesh.position.set(0, 0, z);
     return { mesh, mat };
   };
-  const flameOuter = mkFlame(0xff7a1a, 6.5, 48, 14, 26);
-  const flameMid = mkFlame(0xffc83c, 3.8, 44, 12, 22);
-  const flameCore = mkFlame(0xfff6d0, 1.7, 38, 10, 19);
+  // Boylar BREATH.range (70) ile aynı mertebede: gördüğün alev yaktığın alan.
+  const flameOuter = mkFlame(0xff7a1a, 10, 64, 14);
+  const flameMid = mkFlame(0xffc83c, 6.4, 58, 12);
+  const flameCore = mkFlame(0xfff6d0, 3.2, 50, 10);
   const flameRig = new THREE.Group();
   flameRig.add(flameOuter.mesh, flameMid.mesh, flameCore.mesh);
+  // Hafif aşağı eğim. İki işe yarıyor: takip kamerası tam arkadan baktığı
+  // için düz ileri giden koni eksenden görülüyor ve jet yerine leke gibi
+  // duruyordu; ayrıca yaktığın şey zaten altındaki şehir. Eğim hasar
+  // konisinin yarı açısının (~31°) çok içinde, nişan kaymıyor.
+  flameRig.rotation.x = 0.2;
   dragon.root.add(flameRig);
+  /** Ağzın kök uzayındaki yeri — her karede güncelleniyor, kafa oynuyor. */
+  const flameAnchor = new THREE.Vector3();
   const flameLight = new THREE.PointLight(0xff7a1a, 0, 55, 2);
   flameLight.position.set(0, 0.4, 3);
   dragon.root.add(flameLight);
@@ -837,10 +864,15 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         flameOuter.mat.opacity = 0.42 + Math.random() * 0.18;
         flameMid.mat.opacity = 0.6 + Math.random() * 0.2;
         flameCore.mat.opacity = 0.7 + Math.random() * 0.2;
-        flameOuter.mesh.scale.set(1 + Math.random() * 0.16, 1, len);
-        flameMid.mesh.scale.set(1 + Math.random() * 0.1, 1, len * (0.8 + Math.random() * 0.2));
-        flameCore.mesh.scale.set(1 + Math.random() * 0.08, 1, len * 0.72);
-        fx.flameJet(headPos, 7);
+        // Boy yerel Y'de, kalınlık X/Z'de.
+        const wOuter = 1 + Math.random() * 0.16;
+        const wMid = 1 + Math.random() * 0.1;
+        const wCore = 1 + Math.random() * 0.08;
+        flameOuter.mesh.scale.set(wOuter, len, wOuter);
+        const midLen = len * (0.8 + Math.random() * 0.2);
+        flameMid.mesh.scale.set(wMid, midLen, wMid);
+        flameCore.mesh.scale.set(wCore, len * 0.72, wCore);
+        fx.flameJet(headPos, 7, g.fwd);
         fx.ember(headPos, 3, 5);
       } else {
         dragon.glow.intensity += (0 - dragon.glow.intensity) * Math.min(1, dt * 6);
@@ -849,6 +881,12 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         flameMid.mat.opacity += (0 - flameMid.mat.opacity) * Math.min(1, dt * 10);
         flameCore.mat.opacity += (0 - flameCore.mat.opacity) * Math.min(1, dt * 12);
       }
+      // Alev donanımını ağza kilitle: kafa uçuşta ve alev püskürtürken
+      // eğiliyor, sabit bir ofset alevi gövdenin içinde ya da havada bırakıyor.
+      flameAnchor.copy(headPos);
+      dragon.root.worldToLocal(flameAnchor);
+      flameRig.position.copy(flameAnchor);
+
       updateBreath(g, dt, firing, headPos);
       (dragon.maw.material as THREE.MeshStandardMaterial).emissiveIntensity =
         1.5 + state.heat * 0.06;

@@ -14,7 +14,7 @@ export type FxSystem = {
   /** Kor sıçraması. */
   ember(p: THREE.Vector3, n: number, spread?: number): void;
   /** Ağızdan fışkıran alev jeti. */
-  flameJet(p: THREE.Vector3, n: number): void;
+  flameJet(p: THREE.Vector3, n: number, dir: THREE.Vector3): void;
   explosion(p: THREE.Vector3, size: number): void;
   shock(p: THREE.Vector3): void;
   update(dt: number, now: number): void;
@@ -149,16 +149,26 @@ export function createFx(scene: THREE.Scene): FxSystem {
         emIdx = (emIdx + 1) % EMBERS;
       }
     },
-    flameJet(p, n) {
+    flameJet(p, n, dir) {
       const count = Math.max(1, Math.round(n * density));
+      // Jet ejderhanın baktığı YÖNE atılıyor. Eskiden hız doğrudan dünya
+      // +Z'ye yazılıyordu: heading 0'dan saptığın anda alev ileri değil yana
+      // savruluyor, batıya uçarken de tamamen geriye kalıyordu.
+      const sx = dir.x;
+      const sz = dir.z;
+      // Yöne dik vektör: saçılmayı jetin etrafına dağıtmak için.
+      const px = dir.z;
+      const pz = -dir.x;
       for (let i = 0; i < count; i++) {
         const i3 = fpIdx * 3;
         fpPos[i3] = p.x + rand(-0.7, 0.7);
         fpPos[i3 + 1] = p.y + rand(-0.7, 0.7);
         fpPos[i3 + 2] = p.z + rand(-0.7, 0.7);
-        fpVel[i3] = rand(-4, 4);
+        const speed = rand(52, 96);
+        const spread = rand(-4, 4);
+        fpVel[i3] = sx * speed + px * spread;
         fpVel[i3 + 1] = rand(3, 12);
-        fpVel[i3 + 2] = rand(52, 96);
+        fpVel[i3 + 2] = sz * speed + pz * spread;
         const life = rand(0.35, 0.85);
         fpLife[fpIdx] = life;
         fpMax[fpIdx] = life;
