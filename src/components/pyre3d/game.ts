@@ -167,8 +167,8 @@ export type CreateGameOpts = {
 export type GameHandle = { cmd(c: GameCommand): void; dispose(): void };
 
 /** origin/main'in sis inceltmesi — üç ayar yolunda da aynı kalmalı. */
-const FOG_SCALE = 0.85;
-const SUN_OFFSET = new THREE.Vector3(-140, 200, -110);
+const FOG_SCALE = 0.8;
+const SUN_OFFSET = new THREE.Vector3(-180, 110, -140);
 const FWD = new THREE.Vector3(0, 0, 1);
 
 type Gate = { pos: THREE.Vector3; radius: number; passed: boolean; group: THREE.Group };
@@ -200,9 +200,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   if (renderer.domElement.parentElement !== mount) mount.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x2a1c14);
+  scene.background = new THREE.Color(0x3a2828);
   const fogScale = chapter.world.fogScale ?? 1;
-  const fog = new THREE.FogExp2(0x4a3524, preset.fogDensity * fogScale * FOG_SCALE);
+  const fog = new THREE.FogExp2(0x5a3838, preset.fogDensity * fogScale * FOG_SCALE);
   scene.fog = fog;
 
   const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.5, 2400);
@@ -214,16 +214,14 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   // Yoğunluklar three.js'in fiziksel birimlerine göre: dağınık BRDF ışınımı
   // 1/PI ile ölçekliyor, yani albedosu %3 civarında olan bu kül paletinin
   // okunabilmesi için toplam ışınımın PI mertebesinde olması gerekiyor.
-  // Renkler kasten doygunluğu düşük tutuluyor: turuncu ışık + kahve albedo
-  // çarpımı, yeşil/mavi kanalları söndürüp sahneyi tek renk kırmızıya
-  // çeviriyordu.
-  scene.add(new THREE.HemisphereLight(0xa8825c, 0x2e1e14, 2.3));
-  // Kameraya bağlı dolgu. decay=2 fiziksel sönüm demek: eski 2.8'lik değer
-  // 40 birim uzakta 2.8/1600 ≈ 0.002 ışınım üretiyordu, yani hiç yoktu.
-  const fill = new THREE.PointLight(0xffb870, 600, 220, 2);
+  // Renkler origin/main'in şafak paletinden, şiddetler fiziksel ölçekten.
+  scene.add(new THREE.HemisphereLight(0xb08868, 0x3a2020, 2.3));
+  // Kameraya bağlı dolgu. decay=2 fiziksel sönüm demek: eski 3.6'lık değer
+  // 40 birim uzakta 3.6/1600 ≈ 0.002 ışınım üretiyordu, yani hiç yoktu.
+  const fill = new THREE.PointLight(0xff9070, 600, 220, 2);
   scene.add(fill);
-  const sun = new THREE.DirectionalLight(0xffbe86, 4.6);
-  sun.position.set(-160, 190, -120);
+  const sun = new THREE.DirectionalLight(0xffb070, 4.6);
+  sun.position.copy(SUN_OFFSET);
   sun.castShadow = true;
   sun.shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
   sun.shadow.camera.left = -140;
@@ -1009,10 +1007,10 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       }
       if (state.rageT > 0) {
         state.rageT = Math.max(0, state.rageT - dt);
-        fill.color.setHex(0xff5a1a);
-        fog.density = preset.fogDensity * fogScale * 0.75;
+        fill.color.setHex(0xff7050);
+        fog.density = preset.fogDensity * fogScale * 0.7;
       } else {
-        fill.color.setHex(0xffb870);
+        fill.color.setHex(0xff9070);
         fog.density = preset.fogDensity * fogScale * FOG_SCALE;
         if (state.time > 1) state.rage = Math.max(0, state.rage - 0.5 * dt);
       }
