@@ -136,8 +136,8 @@ export function MobileControls({
     const pitchIn = curve(ny);
     // Ekranda sağa it = sağa dön. `yaw` +1 sola döndürdüğü için ters işaret.
     ctrl.current.yaw = -yawIn;
-    // Ekranda yukarı it = yüksel (ny yukarıda negatif).
-    ctrl.current.pitch = invert.current ? pitchIn : -pitchIn;
+    // Ekranda yukarı it = rise (ny yukarıda negatif, pitch negatif = rise).
+    ctrl.current.pitch = invert.current ? -pitchIn : pitchIn;
     // Roll'u da hafifçe besliyoruz: virajda gövde yatması ve hafif yan
     // kayma güçlensin. Yatmanın asıl kaynağı `flight.ts`'teki otomatik bank.
     ctrl.current.roll = yawIn * 0.35;
