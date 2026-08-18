@@ -127,6 +127,8 @@ export type Game = {
   fwd: THREE.Vector3;
   vel: THREE.Vector3;
   dive: number;
+  /** Fren bu karede gerçekten uygulandı mı (stamina/takla kapısından geçti). */
+  braking: boolean;
   roll: RollState;
   worldRadius: number;
   streetAt(x: number, z: number): boolean;
@@ -489,6 +491,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     fwd: FWD.clone(),
     vel: new THREE.Vector3(),
     dive: 0,
+    braking: false,
     roll: null,
     worldRadius,
     streetAt: city ? (x, z) => city!.streetAt(x, z) : () => false,
@@ -1299,6 +1302,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     f.rageActive = state.rageT;
     f.marked = state.marked;
     f.emberRush = state.emberRush;
+    f.braking = g.braking ? 1 : 0;
     f.fireballCd = state.fireballCd / FIREBALL.cooldown;
     f.shockCd = state.shockCd / 5;
     f.rollCd = state.rollCd / FLIGHT.rollCooldown;
@@ -1398,6 +1402,15 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         case "pause":
           g.paused = true;
           audio.flame(false);
+          // Basılı kalan girdiler duraklatmayı aşmasın: menüden dönünce
+          // ejderha kendi kendine alev püskürtüyor ya da frende kalıyordu.
+          ctrl.current.fire = false;
+          ctrl.current.brake = false;
+          ctrl.current.hover = false;
+          ctrl.current.throttle = 0;
+          ctrl.current.yaw = 0;
+          ctrl.current.pitch = 0;
+          ctrl.current.roll = 0;
           break;
         case "resume":
           g.paused = false;

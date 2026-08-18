@@ -400,6 +400,7 @@ const KEYS: [string, string][] = [
   ["W / S", "Alçal / yüksel"],
   ["Q / E", "Kanat yatır (bank)"],
   ["Shift", "Hızlan"],
+  ["F", "Fren — dur ve yak (stamina)"],
   ["Ctrl", "Askıda dur (stamina)"],
   ["Boşluk", "Konik alev (basılı tut)"],
   ["M / Sağ tık", "Köz Mermisi (alev topu)"],
@@ -414,6 +415,7 @@ const TOUCH: [string, string][] = [
   ["Çubuk ← →", "Sola / sağa dön"],
   ["Çubuk ↑ ↓", "Yüksel / alçal"],
   ["Çubuğu sonuna it", "Hızlan"],
+  ["Dur", "Frenle — hedefin önünde durup yak"],
   ["Alev", "Konik alev (basılı tut)"],
   ["Köz", "Alev topu"],
   ["Takla", "Çubuk hangi yandaysa o yana kaçınma"],
@@ -434,7 +436,8 @@ export function ControlsOverlay({
       <PyrePanel className="w-[min(38rem,92vw)]">
         <Eyebrow>Kontroller</Eyebrow>
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          Ejderha kendiliğinden ileri uçar — yalnız yönünü veriyorsun.
+          Ejderha kendiliğinden ileri uçar — yalnız yönünü veriyorsun. Bir hedefin önünde durup
+          yakmak için frene bas: dönüş ve irtifa sende kalır, yalnız ileri hız kesilir.
         </p>
         <div
           className={`mt-6 grid gap-8 sm:grid-cols-2 ${touch ? "[&>*:first-child]:order-2" : ""}`}

@@ -35,3 +35,8 @@ dist-ssr
 .pyre-harness/
 .playwright-mcp/
 pyre-*.png
+# Elle alınan oynanış ekran görüntüleri ve yerel dev config'i
+*.png
+!public/**/*.png
+!src/assets/**/*.png
+vite.local.config.ts

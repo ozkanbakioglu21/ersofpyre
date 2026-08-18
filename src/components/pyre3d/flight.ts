@@ -54,6 +54,16 @@ export const FLIGHT = {
   hoverLift: 24,
   hoverDamping: 0.82,
 
+  /* ---- fren ----
+   * Yıkımın hazzı hedefin önünde durup yakabilmekte. Fren ileri hızı
+   * kesiyor ama dönüşü ve irtifayı bırakıyor: olduğun yerde dönüp alev
+   * konisini binaya tutabiliyorsun. Bedeli stamina — bar bitince fren
+   * kendiliğinden açılıyor, yani sonsuz kamp yok. */
+  brakeStaminaDrain: 13,
+  brakeLerp: 3.4,
+  /** Frendeyken kanat çırpma temposu (asılı kalma görüntüsü). */
+  brakeFlapRate: 5.4,
+
   /* ---- dalma ---- */
   diveGain: 46,
   diveDecay: 0.75,
@@ -175,11 +185,18 @@ export function updateFlight(g: Game, dt: number): void {
 
   /* ---- stamina ---- */
   const hover = c.hover && s.stamina > 0 && !g.roll;
+  const braking = c.brake && !hover && !g.roll && s.stamina > 0;
   if (hover) {
     s.stamina = Math.max(0, s.stamina - FLIGHT.hoverStaminaDrain * dt);
+  } else if (braking) {
+    s.stamina = Math.max(0, s.stamina - FLIGHT.brakeStaminaDrain * dt);
+    // Bar bittiğinde freni bırak: dokunmatikteki geçiş butonu da bu yüzden
+    // kendi durumunu tutmuyor, kareden okuyor.
+    if (s.stamina <= 0) c.brake = false;
   } else {
     s.stamina = Math.min(100, s.stamina + g.buffs.staminaRegen * dt);
   }
+  g.braking = braking;
 
   /* ---- pitch momentum ---- */
   const pitchTarget = c.pitch * FLIGHT.maxPitch;
@@ -247,8 +264,11 @@ export function updateFlight(g: Game, dt: number): void {
   // arkasındaydı: çubuğu dikeyde tutmayan oyuncu havada asılı kalıyordu ve
   // "ileri gitmiyor" hissi buradan geliyordu. Artık taban hız hep var,
   // gaz ve dalış onun üstüne biner.
-  const targetSpeed = (FLIGHT.baseSpeed + throttleBoost + diveBoost) * rushMul * snareMul;
-  s.speed += (targetSpeed - s.speed) * Math.min(1, dt * FLIGHT.speedLerp);
+  const targetSpeed = braking
+    ? 0
+    : (FLIGHT.baseSpeed + throttleBoost + diveBoost) * rushMul * snareMul;
+  s.speed +=
+    (targetSpeed - s.speed) * Math.min(1, dt * (braking ? FLIGHT.brakeLerp : FLIGHT.speedLerp));
 
   /* ---- yatay hız vektörü ---- */
   if (hover) {
@@ -339,8 +359,8 @@ export function updateFlight(g: Game, dt: number): void {
   d.body.rotation.z += (bank - d.body.rotation.z) * lerpK;
 
   // Kanat çırpma
-  s.flap += dt * (2.2 + s.speed * 0.03);
-  const flapAmt = Math.sin(s.flap) * (c.throttle ? 0.75 : 0.5);
+  s.flap += dt * (braking ? FLIGHT.brakeFlapRate : 2.2 + s.speed * 0.03);
+  const flapAmt = Math.sin(s.flap) * (braking ? 0.9 : c.throttle ? 0.75 : 0.5);
   d.wingR.rotation.z = -flapAmt - 0.1;
   d.wingL.rotation.z = flapAmt + 0.1;
   d.wingR.rotation.x = Math.sin(s.flap - 0.6) * 0.16;

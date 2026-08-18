@@ -34,6 +34,8 @@ const KNOB = 56;
 const DEADZONE = 0.14;
 /** Çubuğun bu kadarını geçmek gaza basmak demek. */
 const BOOST_AT = 0.9;
+/** Boştayken taban bu oranda küçülüyor; parmak değince tam boya açılıyor. */
+const REST_SCALE = 0.66;
 
 /** Kısa dokunsal geri bildirim; desteklemeyen cihazda sessizce yok sayılır. */
 function buzz(ms: number): void {
@@ -101,7 +103,7 @@ export function MobileControls({
         y: r.height - halo - 26,
       };
       if (touchId.current === null) {
-        base.style.transform = `translate(${rest.current.x}px, ${rest.current.y}px) translate(-50%, -50%)`;
+        base.style.transform = `translate(${rest.current.x}px, ${rest.current.y}px) translate(-50%, -50%) scale(${REST_SCALE})`;
       }
     };
     place();
@@ -154,7 +156,7 @@ export function MobileControls({
     if (baseRef.current) {
       baseRef.current.style.transition = "transform .18s ease-out, opacity .18s";
       baseRef.current.style.opacity = "0.45";
-      baseRef.current.style.transform = `translate(${rest.current.x}px, ${rest.current.y}px) translate(-50%, -50%)`;
+      baseRef.current.style.transform = `translate(${rest.current.x}px, ${rest.current.y}px) translate(-50%, -50%) scale(${REST_SCALE})`;
     }
   };
 
@@ -170,7 +172,7 @@ export function MobileControls({
     if (baseRef.current) {
       baseRef.current.style.transition = "opacity .12s";
       baseRef.current.style.opacity = "1";
-      baseRef.current.style.transform = `translate(${e.clientX - r.left}px, ${e.clientY - r.top}px) translate(-50%, -50%)`;
+      baseRef.current.style.transform = `translate(${e.clientX - r.left}px, ${e.clientY - r.top}px) translate(-50%, -50%) scale(1)`;
     }
     moveStick(e.clientX, e.clientY);
   };
@@ -290,6 +292,11 @@ export function MobileControls({
         </div>
       </div>
 
+      {/* --- fren: çubuk alanının DIŞINDA bir kardeş, yoksa dokunuş çubuğa
+              da gidip ejderhayı savuruyor. Basılı tutmak yerine geçiş:
+              sağ başparmak ALEV'de kalırken frenlenebilsin. --- */}
+      <BrakeButton bridge={bridge} ctrl={ctrl} />
+
       {/* --- sağ alt: eylemler --- */}
       <ActionCluster bridge={bridge} buttons={buttons} onFire={ctrl} />
 
@@ -309,6 +316,59 @@ export function MobileControls({
         </span>
       </button>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Fren
+ * ------------------------------------------------------------------ */
+
+/**
+ * "DUR" — ileri hızı keser, dönüş ve irtifa serbest kalır. Hedefin önünde
+ * durup alev konisini tutabilmek için. Stamina bitince oyun döngüsü freni
+ * zorla kapatıyor; buton bu yüzden kendi state'ini tutmuyor, durumu her
+ * karede köprüden okuyor.
+ */
+function BrakeButton({ bridge, ctrl }: { bridge: HudBridge; ctrl: { current: Ctrl } }) {
+  const btn = useRef<HTMLButtonElement | null>(null);
+  const on = useRef(false);
+
+  useLayoutEffect(
+    () =>
+      bridge.register((f: HudFrame) => {
+        const el = btn.current;
+        if (!el) return;
+        const active = f.braking > 0;
+        if (active === on.current) return;
+        on.current = active;
+        el.style.borderColor = active ? "var(--accent)" : "rgba(255,255,255,0.28)";
+        el.style.background = active
+          ? "color-mix(in oklab, var(--accent) 35%, transparent)"
+          : "rgba(0,0,0,0.35)";
+        el.style.color = active ? "var(--accent)" : "rgba(255,255,255,0.75)";
+      }),
+    [bridge],
+  );
+
+  return (
+    <button
+      ref={btn}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        ctrl.current.brake = !ctrl.current.brake;
+        buzz(ctrl.current.brake ? 18 : 8);
+      }}
+      style={{
+        marginLeft: "env(safe-area-inset-left)",
+        borderColor: "rgba(255,255,255,0.28)",
+        background: "rgba(0,0,0,0.35)",
+        transition: "background .12s, border-color .12s, color .12s",
+      }}
+      className="pointer-events-auto absolute bottom-[10.5rem] left-4 h-14 w-14 touch-none rounded-full border-2 font-display text-[10px] font-bold uppercase tracking-wider text-foreground/75 backdrop-blur-[2px]"
+    >
+      Dur
+    </button>
   );
 }
 

@@ -147,6 +147,9 @@ export default function PyreGame3D({
         (keys["KeyD"] || keys["ArrowRight"] ? -1 : 0) + (keys["KeyA"] || keys["ArrowLeft"] ? 1 : 0);
       c.fire = !!keys["Space"];
       c.hover = !!keys["ControlLeft"] || !!keys["ControlRight"];
+      // F = fren: hedefin önünde durup yakmak için. Klavyede basılı tutuluyor,
+      // dokunmatikte geçiş — orada başparmak ALEV'den kalkamıyor.
+      c.brake = !!keys["KeyF"];
     };
     const kd = (e: KeyboardEvent) => {
       if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {

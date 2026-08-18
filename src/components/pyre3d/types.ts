@@ -28,6 +28,10 @@ export type Ctrl = {
   yaw: number;
   /** Hover modu: yerde/alçakta askı. */
   hover: boolean;
+  /** Fren: ileri hızı sıfıra çeker ama dönüşü ve irtifayı SERBEST bırakır —
+   *  binanın önünde durup nişan alarak yakmak için. `hover`'dan farkı bu:
+   *  hover heading güncellemesini tamamen atlıyor, yani asılıyken dönemiyorsun. */
+  brake: boolean;
   /** Konik alev — basılı tutulur. */
   fire: boolean;
   /** Köz Mermisi — kenar tetikli, döngü tükettikten sonra sıfırlanır. */
@@ -47,6 +51,7 @@ export function createCtrl(): Ctrl {
     roll: 0,
     yaw: 0,
     hover: false,
+    brake: false,
     fire: false,
     fireball: false,
     dodge: 0,
@@ -304,6 +309,9 @@ export type HudFrame = {
   fireballCd: number;
   shockCd: number;
   rollCd: number;
+  /** Fren açık mı (0/1). Buton kendi durumunu buradan okuyor: stamina
+   *  bitince oyun döngüsü freni zorla kapatabiliyor. */
+  braking: number;
   markers: Marker[];
 };
 

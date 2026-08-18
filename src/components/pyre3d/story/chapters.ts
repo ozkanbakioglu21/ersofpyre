@@ -109,7 +109,11 @@ const c02: ChapterDef = {
       "geçit yok. Pyra'nın boğazındaki köz ilk kez gerçek bir işe yarayacak — " +
       "ama alev bedava değil: Heat barı dolarsa boğaz kilitlenir.",
     objectives: ["Madenci köprüsünü yak", "Kampın yarısını küle çevir"],
-    tips: ["Boşluk basılı = konik alev", "Heat dolarsa alev kilitlenir", "Ateşi kesince soğur"],
+    tips: [
+      "Boşluk basılı = konik alev",
+      "Fren (F / DUR) ile hedefin önünde dur ve yak",
+      "Heat dolarsa alev kilitlenir, ateşi kesince soğur",
+    ],
   },
   world: {
     radius: 620,
@@ -145,6 +149,7 @@ const c02: ChapterDef = {
       id: "ilkAlev",
       trigger: { at: "event", event: "firstFlame" },
       lines: [{ who: "Kayra", text: "İşte bu. Ahşap hemen tutuşuyor.", dur: 3 }],
+      actions: [{ do: "hint", text: "Durup yak", keys: ["F"], dur: 8 }],
     },
     {
       id: "isinma",
