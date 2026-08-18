@@ -192,15 +192,15 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   applyPixelRatio();
   renderer.setSize(mount.clientWidth, mount.clientHeight);
   renderer.shadowMap.enabled = preset.shadows;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.45;
+  renderer.toneMappingExposure = 1.2;
   if (renderer.domElement.parentElement !== mount) mount.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1210);
   const fogScale = chapter.world.fogScale ?? 1;
-  const fog = new THREE.FogExp2(0x3a2518, preset.fogDensity * fogScale);
+  const fog = new THREE.FogExp2(0x4a3524, preset.fogDensity * fogScale);
   scene.fog = fog;
 
   const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.5, 2400);
@@ -209,10 +209,18 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
    * Sahnedeki ışık SAYISI derlemeden sonra asla değişmez (bkz. quality.ts).
    * Hepsi burada doğuyor, kullanılmayan yoğunluğu 0'da bekliyor.
    */
-  scene.add(new THREE.HemisphereLight(0x7a5030, 0x1a0e08, 0.9));
-  const fill = new THREE.PointLight(0xffa860, 2.8, 140, 2);
+  // Yoğunluklar three.js'in fiziksel birimlerine göre: dağınık BRDF ışınımı
+  // 1/PI ile ölçekliyor, yani albedosu %3 civarında olan bu kül paletinin
+  // okunabilmesi için toplam ışınımın PI mertebesinde olması gerekiyor.
+  // Renkler kasten doygunluğu düşük tutuluyor: turuncu ışık + kahve albedo
+  // çarpımı, yeşil/mavi kanalları söndürüp sahneyi tek renk kırmızıya
+  // çeviriyordu.
+  scene.add(new THREE.HemisphereLight(0xa8825c, 0x2e1e14, 2.3));
+  // Kameraya bağlı dolgu. decay=2 fiziksel sönüm demek: eski 2.8'lik değer
+  // 40 birim uzakta 2.8/1600 ≈ 0.002 ışınım üretiyordu, yani hiç yoktu.
+  const fill = new THREE.PointLight(0xffb877, 600, 220, 2);
   scene.add(fill);
-  const sun = new THREE.DirectionalLight(0xff8a3c, 1.8);
+  const sun = new THREE.DirectionalLight(0xffbe86, 4.6);
   sun.position.set(-160, 190, -120);
   sun.castShadow = true;
   sun.shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
@@ -233,15 +241,22 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       side: THREE.BackSide,
       uniforms: {},
       vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);} `,
+      // Renkler SAHNE-LİNEER uzayda; sahnenin geri kalanıyla aynı işlemden
+      // geçmeleri için tonemapping ve çıkış renk uzayı yamalarını dahil
+      // etmek ZORUNLU. Bunlar olmadan gökyüzü ton eşlemesini atlayıp ham
+      // lineer değerle sRGB tampona yazılıyor: yeşil/mavi kanal ezilip
+      // ufuk kıpkırmızı bir perdeye dönüşüyordu.
       fragmentShader: `varying vec3 vP;
       void main(){
         float h = normalize(vP).y;
-        vec3 low = vec3(0.42,0.15,0.07);
-        vec3 mid = vec3(0.16,0.10,0.09);
-        vec3 top = vec3(0.05,0.04,0.05);
+        vec3 low = vec3(0.46,0.16,0.06);
+        vec3 mid = vec3(0.13,0.09,0.09);
+        vec3 top = vec3(0.035,0.035,0.055);
         vec3 c = mix(low, mid, smoothstep(-0.15,0.25,h));
         c = mix(c, top, smoothstep(0.2,0.85,h));
         gl_FragColor = vec4(c,1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
       }`,
     }),
   );
