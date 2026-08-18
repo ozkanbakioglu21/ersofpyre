@@ -194,9 +194,9 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
     }
 
     // Cadde kenarlarına ağaçlar — lambaların ters tarafına
-    const treePerAvenue = Math.max(3, Math.floor(len / 8));
+    const treePerAvenue = Math.max(1, Math.floor(len / 16));
     for (let k = 0; k < treePerAvenue; k++) {
-      if (rng.chance(0.35)) continue;
+      if (rng.chance(0.55)) continue;
       const t = (k + 0.5) / treePerAvenue;
       const tx = spec.cx + Math.cos(a) * (R * RINGS[0]! + len * t);
       const tz = spec.cz + Math.sin(a) * (R * RINGS[0]! + len * t);
@@ -252,9 +252,9 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
     }
 
     // Halka yolu kenarlarına ağaçlar
-    const ringTreeCount = Math.max(6, Math.floor(circumference / 10));
+    const ringTreeCount = Math.max(3, Math.floor(circumference / 22));
     for (let k = 0; k < ringTreeCount; k++) {
-      if (rng.chance(0.3)) continue;
+      if (rng.chance(0.5)) continue;
       const a = (k / ringTreeCount) * Math.PI * 2;
       const side = k % 2 === 0 ? 1 : -1;
       const tree = buildTree(rng);
@@ -281,7 +281,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
   parts.add(vent);
 
   // Meydan etrafında ağaçlar
-  const treeCount = rng.int(12, 18);
+  const treeCount = rng.int(5, 8);
   for (let i = 0; i < treeCount; i++) {
     const a = rng.range(0, Math.PI * 2);
     const rr = rng.range(R * RINGS[0]! * 0.45, R * RINGS[0]! * 0.82);
@@ -355,7 +355,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
   const parkA = parkSector * daPark + daPark * 0.5;
   const parkR0 = R * 0.45;
   const parkR1 = R * 0.72;
-  for (let i = 0; i < 35; i++) {
+  for (let i = 0; i < 15; i++) {
     const a = rng.range(parkA - daPark * 0.35, parkA + daPark * 0.35);
     const r = rng.range(parkR0, parkR1);
     const tx = spec.cx + Math.cos(a) * r;
@@ -488,24 +488,13 @@ export async function createCity(
       const lotD = lot.r1 - lot.r0 - GUTTER * 2;
       if (lotW < 3.5 || lotD < 3.5) continue;
       // Bazı parseller boş kalsın: avlu, yıkıntı, meydan artığı — ağaç dik.
-      if (rng.chance(0.08)) {
+      if (rng.chance(0.05)) {
         const tx = spec.cx + Math.cos(ac) * rc;
         const tz = spec.cz + Math.sin(ac) * rc;
         const tree = buildTree(rng);
         tree.position.set(tx, baseY + 0.1, tz);
         tree.rotation.y = rng.range(0, Math.PI * 2);
         blockParts.add(tree);
-        // Küçük ağaçlar için ekstra yan ağaçlar
-        if (rng.chance(0.5)) {
-          const tree2 = buildTree(rng);
-          tree2.position.set(
-            tx + rng.range(-1.5, 1.5),
-            baseY + 0.1,
-            tz + rng.range(-1.5, 1.5),
-          );
-          tree2.rotation.y = rng.range(0, Math.PI * 2);
-          blockParts.add(tree2);
-        }
         continue;
       }
 
