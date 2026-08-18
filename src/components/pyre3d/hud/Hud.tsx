@@ -3,6 +3,27 @@ import { MARKER_POOL, type HudSnapshot } from "../types";
 import type { HudBridge } from "./bridge";
 
 /**
+ * Klavye tuşunun dokunmatikteki karşılığı. İpuçları senaryoda tuş adıyla
+ * yazılı; telefonda "R" yazan bir rozet hiçbir şey anlatmıyor.
+ */
+const TOUCH_LABEL: Record<string, string> = {
+  W: "Çubuk ↑",
+  S: "Çubuk ↓",
+  A: "Çubuk ←",
+  D: "Çubuk →",
+  Q: "Çubuk ←",
+  E: "Çubuk ↑",
+  R: "TAKLA",
+  C: "ŞOK",
+  G: "ÖFKE",
+  M: "KÖZ",
+  F: "KÖZ",
+  Shift: "Çubuğu sonuna it",
+  Boşluk: "ALEV",
+  Esc: "⏸",
+};
+
+/**
  * Oyun içi HUD.
  *
  * Buradaki her parça DOM'unu BİR KEZ render eder ve sonra köprüye bir
@@ -61,9 +82,14 @@ const pickStm = (f: import("../types").HudFrame) => f.stamina;
 const pickHeat = (f: import("../types").HudFrame) => f.heat;
 const pickRage = (f: import("../types").HudFrame) => f.rage;
 
-function Bars({ bridge }: { bridge: HudBridge }) {
+function Bars({ bridge, touch }: { bridge: HudBridge; touch: boolean }) {
   return (
-    <div className="pointer-events-none absolute left-4 top-4 w-40 space-y-2">
+    <div
+      className={`pointer-events-none absolute space-y-2 ${
+        touch ? "left-3 top-3 w-24 space-y-1.5" : "left-4 top-4 w-40"
+      }`}
+      style={{ paddingTop: "env(safe-area-inset-top)", paddingLeft: "env(safe-area-inset-left)" }}
+    >
       <Bar label="Can" color="bg-destructive" bridge={bridge} pick={pickHp} />
       <Bar label="Stm" color="bg-accent" bridge={bridge} pick={pickStm} />
       <Bar label="Isı" color="bg-primary" bridge={bridge} pick={pickHeat} glowAt={80} />
@@ -132,7 +158,7 @@ function OverheatChip({ bridge }: { bridge: HudBridge }) {
  * Kombo halkası
  * ------------------------------------------------------------------ */
 
-function ComboRing({ bridge }: { bridge: HudBridge }) {
+function ComboRing({ bridge, touch }: { bridge: HudBridge; touch: boolean }) {
   const box = useRef<HTMLDivElement | null>(null);
   const num = useRef<HTMLSpanElement | null>(null);
   const ring = useRef<SVGCircleElement | null>(null);
@@ -154,7 +180,9 @@ function ComboRing({ bridge }: { bridge: HudBridge }) {
     <div
       ref={box}
       style={{ opacity: 0, transition: "opacity .15s, transform .15s" }}
-      className="pointer-events-none absolute right-4 top-16 h-14 w-14"
+      className={`pointer-events-none absolute ${
+        touch ? "right-3 top-[3.5rem] h-11 w-11" : "right-4 top-16 h-14 w-14"
+      }`}
     >
       <svg viewBox="0 0 36 36" className="absolute inset-0 h-full w-full -rotate-90">
         <circle
@@ -180,7 +208,9 @@ function ComboRing({ bridge }: { bridge: HudBridge }) {
       </svg>
       <span
         ref={num}
-        className="absolute inset-0 flex items-center justify-center font-display text-lg font-black text-primary"
+        className={`absolute inset-0 flex items-center justify-center font-display font-black text-primary ${
+          touch ? "text-sm" : "text-lg"
+        }`}
       >
         x1
       </span>
@@ -318,11 +348,15 @@ function FlightChip({ bridge }: { bridge: HudBridge }) {
  * React ile render edilen (seyrek değişen) parçalar
  * ------------------------------------------------------------------ */
 
-const Objectives = memo(function Objectives({ s }: { s: HudSnapshot }) {
+const Objectives = memo(function Objectives({ s, touch }: { s: HudSnapshot; touch: boolean }) {
   if (!s.objectives.length) return null;
   return (
-    <div className="pointer-events-none absolute right-4 top-32 w-52 space-y-1.5">
-      {s.objectives.map((o) => (
+    <div
+      className={`pointer-events-none absolute ${
+        touch ? "right-3 top-[7rem] w-40 space-y-1" : "right-4 top-32 w-52 space-y-1.5"
+      }`}
+    >
+      {s.objectives.slice(0, touch ? 3 : 6).map((o) => (
         <div
           key={o.id}
           className="rounded border border-foreground/15 bg-background/60 px-2.5 py-1.5 backdrop-blur"
@@ -391,14 +425,34 @@ const BossBar = memo(function BossBar({ s }: { s: HudSnapshot }) {
   );
 });
 
-const Subtitles = memo(function Subtitles({ s, onSkip }: { s: HudSnapshot; onSkip: () => void }) {
+const Subtitles = memo(function Subtitles({
+  s,
+  onSkip,
+  touch,
+}: {
+  s: HudSnapshot;
+  onSkip: () => void;
+  touch: boolean;
+}) {
   if (!s.subtitle) return null;
   const who = s.subtitle.who;
+  // Dokunmatikte alt şerit başparmakların yeri: diyalog kutusu tam da
+  // uçuş çubuğunun üstüne oturuyor ve dokunuşları yutuyordu. Orada
+  // altyazı üst şeride çıkıyor.
   return (
-    <div className="absolute bottom-28 left-1/2 w-[min(46rem,88vw)] -translate-x-1/2 sm:bottom-24">
+    <div
+      className={
+        touch
+          ? "absolute left-1/2 top-2 w-[min(30rem,56vw)] -translate-x-1/2"
+          : "absolute bottom-28 left-1/2 w-[min(46rem,88vw)] -translate-x-1/2 sm:bottom-24"
+      }
+      style={touch ? { paddingTop: "env(safe-area-inset-top)" } : undefined}
+    >
       <button
         onClick={onSkip}
-        className="w-full rounded-lg border border-foreground/15 bg-background/85 px-4 py-3 text-left backdrop-blur transition-colors hover:border-primary/50"
+        className={`w-full rounded-lg border border-foreground/15 bg-background/85 text-left backdrop-blur transition-colors hover:border-primary/50 ${
+          touch ? "px-3 py-2" : "px-4 py-3"
+        }`}
       >
         {who !== "sistem" && (
           <p className="font-display text-[10px] font-bold uppercase tracking-[0.35em] text-primary">
@@ -406,7 +460,9 @@ const Subtitles = memo(function Subtitles({ s, onSkip }: { s: HudSnapshot; onSki
           </p>
         )}
         <p
-          className={`text-sm leading-snug ${who === "sistem" ? "italic text-foreground/70" : "text-foreground"}`}
+          className={`leading-snug ${touch ? "text-xs" : "text-sm"} ${
+            who === "sistem" ? "italic text-foreground/70" : "text-foreground"
+          }`}
         >
           {s.subtitle.text}
         </p>
@@ -415,17 +471,21 @@ const Subtitles = memo(function Subtitles({ s, onSkip }: { s: HudSnapshot; onSki
   );
 });
 
-const HintToast = memo(function HintToast({ s }: { s: HudSnapshot }) {
+const HintToast = memo(function HintToast({ s, touch }: { s: HudSnapshot; touch: boolean }) {
   if (!s.hint) return null;
   return (
-    <div className="pointer-events-none absolute left-1/2 top-14 flex -translate-x-1/2 items-center gap-2 rounded-full border border-accent/40 bg-background/85 px-4 py-1.5 backdrop-blur">
+    <div
+      className={`pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-accent/40 bg-background/85 px-4 py-1.5 backdrop-blur ${
+        touch ? "top-[4.5rem]" : "top-14"
+      }`}
+    >
       <span className="text-[11px] uppercase tracking-widest text-accent">{s.hint.text}</span>
       {s.hint.keys.map((k) => (
         <kbd
           key={k}
-          className="rounded border border-accent/50 bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] text-accent"
+          className="whitespace-nowrap rounded border border-accent/50 bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] text-accent"
         >
-          {k}
+          {touch ? (TOUCH_LABEL[k] ?? k) : k}
         </kbd>
       ))}
     </div>
@@ -449,32 +509,47 @@ export function Hud({
   bridge,
   s,
   onSkip,
+  touch,
 }: {
   bridge: HudBridge;
   s: HudSnapshot;
   onSkip: () => void;
+  /** Dokunmatik yerleşim: alt şerit kontrollere ayrılıyor. */
+  touch: boolean;
 }) {
   return (
     <>
       <Vignettes bridge={bridge} />
-      <Bars bridge={bridge} />
-      <div className="pointer-events-none absolute right-4 top-4 text-right">
-        <p className="font-display text-xl font-black text-foreground drop-shadow">
+      <Bars bridge={bridge} touch={touch} />
+      <div
+        className={`pointer-events-none absolute top-4 text-right ${touch ? "right-16" : "right-4"}`}
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          paddingRight: "env(safe-area-inset-right)",
+        }}
+      >
+        <p
+          className={`font-display font-black text-foreground drop-shadow ${
+            touch ? "text-base" : "text-xl"
+          }`}
+        >
           {s.score.toLocaleString("tr-TR")}
         </p>
         <p className="text-[10px] uppercase tracking-widest text-primary">
           Yıkım {s.destroyed}/{s.goal}
         </p>
       </div>
-      <ComboRing bridge={bridge} />
+      <ComboRing bridge={bridge} touch={touch} />
       <OverheatChip bridge={bridge} />
       <TargetMarkers bridge={bridge} />
       <BossBar s={s} />
-      <Objectives s={s} />
-      <HintToast s={s} />
+      <Objectives s={s} touch={touch} />
+      <HintToast s={s} touch={touch} />
       <MarkedBanner s={s} />
-      <Subtitles s={s} onSkip={onSkip} />
-      <FlightChip bridge={bridge} />
+      <Subtitles s={s} onSkip={onSkip} touch={touch} />
+      {/* Hız/irtifa/fps çipi telefonda hem okunmuyor hem de GDD bağlantısıyla
+          üst üste biniyordu; orada gizli. */}
+      {!touch && <FlightChip bridge={bridge} />}
     </>
   );
 }

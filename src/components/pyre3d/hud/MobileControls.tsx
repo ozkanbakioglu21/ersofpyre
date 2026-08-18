@@ -3,234 +3,464 @@ import type { Ctrl, HudFrame } from "../types";
 import type { HudBridge } from "./bridge";
 
 /**
- * Dokunmatik kontroller.
+ * Dokunmatik kontroller — tek başparmak uç, tek başparmak yak.
  *
- * Önceden mobilde irtifa, takla, alev topu ve duraklatma tamamen erişilemezdi:
- * Q/E yalnız klavyedeydi, `roll` hiç okunmuyordu, alev topu yoktu. Eksik olan
- * her giriş burada bir denetime karşılık geliyor.
+ * Önceki şema telefonda oynanmıyordu ve sebebi düzen değil eşlemeydi:
+ *
+ *  - Sol çubuğun X ekseni `roll`'a bağlıydı. Roll yalnız gövdeyi yatırır,
+ *    ejderhayı DÖNDÜRMEZ; oyuncu çubuğu sağa itip "neden dönmüyorum"
+ *    diyordu. Dönüş, üzerinde ▲▼ okları çizili ayrı bir dikey pedin
+ *    yukarı/aşağı sürüklenmesine bağlıydı — yani sol/sağ dönmek için
+ *    yukarı/aşağı çekmek gerekiyordu.
+ *  - İleri hız `|pitch| > 0.05` kapısının arkasındaydı: çubuk dikeyde
+ *    boştayken hız sıfırdı, ejderha havada asılı kalıyordu.
+ *
+ * Şimdi tek çubuk var ve beklendiği gibi eşlenmiş: yana = dön, yukarı =
+ * yüksel, aşağı = alçal. İleri uçuş her zaman açık (bkz. `flight.ts`),
+ * çubuğu sonuna kadar itmek gaz veriyor. Çubuk sabit değil: sol yarıya
+ * nereye basarsan orada doğuyor — küçük ekranda 128 pikselli bir daireyi
+ * körlemesine bulmak zorunda kalmıyorsun.
  *
  * Başparmak kaydırması sırasında React state'i güncellemiyoruz — eski kodda
  * `setJoy` her pointermove'da (saniyede 120'ye kadar) tüm oyunu yeniden
  * render ediyordu. Topuz doğrudan transform ile taşınıyor.
  */
 
-const RADIUS = 34;
+/** Topuzun merkezden azami sapması (piksel). */
+const RADIUS = 44;
+/** Topuz çapı. Taban çapı = 2·RADIUS + KNOB, böylece topuz tam kenarda durur. */
+const KNOB = 56;
+/** Bu eşiğin altındaki sapma yok sayılır — başparmak titremesi sürüklemesin. */
+const DEADZONE = 0.14;
+/** Çubuğun bu kadarını geçmek gaza basmak demek. */
+const BOOST_AT = 0.9;
+
+/** Kısa dokunsal geri bildirim; desteklemeyen cihazda sessizce yok sayılır. */
+function buzz(ms: number): void {
+  try {
+    navigator.vibrate?.(ms);
+  } catch {
+    /* iOS Safari desteklemiyor — sorun değil */
+  }
+}
+
+/**
+ * Merkeze yakın hassas, kenara doğru hızlı yanıt. Doğrusal eşleme mobilde
+ * ya çok hantal ya çok savruk oluyor; 1.4'lük üs ikisinin arasını tutuyor.
+ */
+function curve(v: number): number {
+  const t = Math.max(0, (Math.abs(v) - DEADZONE) / (1 - DEADZONE));
+  return Math.sign(v) * Math.min(1, Math.pow(t, 1.35) * 1.15);
+}
+
+export type TouchAbilities = {
+  fireball: boolean;
+  roll: boolean;
+  shock: boolean;
+  rage: boolean;
+};
 
 export function MobileControls({
   ctrl,
   bridge,
   onPause,
   abilities,
+  invertY,
 }: {
   ctrl: { current: Ctrl };
   bridge: HudBridge;
   onPause: () => void;
-  abilities: { fireball: boolean; roll: boolean; shock: boolean; rage: boolean };
+  abilities: TouchAbilities;
+  /** Uçuş simülasyonu alışkanlığı: aşağı çek = yüksel. */
+  invertY: boolean;
 }) {
-  const padRef = useRef<HTMLDivElement | null>(null);
+  const zoneRef = useRef<HTMLDivElement | null>(null);
+  const baseRef = useRef<HTMLDivElement | null>(null);
   const knobRef = useRef<HTMLDivElement | null>(null);
-  const joyId = useRef<number | null>(null);
+  const boostRef = useRef<HTMLDivElement | null>(null);
 
-  const altRef = useRef<HTMLDivElement | null>(null);
-  const altKnob = useRef<HTMLDivElement | null>(null);
-  const altId = useRef<number | null>(null);
+  const touchId = useRef<number | null>(null);
+  const origin = useRef({ x: 0, y: 0 });
+  /** Çubuk boştayken oturduğu yer; dokunma bırakılınca oraya dönüyor. */
+  const rest = useRef({ x: 0, y: 0 });
 
-  const rageBtn = useRef<HTMLButtonElement | null>(null);
-  const fireBtn = useRef<HTMLButtonElement | null>(null);
+  const invert = useRef(invertY);
+  invert.current = invertY;
 
-  // Öfke butonu yalnız bar dolunca beliriyor; alev butonu aşırı ısınmada söner.
-  useLayoutEffect(
-    () =>
-      bridge.register((f: HudFrame) => {
-        if (rageBtn.current) {
-          const ready = f.rage >= 100;
-          rageBtn.current.style.opacity = ready ? "1" : "0";
-          rageBtn.current.style.pointerEvents = ready ? "auto" : "none";
-        }
-        if (fireBtn.current) fireBtn.current.style.opacity = f.overheat > 0 ? "0.35" : "1";
-      }),
-    [bridge],
-  );
+  /* Boştaki konumu ölç: sol alt köşe, güvenli alan payıyla. */
+  useLayoutEffect(() => {
+    const place = () => {
+      const el = zoneRef.current;
+      const base = baseRef.current;
+      if (!el || !base) return;
+      const r = el.getBoundingClientRect();
+      // Taban dairesi ekran dışına taşmasın: yarıçapı kadar içeride dursun.
+      const halo = RADIUS + KNOB / 2 + 8;
+      rest.current = {
+        x: Math.min(Math.max(halo, r.width * 0.38), Math.max(halo, r.width - halo)),
+        y: r.height - halo - 26,
+      };
+      if (touchId.current === null) {
+        base.style.transform = `translate(${rest.current.x}px, ${rest.current.y}px) translate(-50%, -50%)`;
+      }
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("orientationchange", place);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("orientationchange", place);
+    };
+  }, []);
 
-  const moveJoy = (e: React.PointerEvent) => {
-    const el = padRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2);
-    const dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
-    const len = Math.hypot(dx, dy) || 1;
-    const k = Math.min(1, len) / len;
-    const x = dx * k;
-    const y = dy * k;
-    ctrl.current.roll = x;
-    ctrl.current.pitch = y;
-    ctrl.current.throttle = Math.hypot(x, y) > 0.88 ? 1 : 0;
+  const write = (nx: number, ny: number) => {
+    const yawIn = curve(nx);
+    const pitchIn = curve(ny);
+    // Ekranda sağa it = sağa dön. `yaw` +1 sola döndürdüğü için ters işaret.
+    ctrl.current.yaw = -yawIn;
+    // Ekranda yukarı it = yüksel (ny yukarıda negatif).
+    ctrl.current.pitch = invert.current ? pitchIn : -pitchIn;
+    // Roll'u da hafifçe besliyoruz: virajda gövde yatması ve hafif yan
+    // kayma güçlensin. Yatmanın asıl kaynağı `flight.ts`'teki otomatik bank.
+    ctrl.current.roll = yawIn * 0.35;
+    const push = Math.min(1, Math.hypot(nx, ny));
+    const boosting = push > BOOST_AT;
+    ctrl.current.throttle = boosting ? 1 : 0;
+    if (boostRef.current) boostRef.current.style.opacity = boosting ? "1" : "0";
+  };
+
+  const moveStick = (clientX: number, clientY: number) => {
+    const dx = clientX - origin.current.x;
+    const dy = clientY - origin.current.y;
+    const len = Math.hypot(dx, dy);
+    const k = len > RADIUS ? RADIUS / len : 1;
+    const kx = dx * k;
+    const ky = dy * k;
+    write(kx / RADIUS, ky / RADIUS);
     if (knobRef.current) {
-      knobRef.current.style.transform = `translate(calc(-50% + ${x * RADIUS}px), calc(-50% + ${y * RADIUS}px))`;
+      knobRef.current.style.transform = `translate(calc(-50% + ${kx}px), calc(-50% + ${ky}px))`;
     }
   };
 
-  const endJoy = () => {
-    joyId.current = null;
-    ctrl.current.roll = 0;
-    ctrl.current.pitch = 0;
-    ctrl.current.throttle = 0;
+  const release = () => {
+    touchId.current = null;
+    const c = ctrl.current;
+    c.yaw = 0;
+    c.pitch = 0;
+    c.roll = 0;
+    c.throttle = 0;
     if (knobRef.current) knobRef.current.style.transform = "translate(-50%, -50%)";
-  };
-
-  const moveAlt = (e: React.PointerEvent) => {
-    const el = altRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const t = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
-    const v = Math.max(-1, Math.min(1, -t));
-    ctrl.current.yaw = Math.abs(v) < 0.14 ? 0 : v;
-    if (altKnob.current) {
-      altKnob.current.style.transform = `translate(-50%, calc(-50% + ${-v * 46}px))`;
+    if (boostRef.current) boostRef.current.style.opacity = "0";
+    if (baseRef.current) {
+      baseRef.current.style.transition = "transform .18s ease-out, opacity .18s";
+      baseRef.current.style.opacity = "0.45";
+      baseRef.current.style.transform = `translate(${rest.current.x}px, ${rest.current.y}px) translate(-50%, -50%)`;
     }
   };
 
-  const endAlt = () => {
-    altId.current = null;
-    ctrl.current.yaw = 0;
-    if (altKnob.current) altKnob.current.style.transform = "translate(-50%, -50%)";
+  const grab = (e: React.PointerEvent) => {
+    if (touchId.current !== null) return;
+    const el = zoneRef.current;
+    if (!el) return;
+    e.preventDefault();
+    touchId.current = e.pointerId;
+    el.setPointerCapture(e.pointerId);
+    const r = el.getBoundingClientRect();
+    origin.current = { x: e.clientX, y: e.clientY };
+    if (baseRef.current) {
+      baseRef.current.style.transition = "opacity .12s";
+      baseRef.current.style.opacity = "1";
+      baseRef.current.style.transform = `translate(${e.clientX - r.left}px, ${e.clientY - r.top}px) translate(-50%, -50%)`;
+    }
+    moveStick(e.clientX, e.clientY);
   };
 
-  const tap = (fn: () => void) => ({
-    onPointerDown: (e: React.PointerEvent) => {
-      e.preventDefault();
-      fn();
-    },
-  });
+  /* ---------------- yetenek butonları ---------------- */
 
-  const btn =
-    "touch-none rounded-full border font-display font-bold uppercase tracking-widest transition-colors";
+  const buttons: {
+    key: string;
+    label: string;
+    size: number;
+    tone: string;
+    press: () => void;
+    cd?: (f: HudFrame) => number;
+    /** Öfke gibi yalnız hazırken beliren butonlar. */
+    show?: (f: HudFrame) => boolean;
+  }[] = [];
+
+  if (abilities.fireball) {
+    buttons.push({
+      key: "koz",
+      label: "Köz",
+      size: 62,
+      tone: "border-accent/70 bg-accent/20 text-accent",
+      press: () => {
+        ctrl.current.fireball = true;
+        buzz(14);
+      },
+      cd: (f) => f.fireballCd,
+    });
+  }
+  if (abilities.roll) {
+    buttons.push({
+      key: "takla",
+      label: "Takla",
+      size: 62,
+      tone: "border-foreground/45 bg-foreground/12 text-foreground/90",
+      press: () => {
+        // Çubuk hangi yana yatıksa o yana kaç. `yaw` +1 sola döndürüyor,
+        // takla yönü +1 de sol; işaretler bu yüzden aynı.
+        ctrl.current.dodge = ctrl.current.yaw < -0.15 ? -1 : 1;
+        buzz(10);
+      },
+      cd: (f) => f.rollCd,
+    });
+  }
+  if (abilities.shock) {
+    buttons.push({
+      key: "sok",
+      label: "Şok",
+      size: 58,
+      tone: "border-accent/50 bg-accent/15 text-accent",
+      press: () => {
+        ctrl.current.shock = true;
+        buzz(18);
+      },
+      cd: (f) => f.shockCd,
+    });
+  }
+  if (abilities.rage) {
+    buttons.push({
+      key: "ofke",
+      label: "Öfke",
+      size: 58,
+      tone: "border-ember/75 bg-ember/30 text-ember",
+      press: () => {
+        ctrl.current.rage = true;
+        buzz(26);
+      },
+      show: (f) => f.rage >= 100,
+    });
+  }
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none">
-      {/* duraklatma */}
+      {/* --- sol yarı: uçuş çubuğu --- */}
+      <div
+        ref={zoneRef}
+        onPointerDown={grab}
+        onPointerMove={(e) => {
+          if (touchId.current !== e.pointerId) return;
+          e.preventDefault();
+          moveStick(e.clientX, e.clientY);
+        }}
+        onPointerUp={(e) => touchId.current === e.pointerId && release()}
+        onPointerCancel={(e) => touchId.current === e.pointerId && release()}
+        // Üst şerit altyazı/HUD'a ait: çubuk alanı oradan başlamıyor.
+        className="pointer-events-auto absolute bottom-0 left-0 top-24 w-1/2 touch-none"
+      >
+        <div
+          ref={baseRef}
+          className="absolute left-0 top-0 flex items-center justify-center rounded-full border border-foreground/25 bg-background/25 backdrop-blur-[2px]"
+          style={{ width: RADIUS * 2 + KNOB, height: RADIUS * 2 + KNOB, opacity: 0.45 }}
+        >
+          {/* gaz halkası */}
+          <div
+            ref={boostRef}
+            className="absolute inset-[-6px] rounded-full border-2 border-primary"
+            style={{ opacity: 0, transition: "opacity .1s" }}
+          />
+          <span className="absolute left-1/2 top-1.5 -translate-x-1/2 text-[9px] text-foreground/45">
+            ▲
+          </span>
+          <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[9px] text-foreground/45">
+            ▼
+          </span>
+          <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-foreground/45">
+            ◀
+          </span>
+          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-foreground/45">
+            ▶
+          </span>
+          <div
+            ref={knobRef}
+            className="absolute left-1/2 top-1/2 rounded-full border-2 border-primary/70 bg-primary/35 shadow-[0_0_18px_rgba(0,0,0,0.35)]"
+            style={{ width: KNOB, height: KNOB, transform: "translate(-50%, -50%)" }}
+          />
+        </div>
+      </div>
+
+      {/* --- sağ alt: eylemler --- */}
+      <ActionCluster bridge={bridge} buttons={buttons} onFire={ctrl} />
+
+      {/* --- duraklat --- */}
       <button
         onPointerDown={(e) => {
           e.preventDefault();
           onPause();
         }}
-        className="pointer-events-auto absolute right-4 top-4 h-9 w-9 touch-none rounded-md border border-foreground/25 bg-background/70 text-foreground/80 backdrop-blur active:bg-foreground/20 sm:hidden"
+        className="pointer-events-auto absolute right-3 top-3 flex h-11 w-11 touch-none items-center justify-center rounded-lg border border-foreground/25 bg-background/70 text-foreground/80 backdrop-blur active:bg-foreground/25"
+        style={{ marginTop: "env(safe-area-inset-top)", marginRight: "env(safe-area-inset-right)" }}
         aria-label="Duraklat"
       >
-        ⏸
+        <span className="flex gap-[3px]">
+          <span className="block h-4 w-[3px] rounded-sm bg-current" />
+          <span className="block h-4 w-[3px] rounded-sm bg-current" />
+        </span>
       </button>
+    </div>
+  );
+}
 
-      {/* yön çubuğu */}
-      <div
-        ref={padRef}
+/* ------------------------------------------------------------------ *
+ * Eylem kümesi
+ * ------------------------------------------------------------------ */
+
+/** Alev butonunun merkezi (sağ-alt köşeden içeri). */
+const PIVOT = 62;
+/** İkincil butonların alev butonuna uzaklığı. */
+const ARC_R = 116;
+
+/**
+ * İkincil butonlar alev butonunun çevresinde bir yay üzerine diziliyor:
+ * hepsi aynı başparmağın dönme yarıçapında kalsın diye. Eskiden iki dikey
+ * sütun hâlindeydiler ve en üsttekine ulaşmak için eli kaydırmak gerekiyordu.
+ */
+function arcPos(i: number, n: number): { right: number; bottom: number } {
+  const a0 = 96;
+  const a1 = 172;
+  const t = n === 1 ? 0.5 : i / (n - 1);
+  const rad = ((a0 + (a1 - a0) * t) * Math.PI) / 180;
+  // `right` sola doğru büyüdüğü için yatay bileşen ters işaretle giriyor.
+  return { right: PIVOT - Math.cos(rad) * ARC_R, bottom: PIVOT + Math.sin(rad) * ARC_R };
+}
+
+function ActionCluster({
+  bridge,
+  buttons,
+  onFire,
+}: {
+  bridge: HudBridge;
+  buttons: {
+    key: string;
+    label: string;
+    size: number;
+    tone: string;
+    press: () => void;
+    cd?: (f: HudFrame) => number;
+    show?: (f: HudFrame) => boolean;
+  }[];
+  onFire: { current: Ctrl };
+}) {
+  const fireRef = useRef<HTMLButtonElement | null>(null);
+  const fireLabel = useRef<HTMLSpanElement | null>(null);
+  const cdRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const boxRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const lastCd = useRef<Record<string, number>>({});
+
+  useLayoutEffect(
+    () =>
+      bridge.register((f: HudFrame) => {
+        // Alev: aşırı ısınmada sönük + etiket sebebi söylüyor.
+        if (fireRef.current) {
+          const locked = f.overheat > 0;
+          fireRef.current.style.opacity = locked ? "0.35" : "1";
+          if (fireLabel.current) {
+            const want = locked ? "Isındı" : "Alev";
+            if (fireLabel.current.textContent !== want) fireLabel.current.textContent = want;
+          }
+        }
+        for (const b of buttons) {
+          const box = boxRefs.current[b.key];
+          if (!box) continue;
+          if (b.show) {
+            const on = b.show(f);
+            box.style.opacity = on ? "1" : "0";
+            box.style.pointerEvents = on ? "auto" : "none";
+            box.style.transform = on ? "scale(1)" : "scale(0.7)";
+          }
+          const ring = cdRefs.current[b.key];
+          if (!ring || !b.cd) continue;
+          const v = Math.max(0, Math.min(1, b.cd(f)));
+          // Her karede yeni gradient string'i üretmek boşuna çöp; gözle
+          // görülür değişimde yazıyoruz.
+          if (Math.abs(v - (lastCd.current[b.key] ?? -1)) < 0.02) continue;
+          lastCd.current[b.key] = v;
+          ring.style.opacity = v > 0.001 ? "1" : "0";
+          ring.style.background =
+            v > 0.001
+              ? `conic-gradient(rgba(0,0,0,0.62) ${v * 360}deg, transparent 0deg)`
+              : "transparent";
+        }
+      }),
+    [bridge, buttons],
+  );
+
+  const stopFire = () => {
+    onFire.current.fire = false;
+    if (fireRef.current) fireRef.current.style.filter = "none";
+  };
+
+  return (
+    <div
+      className="pointer-events-none absolute bottom-0 right-0 h-64 w-64"
+      style={{
+        marginBottom: "env(safe-area-inset-bottom)",
+        marginRight: "env(safe-area-inset-right)",
+      }}
+    >
+      {buttons.map((b, i) => {
+        const p = arcPos(i, buttons.length);
+        return (
+          <button
+            key={b.key}
+            ref={(el) => {
+              boxRefs.current[b.key] = el;
+            }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              b.press();
+            }}
+            style={{
+              right: p.right - b.size / 2,
+              bottom: p.bottom - b.size / 2,
+              width: b.size,
+              height: b.size,
+              ...(b.show ? { opacity: 0, pointerEvents: "none", transform: "scale(0.7)" } : {}),
+              transition: "opacity .18s, transform .18s",
+            }}
+            className={`pointer-events-auto absolute touch-none overflow-hidden rounded-full border font-display text-[10px] font-bold uppercase tracking-wider backdrop-blur-[2px] active:brightness-150 ${b.tone}`}
+          >
+            {b.label}
+            {b.cd && (
+              <div
+                ref={(el) => {
+                  cdRefs.current[b.key] = el;
+                }}
+                className="pointer-events-none absolute inset-0 rounded-full"
+                style={{ opacity: 0 }}
+              />
+            )}
+          </button>
+        );
+      })}
+
+      <button
+        ref={fireRef}
         onPointerDown={(e) => {
-          joyId.current = e.pointerId;
-          (e.target as HTMLElement).setPointerCapture(e.pointerId);
-          moveJoy(e);
+          e.preventDefault();
+          onFire.current.fire = true;
+          buzz(8);
+          if (fireRef.current) fireRef.current.style.filter = "brightness(1.5)";
         }}
-        onPointerMove={(e) => joyId.current === e.pointerId && moveJoy(e)}
-        onPointerUp={endJoy}
-        onPointerCancel={endJoy}
-        className="pointer-events-auto absolute bottom-8 left-6 h-32 w-32 touch-none rounded-full border border-foreground/20 bg-foreground/5 backdrop-blur-[2px]"
-        style={{
-          marginBottom: "env(safe-area-inset-bottom)",
-          marginLeft: "env(safe-area-inset-left)",
-        }}
+        onPointerUp={stopFire}
+        onPointerLeave={stopFire}
+        onPointerCancel={stopFire}
+        style={{ right: PIVOT - 54, bottom: PIVOT - 54, width: 108, height: 108 }}
+        className="pointer-events-auto absolute touch-none rounded-full border-2 border-primary/80 bg-primary/30 font-display text-sm font-black uppercase tracking-widest text-primary backdrop-blur-[2px]"
       >
-        <div
-          ref={knobRef}
-          className="pointer-events-none absolute left-1/2 top-1/2 h-14 w-14 rounded-full border border-primary/60 bg-primary/25"
-          style={{ transform: "translate(-50%, -50%)" }}
-        />
-      </div>
-
-      {/* yaw pedi — kamerayı bozmadan döner */}
-      <div
-        ref={altRef}
-        onPointerDown={(e) => {
-          altId.current = e.pointerId;
-          (e.target as HTMLElement).setPointerCapture(e.pointerId);
-          moveAlt(e);
-        }}
-        onPointerMove={(e) => altId.current === e.pointerId && moveAlt(e)}
-        onPointerUp={endAlt}
-        onPointerCancel={endAlt}
-        className="pointer-events-auto absolute bottom-44 left-6 h-32 w-14 touch-none rounded-full border border-foreground/20 bg-foreground/5 backdrop-blur-[2px]"
-        style={{ marginLeft: "env(safe-area-inset-left)" }}
-      >
-        <span className="pointer-events-none absolute left-1/2 top-1.5 -translate-x-1/2 text-[10px] text-accent/70">
-          ▲
-        </span>
-        <span className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[10px] text-accent/70">
-          ▼
-        </span>
-        <div
-          ref={altKnob}
-          className="pointer-events-none absolute left-1/2 top-1/2 h-10 w-10 rounded-full border border-accent/60 bg-accent/20"
-          style={{ transform: "translate(-50%, -50%)" }}
-        />
-      </div>
-
-      {/* eylem kümesi */}
-      <div
-        className="pointer-events-auto absolute bottom-8 right-6 flex items-end gap-2.5"
-        style={{
-          marginBottom: "env(safe-area-inset-bottom)",
-          marginRight: "env(safe-area-inset-right)",
-        }}
-      >
-        <div className="flex flex-col gap-2.5">
-          {abilities.rage && (
-            <button
-              ref={rageBtn}
-              {...tap(() => (ctrl.current.rage = true))}
-              style={{ opacity: 0, pointerEvents: "none" }}
-              className={`${btn} h-12 w-12 border-ember/70 bg-ember/25 text-[9px] text-ember`}
-            >
-              Öfke
-            </button>
-          )}
-          {abilities.shock && (
-            <button
-              {...tap(() => (ctrl.current.shock = true))}
-              className={`${btn} h-14 w-14 border-accent/50 bg-accent/15 text-[10px] text-accent active:bg-accent/40`}
-            >
-              Şok
-            </button>
-          )}
-        </div>
-        <div className="flex flex-col gap-2.5">
-          {abilities.roll && (
-            <button
-              {...tap(() => (ctrl.current.dodge = ctrl.current.roll >= 0 ? 1 : -1))}
-              className={`${btn} h-14 w-14 border-foreground/40 bg-foreground/10 text-[10px] text-foreground/85 active:bg-foreground/25`}
-            >
-              Takla
-            </button>
-          )}
-          {abilities.fireball && (
-            <button
-              {...tap(() => (ctrl.current.fireball = true))}
-              className={`${btn} h-16 w-16 border-accent/70 bg-accent/20 text-[10px] text-accent active:bg-accent/45`}
-            >
-              Köz
-            </button>
-          )}
-        </div>
-        <button
-          ref={fireBtn}
-          onPointerDown={(e) => {
-            e.preventDefault();
-            ctrl.current.fire = true;
-          }}
-          onPointerUp={() => (ctrl.current.fire = false)}
-          onPointerLeave={() => (ctrl.current.fire = false)}
-          onPointerCancel={() => (ctrl.current.fire = false)}
-          className={`${btn} h-24 w-24 border-2 border-primary/70 bg-primary/25 text-xs font-black text-primary active:bg-primary/50`}
-        >
-          Alev
-        </button>
-      </div>
+        <span ref={fireLabel}>Alev</span>
+      </button>
     </div>
   );
 }

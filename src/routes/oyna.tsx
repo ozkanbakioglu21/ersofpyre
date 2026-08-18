@@ -29,19 +29,24 @@ function Play() {
     </div>
   );
 
+  // GDD bağlantısı ana menüde duruyor: sabit alt-orta konumdayken telefonda
+  // hem uçuş göstergesinin hem de başparmağın üstüne biniyordu.
+  const gdd = (
+    <Link
+      to="/"
+      className="inline-flex items-center justify-center rounded-md border border-foreground/25 px-5 py-2.5 font-display text-xs font-bold uppercase tracking-[0.2em] text-foreground/85 transition-colors hover:border-primary hover:text-primary"
+    >
+      GDD
+    </Link>
+  );
+
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-background">
       <ClientOnly fallback={fallback}>
         <Suspense fallback={fallback}>
-          <PyreGame3D onStats={() => {}} />
+          <PyreGame3D onStats={() => {}} menuExtra={gdd} />
         </Suspense>
       </ClientOnly>
-      <Link
-        to="/"
-        className="absolute left-1/2 bottom-4 -translate-x-1/2 rounded-md border border-foreground/20 bg-background/40 px-3 py-1.5 text-[10px] uppercase tracking-widest text-foreground/70 backdrop-blur transition-colors hover:border-primary hover:text-primary"
-      >
-        GDD
-      </Link>
     </div>
   );
 }

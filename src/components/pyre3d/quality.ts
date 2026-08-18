@@ -81,26 +81,46 @@ export function detectQuality(): { quality: QualityLevel; fps: FpsTarget } {
 
 const KEY = "pyre3d-quality";
 
-export function loadSettings(): { quality: QualityLevel; fps: FpsTarget } {
-  if (typeof window === "undefined") return { quality: "medium", fps: 60 };
+export type Settings = {
+  quality: QualityLevel;
+  fps: FpsTarget;
+  /** Dokunmatik çubukta dikey ekseni ters çevir (uçuş simülasyonu alışkanlığı). */
+  invertY: boolean;
+};
+
+export function loadSettings(): Settings {
+  if (typeof window === "undefined") return { quality: "medium", fps: 60, invertY: false };
   try {
     const raw = window.localStorage.getItem(KEY);
     if (raw) {
-      const p = JSON.parse(raw) as { quality?: QualityLevel; fps?: FpsTarget };
+      const p = JSON.parse(raw) as Partial<Settings>;
       if (p.quality && QUALITY_PRESETS[p.quality]) {
-        return { quality: p.quality, fps: (p.fps ?? 60) as FpsTarget };
+        return {
+          quality: p.quality,
+          fps: (p.fps ?? 60) as FpsTarget,
+          invertY: p.invertY === true,
+        };
       }
     }
   } catch {
     /* ignore */
   }
-  return detectQuality();
+  return { ...detectQuality(), invertY: false };
 }
 
-export function saveSettings(quality: QualityLevel, fps: FpsTarget) {
+export function saveSettings(s: Settings) {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify({ quality, fps }));
+    window.localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
     /* ignore */
   }
+}
+
+/** Dokunmatik birincil giriş mi? Fare varsa klavye şeması yeterli. */
+export function isTouchPrimary(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    (window.matchMedia?.("(pointer: coarse)").matches ?? false) &&
+    !(window.matchMedia?.("(pointer: fine)").matches ?? false)
+  );
 }

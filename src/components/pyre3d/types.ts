@@ -298,6 +298,12 @@ export type HudFrame = {
   rageActive: number;
   marked: number;
   emberRush: number;
+  /** Yetenek soğumaları 0..1 (1 = yeni basıldı, 0 = hazır). Dokunmatik
+   *  butonlar bunu halka olarak çiziyor: boşa giden dokunuşun sebebi
+   *  ekranda görünsün. */
+  fireballCd: number;
+  shockCd: number;
+  rollCd: number;
   markers: Marker[];
 };
 

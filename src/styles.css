@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Yatay tutulan telefon: genişlik 844px ile `sm:` kırılımını AÇIYOR ama
+   yükseklik 390px. Menü/brifing panelleri için ölçüt olması gereken bu. */
+@custom-variant short (@media (max-height: 480px));
+
 @theme {
   --font-display: "Cinzel", serif;
   --font-body: "Barlow", sans-serif;
@@ -151,6 +155,14 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-body);
+    /* Oyun sırasında lastik bant kaydırma / aşağı çekip yenileme, dokunma
+       vurgusu ve çift dokunuşla yakınlaştırma devre dışı. */
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button {
+    touch-action: manipulation;
   }
 
   h1, h2, h3 {

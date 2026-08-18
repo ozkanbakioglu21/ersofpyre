@@ -58,6 +58,9 @@ export function emptyFrame(): HudFrame {
     rageActive: 0,
     marked: 0,
     emberRush: 0,
+    fireballCd: 0,
+    shockCd: 0,
+    rollCd: 0,
     markers: emptyMarkers(),
   };
 }

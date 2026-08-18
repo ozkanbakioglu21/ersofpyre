@@ -24,7 +24,11 @@ const c01: ChapterDef = {
       "Pyra'nın sırtında açıyorsun; kanatları henüz senin ağırlığını taşımayı " +
       "yeni öğreniyor. Kanyonun ağzına kadar uçmalısınız — yukarısı ne getirirse.",
     objectives: ["Kaya geçitlerinden uç", "Kanyonun ağzına ulaş"],
-    tips: ["W ileri, A/D yana kayma", "Q alçal, E yüksel", "Shift ile hızlan"],
+    tips: [
+      "Pyra kendiliğinden ileri uçar — sen yönünü ver",
+      "A/D veya çubuğu yana it: dön",
+      "W/S veya çubuğu yukarı/aşağı it: alçal/yüksel",
+    ],
   },
   world: {
     radius: 700,
@@ -63,12 +67,12 @@ const c01: ChapterDef = {
         { who: "Kayra", text: "Pyra… kalkabilir misin?", dur: 3.2 },
         { who: "Pyra", text: "(Kanatlar açılır. Kül dağılır.)", dur: 3 },
       ],
-      actions: [{ do: "hint", text: "İleri uç", keys: ["W"], dur: 6 }],
+      actions: [{ do: "hint", text: "Yönünü ver", keys: ["A", "D"], dur: 6 }],
     },
     {
       id: "irtifa",
       trigger: { at: "time", t: 9 },
-      actions: [{ do: "hint", text: "Alçal / Yüksel", keys: ["Q", "E"], dur: 7 }],
+      actions: [{ do: "hint", text: "Alçal / Yüksel", keys: ["W", "S"], dur: 7 }],
     },
     {
       id: "gecit1",
@@ -268,7 +272,7 @@ const c04: ChapterDef = {
       "Şehrin %60'ı küle dönerse lonca burayı bırakır — %100 fazladan köz getirir.",
     objectives: ["Şehrin %60'ını yık", "3 köz madeni asansörünü imha et"],
     tips: [
-      "F ile Köz Mermisi at — yangını caddenin öbür tarafına sıçratır",
+      "M ile Köz Mermisi at — yangını caddenin öbür tarafına sıçratır",
       "Caddeler yangın duvarıdır",
       "Rüzgâr cepheyi taşır",
     ],
@@ -320,7 +324,7 @@ const c04: ChapterDef = {
       ],
       actions: [
         { do: "unlockAbility", ability: "fireball" },
-        { do: "hint", text: "Köz Mermisi", keys: ["F"], dur: 9 },
+        { do: "hint", text: "Köz Mermisi", keys: ["M"], dur: 9 },
       ],
     },
     {
@@ -330,7 +334,7 @@ const c04: ChapterDef = {
         {
           do: "hint",
           text: "Caddeler yangını durdurur — Köz Mermisi ile atlat",
-          keys: ["F"],
+          keys: ["M"],
           dur: 7,
         },
       ],
@@ -422,7 +426,7 @@ const c05: ChapterDef = {
         { who: "Kayra", text: "Gövdesi kalın. Modüllerini kıracağız — Köz Mermisi.", dur: 3.8 },
       ],
       actions: [
-        { do: "hint", text: "Modülleri hedefle", keys: ["F"], dur: 9 },
+        { do: "hint", text: "Modülleri hedefle", keys: ["M"], dur: 9 },
         { do: "spawnWave", wave: "eskort" },
       ],
     },

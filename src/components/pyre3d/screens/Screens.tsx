@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import hero from "@/assets/hero.jpg";
 import { CHAPTERS } from "../story/chapters";
 import type { ChapterDef, ChapterId } from "../story/types";
@@ -19,6 +19,7 @@ export function MainMenu({
   onSettings,
   onContinue,
   continueId,
+  extra,
 }: {
   save: SaveData;
   onCampaign: () => void;
@@ -27,6 +28,8 @@ export function MainMenu({
   onSettings: () => void;
   onContinue: () => void;
   continueId: ChapterId | null;
+  /** Rotanın eklediği bağlantılar (ör. GDD). */
+  extra?: ReactNode;
 }) {
   const next = continueId ? CHAPTERS.find((c) => c.id === continueId) : null;
   return (
@@ -60,6 +63,7 @@ export function MainMenu({
           <PyreButton full onClick={onSettings}>
             Ayarlar
           </PyreButton>
+          {extra}
         </div>
 
         <div className="mt-10 flex flex-wrap gap-3">
@@ -183,24 +187,26 @@ export function Briefing({
   return (
     <div className="absolute inset-0 z-30 overflow-y-auto bg-background">
       <AshBackdrop />
-      <div className="relative mx-auto flex min-h-full max-w-2xl flex-col justify-center px-6 py-12">
-        <PyrePanel>
+      {/* Yatay tutulan telefonda ekran 390px: aynı boşluklarla "Başla"
+          katlamanın altında kalıyordu. Kısa ekranda her şey sıkışıyor. */}
+      <div className="relative mx-auto flex min-h-full max-w-2xl flex-col justify-center px-6 py-12 short:py-4">
+        <PyrePanel className="short:p-4">
           <Eyebrow>
             Bölüm {chapter.index.toString().padStart(2, "0")} · {chapter.subtitle}
           </Eyebrow>
-          <h2 className="mt-3 font-display text-4xl font-black uppercase text-foreground">
+          <h2 className="mt-3 font-display text-4xl font-black uppercase text-foreground short:mt-1 short:text-2xl">
             {chapter.title}
           </h2>
-          <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-5 text-sm leading-relaxed text-muted-foreground short:mt-2 short:text-xs">
             {chapter.briefing.lore}
           </p>
 
-          <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 short:mt-3 short:gap-3">
             <div>
               <p className="text-[10px] uppercase tracking-widest text-primary">Hedefler</p>
               <ul className="mt-2 space-y-1.5">
                 {chapter.briefing.objectives.map((t) => (
-                  <li key={t} className="flex gap-2 text-sm text-foreground/85">
+                  <li key={t} className="flex gap-2 text-sm text-foreground/85 short:text-xs">
                     <span aria-hidden className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" />
                     {t}
                   </li>
@@ -211,7 +217,7 @@ export function Briefing({
               <p className="text-[10px] uppercase tracking-widest text-accent">Öğrenilecek</p>
               <ul className="mt-2 space-y-1.5">
                 {chapter.briefing.tips.map((t) => (
-                  <li key={t} className="flex gap-2 text-sm text-muted-foreground">
+                  <li key={t} className="flex gap-2 text-sm text-muted-foreground short:text-xs">
                     <span aria-hidden className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-accent" />
                     {t}
                   </li>
@@ -220,7 +226,7 @@ export function Briefing({
             </div>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-8 short:mt-4">
             <div className="h-1 w-full overflow-hidden rounded-full bg-foreground/10">
               <div
                 className="h-full rounded-full bg-primary transition-[width] duration-200 ease-out"
@@ -388,13 +394,15 @@ export function ResultScreen({
  * Kontroller
  * ------------------------------------------------------------------ */
 
+/** Gerçek eşlemeler — `PyreGame3D`'deki klavye bağlamasıyla birebir. */
 const KEYS: [string, string][] = [
-  ["W / S", "İleri / geri"],
-  ["A / D", "Yana kayma"],
-  ["Q / E", "Alçal / yüksel"],
-  ["Shift", "Hızlan (stamina)"],
+  ["A / D", "Sola / sağa dön"],
+  ["W / S", "Alçal / yüksel"],
+  ["Q / E", "Kanat yatır (bank)"],
+  ["Shift", "Hızlan"],
+  ["Ctrl", "Askıda dur (stamina)"],
   ["Boşluk", "Konik alev (basılı tut)"],
-  ["F / Sağ tık", "Köz Mermisi (alev topu)"],
+  ["M / Sağ tık", "Köz Mermisi (alev topu)"],
   ["R", "Takla — 0.4 sn dokunulmazlık"],
   ["C", "Kanat şoku"],
   ["G", "Ejderha Öfkesi (bar doluyken)"],
@@ -402,21 +410,35 @@ const KEYS: [string, string][] = [
 ];
 
 const TOUCH: [string, string][] = [
-  ["Sol çubuk", "Yön ve hız (tam bastırma = boost)"],
-  ["Sol kenar pedi", "İrtifa"],
-  ["Alev", "Konik alev"],
+  ["Sol yarı", "Nereye basarsan çubuk orada doğar"],
+  ["Çubuk ← →", "Sola / sağa dön"],
+  ["Çubuk ↑ ↓", "Yüksel / alçal"],
+  ["Çubuğu sonuna it", "Hızlan"],
+  ["Alev", "Konik alev (basılı tut)"],
   ["Köz", "Alev topu"],
-  ["Takla", "Kaçınma"],
+  ["Takla", "Çubuk hangi yandaysa o yana kaçınma"],
   ["Şok", "Kanat şoku"],
   ["Öfke", "Bar dolunca belirir"],
 ];
 
-export function ControlsOverlay({ onClose }: { onClose: () => void }) {
+export function ControlsOverlay({
+  onClose,
+  touch = false,
+}: {
+  onClose: () => void;
+  /** Dokunmatikte dokunma şeması önce gelsin; klavye tablosu ikinci plana. */
+  touch?: boolean;
+}) {
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center overflow-y-auto bg-background/92 px-6 py-10 backdrop-blur-sm">
       <PyrePanel className="w-[min(38rem,92vw)]">
         <Eyebrow>Kontroller</Eyebrow>
-        <div className="mt-6 grid gap-8 sm:grid-cols-2">
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          Ejderha kendiliğinden ileri uçar — yalnız yönünü veriyorsun.
+        </p>
+        <div
+          className={`mt-6 grid gap-8 sm:grid-cols-2 ${touch ? "[&>*:first-child]:order-2" : ""}`}
+        >
           <div>
             <p className="text-[10px] uppercase tracking-widest text-primary">Klavye</p>
             <dl className="mt-3 space-y-2">
@@ -451,7 +473,8 @@ export function ControlsOverlay({ onClose }: { onClose: () => void }) {
           <strong className="text-foreground/80">Caddeler yangını durdurur:</strong> alevi bir
           sonraki bloğa taşımak için Köz Mermisi kullan.
         </p>
-        <div className="mt-6">
+        {/* Liste uzun ve kısa ekranda kaydırılıyor: kapatma her zaman elde. */}
+        <div className="sticky bottom-0 mt-6 -mx-6 -mb-6 rounded-b-xl bg-card/95 px-6 py-4 backdrop-blur">
           <PyreButton variant="primary" onClick={onClose}>
             Kapat
           </PyreButton>
@@ -470,25 +493,29 @@ export function SettingsOverlay({
   fps,
   muted,
   volume,
+  invertY,
   onQuality,
   onFps,
   onMuted,
   onVolume,
+  onInvertY,
   onClose,
 }: {
   quality: QualityLevel;
   fps: FpsTarget;
   muted: boolean;
   volume: number;
+  invertY: boolean;
   onQuality: (q: QualityLevel) => void;
   onFps: (f: FpsTarget) => void;
   onMuted: (m: boolean) => void;
   onVolume: (v: number) => void;
+  onInvertY: (v: boolean) => void;
   onClose: () => void;
 }) {
   const [vol, setVol] = useState(volume);
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/92 px-6 backdrop-blur-sm">
+    <div className="absolute inset-0 z-40 flex items-center justify-center overflow-y-auto bg-background/92 px-6 py-8 backdrop-blur-sm">
       <PyrePanel className="w-[min(26rem,92vw)]">
         <Eyebrow>Ayarlar</Eyebrow>
 
@@ -553,6 +580,25 @@ export function SettingsOverlay({
           }}
           className="mt-3 w-full accent-[var(--primary)]"
         />
+
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Çubuk dikey ekseni
+            </p>
+            <p className="mt-0.5 text-[10px] text-foreground/50">
+              {invertY ? "Aşağı çek = yüksel" : "Yukarı it = yüksel"}
+            </p>
+          </div>
+          <button
+            onClick={() => onInvertY(!invertY)}
+            className={`rounded border px-3 py-1 text-[10px] uppercase tracking-widest ${
+              invertY ? "border-accent/60 text-accent" : "border-foreground/25 text-foreground/70"
+            }`}
+          >
+            {invertY ? "Ters" : "Normal"}
+          </button>
+        </div>
 
         <p className="mt-4 text-[10px] leading-snug text-muted-foreground">
           Kare hızı hedefin altına düşerse önce gölgeler, sonra çözünürlük otomatik kısılır.

@@ -1,11 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
 import { createAudio, type AudioEngine } from "./pyre3d/audio";
 import { createGame, type GameHandle } from "./pyre3d/game";
 import { createHudBridge, emptySnapshot } from "./pyre3d/hud/bridge";
 import { Hud } from "./pyre3d/hud/Hud";
 import { MobileControls } from "./pyre3d/hud/MobileControls";
-import { loadSettings, saveSettings, type FpsTarget, type QualityLevel } from "./pyre3d/quality";
+import {
+  isTouchPrimary,
+  loadSettings,
+  saveSettings,
+  type FpsTarget,
+  type QualityLevel,
+  type Settings,
+} from "./pyre3d/quality";
 import { applyBondXp, gradeFor, loadSave, writeSave, type SaveData } from "./pyre3d/save";
 import {
   Briefing,
@@ -32,13 +39,21 @@ type Screen = "menu" | "chapters" | "briefing" | "playing" | "paused" | "result"
  * döngü ve tüm oynanış `pyre3d/game.ts` içinde; aralarındaki tek köprü
  * `ctrlRef` (React → döngü) ve HUD köprüsü (döngü → DOM).
  */
-export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => void }) {
+export default function PyreGame3D({
+  onStats,
+  menuExtra,
+}: {
+  onStats: (s: GameStats) => void;
+  /** Yalnız ana menüde gösterilen ek bağlantı(lar). Oyun sırasında ekranın
+   *  altını kaplamasın diye rota değil bileşen karar veriyor. */
+  menuExtra?: ReactNode;
+}) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const gameRef = useRef<GameHandle | null>(null);
   const audioRef = useRef<AudioEngine | null>(null);
   const ctrlRef = useRef(createCtrl());
-  const settingsRef = useRef({ quality: "medium" as QualityLevel, fps: 60 as FpsTarget });
+  const settingsRef = useRef<Settings>({ quality: "medium", fps: 60, invertY: false });
   const statsRef = useRef(onStats);
   statsRef.current = onStats;
 
@@ -58,6 +73,12 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
   const [snapshot, setSnapshot] = useState<HudSnapshot>(emptySnapshot);
   const [quality, setQuality] = useState<QualityLevel>("medium");
   const [fpsTarget, setFpsTarget] = useState<FpsTarget>(60);
+  const [invertY, setInvertY] = useState(false);
+  /** Dokunmatik şema yalnız gerçekten dokunmatik cihazda; masaüstünde
+   *  ekranın yarısını kaplayan görünmez bir çubuk alanı istemiyoruz. */
+  const [touch, setTouch] = useState(false);
+  const [portrait, setPortrait] = useState(false);
+  const [rotateSeen, setRotateSeen] = useState(false);
 
   const chapter: ChapterDef = useMemo(
     () => chapterById(chapterId, runId * 7919 + 13),
@@ -79,12 +100,28 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     settingsRef.current = s;
     setQuality(s.quality);
     setFpsTarget(s.fps);
+    setInvertY(s.invertY);
   }, []);
 
   useEffect(() => {
-    settingsRef.current = { quality, fps: fpsTarget };
+    settingsRef.current = { quality, fps: fpsTarget, invertY };
     gameRef.current?.cmd({ t: "applyQuality" });
-  }, [quality, fpsTarget]);
+  }, [quality, fpsTarget, invertY]);
+
+  /* ---------------- cihaz / yön ---------------- */
+  useEffect(() => {
+    const sync = () => {
+      setTouch(isTouchPrimary());
+      setPortrait(window.innerHeight > window.innerWidth);
+    };
+    sync();
+    window.addEventListener("resize", sync);
+    window.addEventListener("orientationchange", sync);
+    return () => {
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("orientationchange", sync);
+    };
+  }, []);
 
   /* ---------------- ses ---------------- */
   useEffect(() => {
@@ -101,7 +138,8 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
     const sync = () => {
       const c = ctrlRef.current;
       // W = dive (pitch down), S = ascend (pitch up)
-      c.pitch = (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) - (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0);
+      c.pitch =
+        (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0) - (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0);
       c.throttle = keys["ShiftLeft"] || keys["ShiftRight"] ? 1 : 0;
       // A/D = yaw (pure direction), Q/E = roll (bank)
       c.roll = (keys["KeyQ"] ? -1 : 0) + (keys["KeyE"] ? 1 : 0);
@@ -118,7 +156,10 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
       keys[e.code] = true;
       const c = ctrlRef.current;
       if (e.code === "KeyM") c.fireball = true;
-      if (e.code === "KeyR") c.dodge = c.roll >= 0 ? 1 : -1;
+      // Takla yönü basılı dönüş yönünden geliyor: A ile sola yatıkken R
+      // sola kaçırır. Eskiden `roll`'a bakıyordu, ama Q/E'yi kimse takla
+      // atarken basılı tutmuyor — sonuç hep aynı yöne kaçmaktı.
+      if (e.code === "KeyR") c.dodge = c.yaw < 0 ? -1 : 1;
       if (e.code === "KeyC") c.shock = true;
       if (e.code === "KeyG") c.rage = true;
       if (e.code === "Escape") togglePause();
@@ -315,24 +356,52 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
 
       {(screen === "playing" || screen === "paused") && (
         <>
+          {/* Kontroller HUD'DAN ÖNCE: altyazı kutusu gibi tıklanabilir HUD
+              parçaları çubuk alanının üstünde kalsın. */}
+          {touch && (
+            <MobileControls
+              ctrl={ctrlRef}
+              bridge={bridge}
+              onPause={togglePause}
+              abilities={chapter.abilities}
+              invertY={invertY}
+            />
+          )}
           <Hud
             bridge={bridge}
             s={snapshot}
             onSkip={() => gameRef.current?.cmd({ t: "skipLine" })}
+            touch={touch}
           />
-          <MobileControls
-            ctrl={ctrlRef}
-            bridge={bridge}
-            onPause={togglePause}
-            abilities={chapter.abilities}
-          />
-          <button
-            onClick={togglePause}
-            className="absolute left-1/2 top-2 hidden -translate-x-1/2 rounded-md border border-foreground/20 bg-background/50 px-3 py-1 text-[10px] uppercase tracking-widest text-foreground/60 backdrop-blur hover:border-primary hover:text-primary sm:block"
-          >
-            Esc · Duraklat
-          </button>
+          {!touch && (
+            <button
+              onClick={togglePause}
+              className="absolute left-1/2 top-2 -translate-x-1/2 rounded-md border border-foreground/20 bg-background/50 px-3 py-1 text-[10px] uppercase tracking-widest text-foreground/60 backdrop-blur hover:border-primary hover:text-primary"
+            >
+              Esc · Duraklat
+            </button>
+          )}
         </>
+      )}
+
+      {/* Telefonu yatay tutmaya davet — kapatılabilir, oyunu engellemiyor. */}
+      {touch && portrait && !rotateSeen && screen !== "menu" && (
+        <div className="absolute inset-x-0 bottom-0 top-0 z-30 flex flex-col items-center justify-center gap-4 bg-background/85 px-8 text-center backdrop-blur">
+          <span className="text-4xl">📱</span>
+          <p className="font-display text-sm font-black uppercase tracking-[0.3em] text-primary">
+            Telefonu yan çevir
+          </p>
+          <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">
+            Kül vadisi geniş ekran için tasarlandı. Yatay tutunca hem ufuk hem de kontroller rahat
+            oluyor.
+          </p>
+          <button
+            onClick={() => setRotateSeen(true)}
+            className="rounded-md border border-foreground/25 px-4 py-2 font-display text-[11px] uppercase tracking-[0.2em] text-foreground/80"
+          >
+            Yine de dikey oyna
+          </button>
+        </div>
       )}
 
       {screen === "menu" && (
@@ -344,6 +413,7 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
           onSandbox={() => openChapter("sandbox")}
           onControls={() => setOverlay("controls")}
           onSettings={() => setOverlay("settings")}
+          extra={menuExtra}
         />
       )}
 
@@ -387,20 +457,27 @@ export default function PyreGame3D({ onStats }: { onStats: (s: GameStats) => voi
         />
       )}
 
-      {overlay === "controls" && <ControlsOverlay onClose={() => setOverlay("none")} />}
+      {overlay === "controls" && (
+        <ControlsOverlay touch={touch} onClose={() => setOverlay("none")} />
+      )}
       {overlay === "settings" && (
         <SettingsOverlay
           quality={quality}
           fps={fpsTarget}
           muted={save.muted}
           volume={save.volume}
+          invertY={invertY}
           onQuality={(q) => {
             setQuality(q);
-            saveSettings(q, fpsTarget);
+            saveSettings({ quality: q, fps: fpsTarget, invertY });
           }}
           onFps={(f) => {
             setFpsTarget(f);
-            saveSettings(quality, f);
+            saveSettings({ quality, fps: f, invertY });
+          }}
+          onInvertY={(v) => {
+            setInvertY(v);
+            saveSettings({ quality, fps: fpsTarget, invertY: v });
           }}
           onMuted={setMuted}
           onVolume={setVolume}

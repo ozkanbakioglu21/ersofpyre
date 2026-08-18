@@ -76,7 +76,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      // `viewport-fit=cover` olmadan `env(safe-area-inset-*)` her yerde 0
+      // dönüyor: çentikli telefonlarda kontroller köşeye sıfırlanıyordu.
+      // `user-scalable=no` ise çift dokunuşta oyunun zoom'lanmasını kesiyor.
+      {
+        name: "viewport",
+        content:
+          "width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no",
+      },
       { title: "Lovable App" },
       { name: "description", content: "Lovable Generated Project" },
       { name: "author", content: "Lovable" },

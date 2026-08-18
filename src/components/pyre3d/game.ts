@@ -1299,6 +1299,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     f.rageActive = state.rageT;
     f.marked = state.marked;
     f.emberRush = state.emberRush;
+    f.fireballCd = state.fireballCd / FIREBALL.cooldown;
+    f.shockCd = state.shockCd / 5;
+    f.rollCd = state.rollCd / FLIGHT.rollCooldown;
     bridge.paint();
 
     pushT += rawDt;

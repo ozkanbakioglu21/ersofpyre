@@ -22,14 +22,16 @@ export const FLIGHT = {
   baseSpeed: 62,
   boostSpeed: 118,
   accel: 3.6,
-  altSpeed: 70,
+  altSpeed: 88,
   minClearance: 12,
   maxAltitude: 320,
+  /** Hedef hıza yaklaşma katsayısı. */
+  speedLerp: 2.2,
 
   /* ---- pitch (burun yukarı/aşağı) ---- */
-  pitchRate: 2.4,
+  pitchRate: 3.2,
   pitchDamping: 0.88,
-  pitchReturn: 2.8,
+  pitchReturn: 3.4,
   maxPitch: 0.7,
 
   /* ---- roll (yatay bank/kanat) ---- */
@@ -38,11 +40,14 @@ export const FLIGHT = {
   maxRoll: 0.65,
   rollReturn: 1.8,
 
-  /* ---- yaw (saf yön) ---- */
-  yawRate: 1.8,
+  /* ---- yaw (saf yön) ----
+   * Dönüş hissi bilinçli olarak "ağır"dan "çevik"e çekildi: mobilde tek
+   * başparmakla şehri dolaşmak gerekiyor, 1.8 rad/sn'lik eski yanıt
+   * dönmeyi bir manevra değil bir bekleyişe çeviriyordu. */
+  yawRate: 3.4,
   yawDamping: 0.88,
-  maxYaw: 0.5,
-  yawReturn: 1.4,
+  maxYaw: 0.85,
+  yawReturn: 3.2,
 
   /* ---- hover ---- */
   hoverStaminaDrain: 22,
@@ -63,7 +68,9 @@ export const FLIGHT = {
   emberRush: 2.5,
 
   /** Yaw input'unun heading'e ne kadar hızlı eklendiği (radyan/saniye). */
-  headingRate: 1.6,
+  headingRate: 2.1,
+  /** Dönerken gövdenin otomatik yattığı miktar (yaw → görsel bank). */
+  autoBank: 0.55,
 } as const;
 
 /** Açısal momentum durumu: pitch, roll ve yaw için bağımsız state. */
@@ -234,13 +241,14 @@ export function updateFlight(g: Game, dt: number): void {
   /* ---- hız hesapla ---- */
   const rushMul = s.emberRush > 0 ? 1.35 : 1;
   const snareMul = s.snared > 0 ? 0.6 : 1;
-  const pitchActive = Math.abs(c.pitch) > 0.05;
   const throttleBoost = c.throttle * (FLIGHT.boostSpeed - FLIGHT.baseSpeed);
   const diveBoost = a.diveAccum * FLIGHT.diveGain;
-  const targetSpeed = pitchActive
-    ? (FLIGHT.baseSpeed + throttleBoost + diveBoost) * rushMul * snareMul
-    : 0;
-  s.speed += (targetSpeed - s.speed) * Math.min(1, dt * 1.6);
+  // Ejderha DAİMA ileri uçar. Eskiden hız `|pitch| > 0.05` kapısının
+  // arkasındaydı: çubuğu dikeyde tutmayan oyuncu havada asılı kalıyordu ve
+  // "ileri gitmiyor" hissi buradan geliyordu. Artık taban hız hep var,
+  // gaz ve dalış onun üstüne biner.
+  const targetSpeed = (FLIGHT.baseSpeed + throttleBoost + diveBoost) * rushMul * snareMul;
+  s.speed += (targetSpeed - s.speed) * Math.min(1, dt * FLIGHT.speedLerp);
 
   /* ---- yatay hız vektörü ---- */
   if (hover) {
@@ -266,7 +274,12 @@ export function updateFlight(g: Game, dt: number): void {
   if (g.roll) {
     g.roll.t += dt;
     const p = g.roll.t / FLIGHT.rollDuration;
-    d.root.position.x += g.roll.dir * FLIGHT.rollImpulse * (1 - p) * dt;
+    // İtki heading'e DİK olmalı. Eskiden doğrudan dünya X'ine ekleniyordu:
+    // kuzeye uçarken takla yana kaçırıyor, doğuya uçarken öne/arkaya
+    // itiyordu — kaçınma yönü uçuş yönüne göre rastgele görünüyordu.
+    const imp = g.roll.dir * FLIGHT.rollImpulse * (1 - p) * dt;
+    d.root.position.x += Math.cos(a.heading) * imp;
+    d.root.position.z -= Math.sin(a.heading) * imp;
     if (g.roll.t >= FLIGHT.rollDuration) g.roll = null;
   }
 
@@ -283,7 +296,7 @@ export function updateFlight(g: Game, dt: number): void {
     : a.pitch * FLIGHT.altSpeed + c.throttle * FLIGHT.altSpeed * 0.15;
 
   // Hover'da irtifa momentumu daha yumuşak.
-  const altLerp = hover ? 2.5 : 5;
+  const altLerp = hover ? 2.5 : 6.5;
   a.altMomentum += (altInput - a.altMomentum) * Math.min(1, dt * altLerp);
 
   const groundY = terrainHeight(d.root.position.x, d.root.position.z);
@@ -315,8 +328,13 @@ export function updateFlight(g: Game, dt: number): void {
   const headingSmooth = g.roll ? a.heading : a.heading;
   d.root.rotation.y += (headingSmooth - d.root.rotation.y) * Math.min(1, dt * 10);
 
-  // Bank (gövde yatması): roll input'u + takla animasyonu.
-  const bank = g.roll ? g.roll.dir * Math.PI * 2 * (g.roll.t / FLIGHT.rollDuration) : a.roll * 0.8;
+  // Bank (gövde yatması): takla > roll input'u > dönüşten gelen otomatik yatma.
+  // Otomatik yatma sayesinde dokunmatikte ayrı bir roll ekseni gerekmiyor:
+  // çubuğu yana ittiğinde ejderha zaten viraja yatıyor.
+  const turnBank = -a.yaw * FLIGHT.autoBank;
+  const bank = g.roll
+    ? g.roll.dir * Math.PI * 2 * (g.roll.t / FLIGHT.rollDuration)
+    : a.roll * 0.8 + turnBank;
   const lerpK = g.roll ? 1 : Math.min(1, dt * 5);
   d.body.rotation.z += (bank - d.body.rotation.z) * lerpK;
 
