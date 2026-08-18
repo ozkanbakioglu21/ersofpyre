@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { cityMat, lanternMat, streetMat } from "./materials";
 import { mulberry32, type Rng } from "./rng";
-import { buildStructure, FLAMMABILITY } from "./structures";
+import { buildStructure, buildVehicle, FLAMMABILITY } from "./structures";
 import type { Target, TargetKind, TowerKind } from "./types";
 import {
   bake,
@@ -257,6 +257,49 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       spec.cz + Math.sin(a) * plazaR,
       rng,
     );
+  }
+
+  // Araçlar — cadde kenarlarına serpiştirilmiş buharlı arabalar
+  const vehicleKinds: Array<"wagon" | "truck" | "cart"> = ["wagon", "truck", "cart"];
+  for (let j = 0; j < SECTORS; j++) {
+    const a = (j / SECTORS) * Math.PI * 2;
+    const len = R * 1.02 - R * RINGS[0]!;
+    const vCount = Math.max(1, Math.floor(len / 20));
+    for (let k = 0; k < vCount; k++) {
+      if (rng.chance(0.4)) continue;
+      const t = (k + 0.5) / vCount;
+      const vx = spec.cx + Math.cos(a) * (R * RINGS[0]! + len * t);
+      const vz = spec.cz + Math.sin(a) * (R * RINGS[0]! + len * t);
+      const side = k % 2 === 0 ? 1 : -1;
+      const offset = side * (AVENUE_HALF - 2.5);
+      const vx2 = vx + Math.cos(a + Math.PI / 2) * offset;
+      const vz2 = vz + Math.sin(a + Math.PI / 2) * offset;
+      const kind = vehicleKinds[rng.int(0, 2)]!;
+      const v = buildVehicle(kind, rng);
+      v.position.set(vx2, baseY + 0.05, vz2);
+      v.rotation.y = a + (rng.chance(0.5) ? 0 : Math.PI);
+      parts.add(v);
+    }
+  }
+  // Halka yollarına araçlar
+  for (const f of RINGS) {
+    const rr = R * f;
+    if (rr < 8) continue;
+    const circ = 2 * Math.PI * rr;
+    const vCount = Math.max(2, Math.floor(circ / 24));
+    for (let k = 0; k < vCount; k++) {
+      if (rng.chance(0.45)) continue;
+      const a = (k / vCount) * Math.PI * 2;
+      const side = k % 2 === 0 ? 1 : -1;
+      const rr2 = rr + side * (RING_ROAD_HALF - 2.5);
+      const vx = spec.cx + Math.cos(a) * rr2;
+      const vz = spec.cz + Math.sin(a) * rr2;
+      const kind = vehicleKinds[rng.int(0, 2)]!;
+      const v = buildVehicle(kind, rng);
+      v.position.set(vx, baseY + 0.05, vz);
+      v.rotation.y = a + Math.PI / 2 + (rng.chance(0.5) ? 0 : Math.PI);
+      parts.add(v);
+    }
   }
 
   if (spec.wall) {

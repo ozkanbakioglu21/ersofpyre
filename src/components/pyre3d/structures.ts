@@ -1098,3 +1098,101 @@ export function createFlagshipSilhouette(): THREE.Group {
   for (const m of bake(parts, { castShadow: false, receiveShadow: false })) g.add(m);
   return g;
 }
+
+/* ------------------------------------------------------------------ *
+ * Dekoratif Araçlar — şehir sokaklarına serpiştirilen buharlı arabalar
+ * ------------------------------------------------------------------ */
+
+export type VehicleKind = "wagon" | "truck" | "cart";
+
+/** Buharlı araba — yıkılamaz dekoratif prop. */
+export function buildVehicle(kind: VehicleKind, rng: Rng): THREE.Group {
+  const g = new THREE.Group();
+  const dark = cityMat(0x2a1e14);
+  const wood = cityMat(0x3a2a18);
+  const metal = cityMat(0x5a4a30, 0.5, 0.7);
+  const wheelMat = cityMat(0x1a1410, 0.8, 0.5);
+
+  if (kind === "wagon") {
+    const bodyW = rng.range(2.8, 4.2);
+    const bodyH = rng.range(1.2, 1.8);
+    const bodyD = rng.range(1.6, 2.2);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyD), wood);
+    box.position.y = 1.4;
+    g.add(box);
+    if (rng.chance(0.6)) {
+      const load = new THREE.Mesh(
+        new THREE.BoxGeometry(bodyW - 0.4, bodyH * 0.6, bodyD - 0.3),
+        cityMat(0x1a1008),
+      );
+      load.position.y = 1.6;
+      g.add(load);
+    }
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(bodyW + 0.6, 0.25, bodyD + 0.2), dark);
+    chassis.position.y = 0.7;
+    g.add(chassis);
+    for (const [sx, sz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]] as const) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.2, 8), wheelMat);
+      wheel.rotation.x = Math.PI / 2;
+      wheel.position.set(sx * (bodyW / 2 - 0.3), 0.45, sz * (bodyD / 2 + 0.15));
+      g.add(wheel);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.22, 6), metal);
+      hub.rotation.x = Math.PI / 2;
+      hub.position.copy(wheel.position);
+      g.add(hub);
+    }
+    const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 2.0), metal);
+    tongue.position.set(0, 0.9, bodyD / 2 + 1.0);
+    g.add(tongue);
+  } else if (kind === "truck") {
+    const bodyW = rng.range(3.5, 5.0);
+    const bodyH = rng.range(1.4, 2.0);
+    const bodyD = rng.range(2.0, 2.8);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyD), dark);
+    box.position.y = 1.5;
+    g.add(box);
+    const boiler = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.6, 0.6, bodyW * 0.4, 8),
+      metal,
+    );
+    boiler.rotation.z = Math.PI / 2;
+    boiler.position.set(-bodyW / 4, 1.5, 0);
+    g.add(boiler);
+    const stack = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.2, 1.2, 6),
+      cityMat(0x3a3028, 0.6, 0.6),
+    );
+    stack.position.set(-bodyW / 4, 2.6, 0);
+    g.add(stack);
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(bodyW + 0.8, 0.3, bodyD + 0.3), dark);
+    chassis.position.y = 0.7;
+    g.add(chassis);
+    for (const sx of [-bodyW / 3, 0, bodyW / 3]) {
+      for (const sz of [-1, 1]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.25, 8), wheelMat);
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(sx, 0.5, sz * (bodyD / 2 + 0.2));
+        g.add(wheel);
+      }
+    }
+  } else {
+    const bodyW = rng.range(1.2, 1.8);
+    const bodyH = rng.range(0.6, 1.0);
+    const bodyD = rng.range(0.8, 1.2);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyD), wood);
+    box.position.y = 1.0;
+    g.add(box);
+    for (const sz of [-1, 1]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.15, 8), wheelMat);
+      wheel.rotation.x = Math.PI / 2;
+      wheel.position.set(0, 0.35, sz * (bodyD / 2 + 0.1));
+      g.add(wheel);
+    }
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 2.0), metal);
+    handle.position.set(0, 1.2, bodyD / 2 + 1.0);
+    g.add(handle);
+  }
+
+  g.rotation.y = rng.range(0, Math.PI * 2);
+  return g;
+}
