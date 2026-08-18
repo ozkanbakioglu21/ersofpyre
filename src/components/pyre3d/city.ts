@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { cityMat, lanternMat, streetMat } from "./materials";
 import { mulberry32, type Rng } from "./rng";
 import { buildStructure, buildVehicle, FLAMMABILITY } from "./structures";
+import { createNpcSystem, type NpcHandle } from "./npcs";
 import type { Target, TargetKind, TowerKind } from "./types";
 import {
   bake,
@@ -59,6 +60,7 @@ export type CityHandle = {
   blocks: CityBlock[];
   targets: Target[];
   spec: CitySpec;
+  npcs: NpcHandle;
   /** Cadde/meydan testi — yangının blok atlamasını zorlaştırır. */
   streetAt(x: number, z: number): boolean;
   dispose(): void;
@@ -594,30 +596,31 @@ export async function createCity(
 
   const plazaR = R * RINGS[0]! * 0.9;
 
+  // Sivil ve asker NPC'ler
+  const streetTest = (x: number, z: number): boolean => {
+    const dx = x - spec.cx;
+    const dz = z - spec.cz;
+    const r = Math.hypot(dx, dz);
+    if (r < plazaR) return true;
+    if (r > R * 1.02) return true;
+    for (const f of RINGS) {
+      if (Math.abs(r - R * f) < RING_ROAD_HALF) return true;
+    }
+    const a = Math.atan2(dz, dx);
+    const m = ((a % da) + da) % da;
+    return Math.min(m, da - m) * r < AVENUE_HALF;
+  };
+  const npcs = createNpcSystem(group, rng, streetTest, spec.cx, spec.cz, R);
+
   return {
     group,
     blocks,
     targets,
     spec,
-    /**
-     * Analitik cadde testi — maske dizisi tutmaya gerek yok, O(1).
-     * Yangın yayılmada iki bina arasındaki orta nokta caddeye düşüyorsa
-     * sıçrama olasılığı düşüyor: caddeler yangın duvarı gibi çalışıyor.
-     */
-    streetAt(x, z) {
-      const dx = x - spec.cx;
-      const dz = z - spec.cz;
-      const r = Math.hypot(dx, dz);
-      if (r < plazaR) return true;
-      if (r > R * 1.02) return true;
-      for (const f of RINGS) {
-        if (Math.abs(r - R * f) < RING_ROAD_HALF) return true;
-      }
-      const a = Math.atan2(dz, dx);
-      const m = ((a % da) + da) % da;
-      return Math.min(m, da - m) * r < AVENUE_HALF;
-    },
+    npcs,
+    streetAt: streetTest,
     dispose() {
+      npcs.dispose();
       group.traverse((o) => {
         const m = o as THREE.Mesh;
         if (m.geometry) m.geometry.dispose();

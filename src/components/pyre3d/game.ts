@@ -1353,6 +1353,11 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     sky.position.copy(dragon.root.position);
     fill.position.copy(camera.position);
 
+    // NPC güncellemesi (siviller kaçışır, askerler ateş eder)
+    if (city && playing) {
+      city.npcs.update(rawDt, dragon.root.position, g.fwd);
+    }
+
     updateCamera(g, rawDt, playing);
     renderer.render(scene, camera);
 
