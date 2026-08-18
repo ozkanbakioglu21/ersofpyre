@@ -166,6 +166,8 @@ export type CreateGameOpts = {
 
 export type GameHandle = { cmd(c: GameCommand): void; dispose(): void };
 
+/** origin/main'in sis inceltmesi — üç ayar yolunda da aynı kalmalı. */
+const FOG_SCALE = 0.85;
 const SUN_OFFSET = new THREE.Vector3(-140, 200, -110);
 const FWD = new THREE.Vector3(0, 0, 1);
 
@@ -198,9 +200,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   if (renderer.domElement.parentElement !== mount) mount.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1210);
+  scene.background = new THREE.Color(0x2a1c14);
   const fogScale = chapter.world.fogScale ?? 1;
-  const fog = new THREE.FogExp2(0x4a3524, preset.fogDensity * fogScale);
+  const fog = new THREE.FogExp2(0x4a3524, preset.fogDensity * fogScale * FOG_SCALE);
   scene.fog = fog;
 
   const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.5, 2400);
@@ -218,7 +220,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   scene.add(new THREE.HemisphereLight(0xa8825c, 0x2e1e14, 2.3));
   // Kameraya bağlı dolgu. decay=2 fiziksel sönüm demek: eski 2.8'lik değer
   // 40 birim uzakta 2.8/1600 ≈ 0.002 ışınım üretiyordu, yani hiç yoktu.
-  const fill = new THREE.PointLight(0xffb877, 600, 220, 2);
+  const fill = new THREE.PointLight(0xffb870, 600, 220, 2);
   scene.add(fill);
   const sun = new THREE.DirectionalLight(0xffbe86, 4.6);
   sun.position.set(-160, 190, -120);
@@ -657,7 +659,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     sun.shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
     sun.shadow.map?.dispose();
     sun.shadow.map = null as unknown as THREE.WebGLRenderTarget;
-    fog.density = preset.fogDensity * fogScale;
+    fog.density = preset.fogDensity * fogScale * FOG_SCALE;
     ash.geometry.setDrawRange(0, preset.ashCount);
     const am = ash.material as THREE.PointsMaterial;
     am.size = preset.ashSize;
@@ -985,8 +987,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         fill.color.setHex(0xff5a1a);
         fog.density = preset.fogDensity * fogScale * 0.75;
       } else {
-        fill.color.setHex(0xffa860);
-        fog.density = preset.fogDensity * fogScale;
+        fill.color.setHex(0xffb870);
+        fog.density = preset.fogDensity * fogScale * FOG_SCALE;
         if (state.time > 1) state.rage = Math.max(0, state.rage - 0.5 * dt);
       }
 
