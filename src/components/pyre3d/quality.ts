@@ -84,12 +84,15 @@ const KEY = "pyre3d-quality";
 export type Settings = {
   quality: QualityLevel;
   fps: FpsTarget;
-  /** Dokunmatik çubukta dikey ekseni ters çevir (uçuş simülasyonu alışkanlığı). */
+  /**
+   * Dokunmatik çubukta dikey eksen. Varsayılan TERS: uçak kumandası gibi
+   * aşağı çekince burun yukarı kalkıyor. Düz isteyen Ayarlar'dan çeviriyor.
+   */
   invertY: boolean;
 };
 
 export function loadSettings(): Settings {
-  if (typeof window === "undefined") return { quality: "medium", fps: 60, invertY: false };
+  if (typeof window === "undefined") return { quality: "medium", fps: 60, invertY: true };
   try {
     const raw = window.localStorage.getItem(KEY);
     if (raw) {
@@ -98,14 +101,16 @@ export function loadSettings(): Settings {
         return {
           quality: p.quality,
           fps: (p.fps ?? 60) as FpsTarget,
-          invertY: p.invertY === true,
+          // Anahtar yoksa yeni varsayılan; açıkça false yazılmışsa oyuncunun
+          // tercihi korunuyor.
+          invertY: p.invertY ?? true,
         };
       }
     }
   } catch {
     /* ignore */
   }
-  return { ...detectQuality(), invertY: false };
+  return { ...detectQuality(), invertY: true };
 }
 
 export function saveSettings(s: Settings) {

@@ -80,6 +80,7 @@ export function MobileControls({
   const baseRef = useRef<HTMLDivElement | null>(null);
   const knobRef = useRef<HTMLDivElement | null>(null);
   const boostRef = useRef<HTMLDivElement | null>(null);
+  const noseRef = useRef<HTMLDivElement | null>(null);
 
   const touchId = useRef<number | null>(null);
   const origin = useRef({ x: 0, y: 0 });
@@ -88,6 +89,21 @@ export function MobileControls({
 
   const invert = useRef(invertY);
   invert.current = invertY;
+
+  /* Burun eğimi göstergesi: pitch artık parmağı çekince sıfırlanmıyor, bu
+   * yüzden burnun nerede durduğu görünür olmalı. Çubuğun içindeki ufuk
+   * çizgisi ejderhanın eğimiyle birlikte kayıyor. */
+  useLayoutEffect(
+    () =>
+      bridge.register((f: HudFrame) => {
+        const el = noseRef.current;
+        if (!el) return;
+        const p = Math.max(-1, Math.min(1, f.pitch));
+        el.style.transform = `translate(-50%, -50%) translateY(${-p * 26}px)`;
+        el.style.opacity = Math.abs(p) < 0.04 ? "0.25" : "0.85";
+      }),
+    [bridge],
+  );
 
   /* Boştaki konumu ölç: sol alt köşe, güvenli alan payıyla. */
   useLayoutEffect(() => {
@@ -284,6 +300,12 @@ export function MobileControls({
           <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-foreground/45">
             ▶
           </span>
+          {/* ufuk çizgisi — burnun tutulan eğimi */}
+          <div
+            ref={noseRef}
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[2px] w-16 rounded-full bg-accent"
+            style={{ transform: "translate(-50%, -50%)", opacity: 0.25 }}
+          />
           <div
             ref={knobRef}
             className="absolute left-1/2 top-1/2 rounded-full border-2 border-primary/70 bg-primary/35 shadow-[0_0_18px_rgba(0,0,0,0.35)]"

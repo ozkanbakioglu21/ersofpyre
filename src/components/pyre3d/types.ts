@@ -309,6 +309,10 @@ export type HudFrame = {
   fireballCd: number;
   shockCd: number;
   rollCd: number;
+  /** Burnun tutulan eğimi -1..1. Çubuktaki eğim göstergesi bunu çiziyor:
+   *  pitch artık bırakınca sıfırlanmadığı için oyuncunun burnun nerede
+   *  olduğunu görmesi gerekiyor. */
+  pitch: number;
   /** Fren açık mı (0/1). Buton kendi durumunu buradan okuyor: stamina
    *  bitince oyun döngüsü freni zorla kapatabiliyor. */
   braking: number;

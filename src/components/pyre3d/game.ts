@@ -1302,6 +1302,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     f.rageActive = state.rageT;
     f.marked = state.marked;
     f.emberRush = state.emberRush;
+    f.pitch = g.flightAxes.pitch / FLIGHT.maxPitch;
     f.braking = g.braking ? 1 : 0;
     f.fireballCd = state.fireballCd / FIREBALL.cooldown;
     f.shockCd = state.shockCd / 5;

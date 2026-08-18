@@ -397,7 +397,7 @@ export function ResultScreen({
 /** Gerçek eşlemeler — `PyreGame3D`'deki klavye bağlamasıyla birebir. */
 const KEYS: [string, string][] = [
   ["A / D", "Sola / sağa dön"],
-  ["W / S", "Alçal / yüksel"],
+  ["W / S", "Burnu indir / kaldır (eğim kalıcı)"],
   ["Q / E", "Kanat yatır (bank)"],
   ["Shift", "Hızlan"],
   ["F", "Fren — dur ve yak (stamina)"],
@@ -413,7 +413,7 @@ const KEYS: [string, string][] = [
 const TOUCH: [string, string][] = [
   ["Sol yarı", "Nereye basarsan çubuk orada doğar"],
   ["Çubuk ← →", "Sola / sağa dön"],
-  ["Çubuk ↑ ↓", "Yüksel / alçal"],
+  ["Çubuk ↑ ↓", "Burnu indir / kaldır — bıraktığında eğim kalır"],
   ["Çubuğu sonuna it", "Hızlan"],
   ["Dur", "Frenle — hedefin önünde durup yak"],
   ["Alev", "Konik alev (basılı tut)"],
@@ -436,8 +436,10 @@ export function ControlsOverlay({
       <PyrePanel className="w-[min(38rem,92vw)]">
         <Eyebrow>Kontroller</Eyebrow>
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          Ejderha kendiliğinden ileri uçar — yalnız yönünü veriyorsun. Bir hedefin önünde durup
-          yakmak için frene bas: dönüş ve irtifa sende kalır, yalnız ileri hız kesilir.
+          Ejderha kendiliğinden ileri uçar — yalnız yönünü veriyorsun. Burun uçak kumandası gibi
+          çalışır: verdiğin eğimi korur, düzlemek için karşı yöne it. Çubuğun içindeki ufuk çizgisi
+          burnun nerede olduğunu gösterir. Bir hedefin önünde durup yakmak için frene bas: dönüş ve
+          irtifa sende kalır, yalnız ileri hız kesilir.
         </p>
         <div
           className={`mt-6 grid gap-8 sm:grid-cols-2 ${touch ? "[&>*:first-child]:order-2" : ""}`}
@@ -590,7 +592,7 @@ export function SettingsOverlay({
               Çubuk dikey ekseni
             </p>
             <p className="mt-0.5 text-[10px] text-foreground/50">
-              {invertY ? "Aşağı çek = yüksel" : "Yukarı it = yüksel"}
+              {invertY ? "Aşağı çek = burun yukarı (uçak)" : "Yukarı it = burun yukarı"}
             </p>
           </div>
           <button

@@ -53,7 +53,7 @@ export default function PyreGame3D({
   const gameRef = useRef<GameHandle | null>(null);
   const audioRef = useRef<AudioEngine | null>(null);
   const ctrlRef = useRef(createCtrl());
-  const settingsRef = useRef<Settings>({ quality: "medium", fps: 60, invertY: false });
+  const settingsRef = useRef<Settings>({ quality: "medium", fps: 60, invertY: true });
   const statsRef = useRef(onStats);
   statsRef.current = onStats;
 
@@ -73,7 +73,7 @@ export default function PyreGame3D({
   const [snapshot, setSnapshot] = useState<HudSnapshot>(emptySnapshot);
   const [quality, setQuality] = useState<QualityLevel>("medium");
   const [fpsTarget, setFpsTarget] = useState<FpsTarget>(60);
-  const [invertY, setInvertY] = useState(false);
+  const [invertY, setInvertY] = useState(true);
   /** Dokunmatik şema yalnız gerçekten dokunmatik cihazda; masaüstünde
    *  ekranın yarısını kaplayan görünmez bir çubuk alanı istemiyoruz. */
   const [touch, setTouch] = useState(false);

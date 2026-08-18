@@ -27,7 +27,7 @@ const c01: ChapterDef = {
     tips: [
       "Pyra kendiliğinden ileri uçar — sen yönünü ver",
       "A/D veya çubuğu yana it: dön",
-      "W/S veya çubuğu yukarı/aşağı it: alçal/yüksel",
+      "Burun uçak gibi: çubuğu aşağı çek burun kalkar, eğim kalıcıdır",
     ],
   },
   world: {
@@ -72,7 +72,7 @@ const c01: ChapterDef = {
     {
       id: "irtifa",
       trigger: { at: "time", t: 9 },
-      actions: [{ do: "hint", text: "Alçal / Yüksel", keys: ["W", "S"], dur: 7 }],
+      actions: [{ do: "hint", text: "Burnu kaldır — eğim kalıcı", keys: ["S"], dur: 7 }],
     },
     {
       id: "gecit1",

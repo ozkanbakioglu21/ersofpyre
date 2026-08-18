@@ -28,11 +28,19 @@ export const FLIGHT = {
   /** Hedef hıza yaklaşma katsayısı. */
   speedLerp: 2.2,
 
-  /* ---- pitch (burun yukarı/aşağı) ---- */
+  /* ---- pitch (burun yukarı/aşağı) ----
+   * Uçak kumandası mantığı: çubuk burnun KONUMUNU değil, DEĞİŞİM HIZINI
+   * sürüyor. Parmağı çekince ejderha kendi kendine düzleşmiyor, verdiğin
+   * eğimi koruyor — trim'li bir irtifa kumandası gibi. */
   pitchRate: 3.2,
   pitchDamping: 0.88,
   pitchReturn: 3.4,
   maxPitch: 0.7,
+  /** Tam basılı çubuğun burnu saniyede kaç radyan çevirdiği. */
+  pitchTrimRate: 1.15,
+  /** Tavana/tabana yaslanınca burnun düzelme hızı — burun sabit kaldığı
+   *  için oyuncu aksi hâlde yere sürtünerek takılı kalıyor. */
+  pitchLevelAtLimit: 2.6,
 
   /* ---- roll (yatay bank/kanat) ---- */
   rollRate: 3.2,
@@ -198,21 +206,19 @@ export function updateFlight(g: Game, dt: number): void {
   }
   g.braking = braking;
 
-  /* ---- pitch momentum ---- */
-  const pitchTarget = c.pitch * FLIGHT.maxPitch;
-  const [newPitch, pitchVel] = lerpDamp(
-    a.pitch,
-    hover ? 0 : pitchTarget,
-    dt,
-    FLIGHT.pitchRate,
-    FLIGHT.pitchDamping,
-  );
-  a.pitchVel = pitchVel;
-  a.pitch = THREE.MathUtils.clamp(newPitch, -FLIGHT.maxPitch, FLIGHT.maxPitch);
-
-  // Pitch sıfıra dönerken daha hızlı (doğal stabilizasyon).
-  if (Math.abs(c.pitch) < 0.1) {
+  /* ---- pitch (burun eğimi) ---- */
+  if (hover) {
+    // Askıda kalırken burun düzleşiyor.
     a.pitch += (0 - a.pitch) * Math.min(1, dt * FLIGHT.pitchReturn);
+    a.pitchVel = 0;
+  } else {
+    const before = a.pitch;
+    a.pitch = THREE.MathUtils.clamp(
+      a.pitch + c.pitch * FLIGHT.pitchTrimRate * dt,
+      -FLIGHT.maxPitch,
+      FLIGHT.maxPitch,
+    );
+    a.pitchVel = (a.pitch - before) / Math.max(dt, 1e-4);
   }
 
   /* ---- roll momentum ---- */
@@ -311,20 +317,30 @@ export function updateFlight(g: Game, dt: number): void {
   g.fwd.set(Math.sin(a.heading), 0, Math.cos(a.heading)).normalize();
 
   /* ---- irtifa (pitch + hover) ---- */
+  // Frendeyken irtifa TUTULAN eğimi değil, o anki parmağı takip ediyor:
+  // hedefin önünde durduğunda çubuğu bırakınca yükseklik kilitleniyor,
+  // ince ayar için itip çekiyorsun.
   const altInput = hover
     ? FLIGHT.hoverLift * (0.3 + 0.7 * c.throttle)
-    : a.pitch * FLIGHT.altSpeed + c.throttle * FLIGHT.altSpeed * 0.15;
+    : braking
+      ? c.pitch * FLIGHT.altSpeed * 0.55
+      : a.pitch * FLIGHT.altSpeed + c.throttle * FLIGHT.altSpeed * 0.15;
 
   // Hover'da irtifa momentumu daha yumuşak.
   const altLerp = hover ? 2.5 : 6.5;
   a.altMomentum += (altInput - a.altMomentum) * Math.min(1, dt * altLerp);
 
   const groundY = terrainHeight(d.root.position.x, d.root.position.z);
-  d.root.position.y = THREE.MathUtils.clamp(
-    d.root.position.y + a.altMomentum * dt,
-    groundY + FLIGHT.minClearance,
-    FLIGHT.maxAltitude,
-  );
+  const minY = groundY + FLIGHT.minClearance;
+  const rawY = d.root.position.y + a.altMomentum * dt;
+  d.root.position.y = THREE.MathUtils.clamp(rawY, minY, FLIGHT.maxAltitude);
+
+  // Sınıra yaslandık: burun sabit kaldığı için oyuncu aksi hâlde zemine
+  // sürtünerek asılı kalıyordu. Eğimi ve momentumu yumuşakça geri al.
+  if (rawY < minY || rawY > FLIGHT.maxAltitude) {
+    a.pitch += (0 - a.pitch) * Math.min(1, dt * FLIGHT.pitchLevelAtLimit);
+    a.altMomentum *= 0.6;
+  }
 
   /* ---- sınır kontrolü ---- */
   if (g.autoForward) {
