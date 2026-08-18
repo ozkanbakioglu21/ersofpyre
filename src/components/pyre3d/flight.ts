@@ -213,11 +213,15 @@ export function updateFlight(g: Game, dt: number): void {
     a.pitchVel = 0;
   } else {
     const before = a.pitch;
-    a.pitch = THREE.MathUtils.clamp(
-      a.pitch + c.pitch * FLIGHT.pitchTrimRate * dt,
-      -FLIGHT.maxPitch,
-      FLIGHT.maxPitch,
-    );
+    if (Math.abs(c.pitch) > 0.05) {
+      a.pitch = THREE.MathUtils.clamp(
+        a.pitch + c.pitch * FLIGHT.pitchTrimRate * dt,
+        -FLIGHT.maxPitch,
+        FLIGHT.maxPitch,
+      );
+    } else {
+      a.pitch += (0 - a.pitch) * Math.min(1, dt * FLIGHT.pitchReturn);
+    }
     a.pitchVel = (a.pitch - before) / Math.max(dt, 1e-4);
   }
 
