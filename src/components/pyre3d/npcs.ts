@@ -34,7 +34,7 @@ export type NpcHandle = {
   dispose(): void;
 };
 
-const MAX_NPC = 120;
+const MAX_NPC = 300;
 const CIVILIAN_SPEED = 14;
 const SOLDIER_SHOOT_INTERVAL = 2.2;
 const FLEE_DISTANCE = 60;
@@ -152,7 +152,7 @@ export function createNpcSystem(
   const bullets: Bullet[] = [];
 
   // Sokaklara NPC yerleştir
-  const placeCount = Math.min(MAX_NPC, Math.floor(radius / 3));
+  const placeCount = Math.min(MAX_NPC, Math.floor(radius / 1.8));
   for (let i = 0; i < placeCount; i++) {
     const a = rng.range(0, Math.PI * 2);
     const r = rng.range(radius * 0.15, radius * 0.95);
