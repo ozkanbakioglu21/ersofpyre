@@ -248,7 +248,7 @@ export function cityMat(color: number, roughness = 0.9, metalness = 0.1) {
           color,
           roughness,
           metalness,
-          flatShading: true,
+          flatShading: false,
         }),
       ),
     );
@@ -285,4 +285,170 @@ export function cityWindowMaterial(): THREE.MeshStandardMaterial {
 /** `aState` tabanlı materyallerin listesi — dev doğrulaması için. */
 export function cityMaterialCount(): number {
   return cityCache.size + (cityWindowMat ? 1 : 0);
+}
+
+/* ------------------------------------------------------------------ *
+ *  Duvar dokuları — prosedürel tuğla / taş / ahşap
+ * ------------------------------------------------------------------ */
+
+function makeBrickTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext("2d")!;
+  // Tuğla zemin rengi
+  ctx.fillStyle = "#5a3525";
+  ctx.fillRect(0, 0, 128, 128);
+  const bw = 30;
+  const bh = 14;
+  const gap = 2;
+  for (let row = 0; row < 5; row++) {
+    const offset = row % 2 === 0 ? 0 : bw / 2;
+    for (let col = -1; col < 6; col++) {
+      const x = col * (bw + gap) + offset;
+      const y = row * (bh + gap);
+      // Her tuğlaya hafif renk varyasyonu
+      const r = 80 + Math.floor(Math.random() * 30);
+      const g = 40 + Math.floor(Math.random() * 20);
+      const b = 30 + Math.floor(Math.random() * 15);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, bw, bh);
+      // Üst yüzeyde hafif highlight
+      ctx.fillStyle = `rgba(255,200,150,${0.06 + Math.random() * 0.06})`;
+      ctx.fillRect(x, y, bw, 2);
+    }
+  }
+  // Harç çizgileri
+  ctx.strokeStyle = "rgba(30,18,12,0.6)";
+  ctx.lineWidth = 1;
+  for (let row = 0; row <= 5; row++) {
+    const y = row * (bh + gap) - gap / 2;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(128, y);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.repeat.set(2, 2);
+  tex.userData["shared"] = true;
+  return tex;
+}
+
+function makeStoneTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#4a4540";
+  ctx.fillRect(0, 0, 128, 128);
+  // Rastgele taş bloklar
+  const blocks: [number, number, number, number][] = [
+    [0, 0, 50, 30],
+    [52, 0, 76, 28],
+    [0, 32, 40, 30],
+    [42, 30, 86, 32],
+    [0, 64, 60, 32],
+    [62, 64, 128, 30],
+    [0, 98, 48, 30],
+    [50, 96, 100, 32],
+    [102, 98, 128, 30],
+  ];
+  for (const b of blocks) {
+    const [x0, y0, x1, y1] = b;
+    const base = 55 + Math.floor(Math.random() * 25);
+    const r = base + Math.floor(Math.random() * 10);
+    const g = base + Math.floor(Math.random() * 8);
+    const bv = base - 5 + Math.floor(Math.random() * 10);
+    ctx.fillStyle = `rgb(${r},${g},${bv})`;
+    ctx.fillRect(x0 + 1, y0 + 1, x1 - x0 - 2 || 24, y1 - y0 - 2 || 26);
+    ctx.fillStyle = `rgba(200,190,180,${0.05 + Math.random() * 0.05})`;
+    ctx.fillRect(x0 + 1, y0 + 1, x1 - x0 - 2 || 24, 1);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.repeat.set(2, 2);
+  tex.userData["shared"] = true;
+  return tex;
+}
+
+function makeWoodTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#3e2815";
+  ctx.fillRect(0, 0, 128, 128);
+  // Ahşap tahtalar (dikey)
+  const plankW = 22;
+  for (let i = 0; i < 7; i++) {
+    const x = i * (plankW + 1);
+    const base = 50 + Math.floor(Math.random() * 15);
+    ctx.fillStyle = `rgb(${base + 10},${base},${base - 10})`;
+    ctx.fillRect(x, 0, plankW, 128);
+    // Doku çizgileri
+    ctx.strokeStyle = `rgba(20,12,5,${0.15 + Math.random() * 0.1})`;
+    ctx.lineWidth = 0.5;
+    for (let ly = 0; ly < 128; ly += 4 + Math.floor(Math.random() * 6)) {
+      ctx.beginPath();
+      ctx.moveTo(x + 2, ly);
+      ctx.lineTo(x + plankW - 2, ly + (Math.random() - 0.5) * 3);
+      ctx.stroke();
+    }
+    // Düğüm deliği
+    if (Math.random() > 0.6) {
+      const ky = 20 + Math.random() * 88;
+      ctx.fillStyle = `rgba(25,15,8,0.5)`;
+      ctx.beginPath();
+      ctx.ellipse(x + plankW / 2, ky, 3, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.repeat.set(1.5, 1.5);
+  tex.userData["shared"] = true;
+  return tex;
+}
+
+let _brickTex: THREE.CanvasTexture | null = null;
+let _stoneTex: THREE.CanvasTexture | null = null;
+let _woodTex: THREE.CanvasTexture | null = null;
+
+export function brickTexture(): THREE.CanvasTexture {
+  return (_brickTex ??= makeBrickTexture());
+}
+export function stoneTexture(): THREE.CanvasTexture {
+  return (_stoneTex ??= makeStoneTexture());
+}
+export function woodTexture(): THREE.CanvasTexture {
+  return (_woodTex ??= makeWoodTexture());
+}
+
+/** Doku kaplı şehir materyali — `aState` yaması ile. */
+export function cityTexturedMat(
+  tex: THREE.CanvasTexture,
+  color: number,
+  roughness = 0.9,
+): THREE.MeshStandardMaterial {
+  const key = `tex:${color}:${roughness}`;
+  let m = cityCache.get(key);
+  if (!m) {
+    m = patchChar(
+      shared(
+        new THREE.MeshStandardMaterial({
+          color,
+          map: tex,
+          roughness,
+          metalness: 0.1,
+          flatShading: false,
+        }),
+      ),
+    );
+    cityCache.set(key, m);
+  }
+  return m;
 }

@@ -226,7 +226,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
   }
 
   const g = new THREE.Group();
-  for (const m of bake(parts, { castShadow: false, receiveShadow: true })) g.add(m);
+  for (const m of bake(parts, { castShadow: true, receiveShadow: true })) g.add(m);
   return g;
 }
 
@@ -337,7 +337,7 @@ export async function createCity(
     const { meshes, ranges } = bakeTagged(
       blockParts,
       (m) => (m.userData["tag"] as number | undefined) ?? -1,
-      { castShadow: false, receiveShadow: true },
+      { castShadow: true, receiveShadow: true },
     );
     for (const m of meshes) group.add(m);
 
