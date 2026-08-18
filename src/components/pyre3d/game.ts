@@ -649,16 +649,42 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   window.addEventListener("resize", resize);
   cleanups.push(() => window.removeEventListener("resize", resize));
 
+  /**
+   * Gölge haritasını aç/kapat.
+   *
+   * `renderer.shadowMap.enabled` program önbellek anahtarının parçası
+   * (WebGLPrograms: shadowMapEnabled), ama three bunun değiştiğini
+   * KENDİLİĞİNDEN fark etmiyor — `setProgram()` içindeki needsProgramChange
+   * zincirinde bu bayrağın kontrolü yok. Bayrak çevrildiğinde eski program
+   * gölge örnekleyicisini (sampler2DShadow) bildirmeye devam ediyor ama
+   * arkasında geçerli derinlik dokusu kalmıyor; sürücü çizimi
+   * "GL_INVALID_OPERATION: Mismatch between texture format and sampler type"
+   * ile düşürüyor ve nesne ekrandan tamamen kayboluyor.
+   *
+   * Bu yüzden bayrağı her çevirişte sahnedeki materyalleri yeniden
+   * derletiyoruz. Nadir bir işlem, maliyeti önemsiz.
+   */
+  const setShadowsEnabled = (on: boolean) => {
+    if (renderer.shadowMap.enabled === on && sun.castShadow === on) return;
+    renderer.shadowMap.enabled = on;
+    renderer.shadowMap.needsUpdate = on;
+    sun.castShadow = on;
+    scene.traverse((obj) => {
+      const m = (obj as THREE.Mesh).material;
+      if (!m) return;
+      if (Array.isArray(m)) for (const x of m) x.needsUpdate = true;
+      else m.needsUpdate = true;
+    });
+  };
+
   const applyQuality = () => {
     preset = QUALITY_PRESETS[settings.current.quality];
     resScale = 1;
     applyPixelRatio();
-    renderer.shadowMap.enabled = preset.shadows;
-    renderer.shadowMap.needsUpdate = true;
-    sun.castShadow = preset.shadows;
     sun.shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
     sun.shadow.map?.dispose();
     sun.shadow.map = null as unknown as THREE.WebGLRenderTarget;
+    setShadowsEnabled(preset.shadows);
     fog.density = preset.fogDensity * fogScale * FOG_SCALE;
     ash.geometry.setDrawRange(0, preset.ashCount);
     const am = ash.material as THREE.PointsMaterial;
@@ -829,8 +855,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       if (slowSamples >= 2) {
         if (!shadowsDropped && renderer.shadowMap.enabled) {
           shadowsDropped = true;
-          renderer.shadowMap.enabled = false;
-          sun.castShadow = false;
+          setShadowsEnabled(false);
           slowSamples = 0;
         } else if (resScale > 0.6) {
           resScale = Math.max(0.6, resScale - 0.15);
