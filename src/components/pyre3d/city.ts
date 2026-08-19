@@ -55,12 +55,15 @@ export type CityBlock = {
   alive: number;
 };
 
+export type GateTurret = { pos: THREE.Vector3; y: number; cool: number };
+
 export type CityHandle = {
   group: THREE.Group;
   blocks: CityBlock[];
   targets: Target[];
   spec: CitySpec;
   npcs: NpcHandle;
+  gateTurrets: GateTurret[];
   /** Cadde/meydan testi — yangının blok atlamasını zorlaştırır. */
   streetAt(x: number, z: number): boolean;
   dispose(): void;
@@ -1393,12 +1396,28 @@ export async function createCity(
   };
   const npcs = createNpcSystem(group, rng, streetTest, spec.cx, spec.cz, R);
 
+  // Kapı kulesi topçu mevzileri
+  const gateTurrets: GateTurret[] = [];
+  if (spec.wall) {
+    const wallRt = R * 1.06;
+    const da2 = (Math.PI * 2) / SECTORS;
+    for (let j = 0; j < SECTORS; j++) {
+      const ga = j * da2;
+      for (const side of [-1, 1]) {
+        const kx = spec.cx + Math.cos(ga) * wallRt + Math.cos(ga + Math.PI / 2) * side * (7 / 2 + 3.2 + 0.8);
+        const kz = spec.cz + Math.sin(ga) * wallRt + Math.sin(ga + Math.PI / 2) * side * (7 / 2 + 3.2 + 0.8);
+        gateTurrets.push({ pos: new THREE.Vector3(kx, baseY + 14, kz), y: baseY + 14, cool: rng.range(0, 2) });
+      }
+    }
+  }
+
   return {
     group,
     blocks,
     targets,
     spec,
     npcs,
+    gateTurrets,
     streetAt: streetTest,
     dispose() {
       npcs.dispose();

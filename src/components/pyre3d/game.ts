@@ -1140,6 +1140,24 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         }
       }
 
+      /* ---- kapı kuleleri topçu ---- */
+      if (city) {
+        for (const gt of city.gateTurrets) {
+          gt.cool -= dt;
+          const d = gt.pos.distanceTo(dp);
+          const rate = state.marked > 0 ? 0.62 : 1;
+          if (gt.cool <= 0 && d < 180) {
+            gt.cool = (2.5 + Math.random() * 0.8) * rate;
+            tmp.copy(dp).sub(gt.pos).normalize();
+            tmp.x += (Math.random() - 0.5) * 0.12;
+            tmp.z += (Math.random() - 0.5) * 0.12;
+            tmp2.copy(gt.pos);
+            shots.spawn("bolt", tmp2, tmp.normalize().multiplyScalar(80), 6, 0);
+            audio.enemyShot();
+          }
+        }
+      }
+
       /* ---- zeplinler ---- */
       for (const z of g.airships) {
         if (z.dead) continue;
