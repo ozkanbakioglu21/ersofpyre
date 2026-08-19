@@ -451,7 +451,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     pad2.frequency.value = 55.7; // hafif detune → chorusing
     const padGain = c.ac.createGain();
     padGain.gain.setValueAtTime(0.0001, t);
-    padGain.gain.exponentialRampToValueAtTime(0.45, t + 1.5);
+    padGain.gain.exponentialRampToValueAtTime(0.75, t + 1.2);
     const padFilter = c.ac.createBiquadFilter();
     padFilter.type = "lowpass";
     padFilter.frequency.value = 280;
@@ -467,7 +467,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     subPulse.frequency.value = 42;
     const subPulseGain = c.ac.createGain();
     subPulseGain.gain.setValueAtTime(0.0001, t);
-    subPulseGain.gain.exponentialRampToValueAtTime(0.55, t + 1);
+    subPulseGain.gain.exponentialRampToValueAtTime(0.85, t + 0.8);
     // LFO ile nabız: sine 0.35 Hz → sub-bass gain'i açıp kapatır
     const pulseLfo = c.ac.createOscillator();
     pulseLfo.type = "sine";
@@ -484,7 +484,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     tension.frequency.value = 110;
     const tensionGain = c.ac.createGain();
     tensionGain.gain.setValueAtTime(0.0001, t);
-    tensionGain.gain.exponentialRampToValueAtTime(0.25, t + 2);
+    tensionGain.gain.exponentialRampToValueAtTime(0.45, t + 1.5);
     // Yavaş frekans tarama: 90-165 Hz arası 12 saniyede
     tension.frequency.setValueAtTime(90, t);
     tension.frequency.linearRampToValueAtTime(165, t + 12);
@@ -506,7 +506,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     metalFilter.Q.value = 6;
     const metallicGain = c.ac.createGain();
     metallicGain.gain.setValueAtTime(0.0001, t);
-    metallicGain.gain.exponentialRampToValueAtTime(0.12, t + 2);
+    metallicGain.gain.exponentialRampToValueAtTime(0.22, t + 1.5);
     // LFO: bandpass frekansını gezdirir → metalik tınlama
     const lfo = c.ac.createOscillator();
     lfo.type = "sine";
