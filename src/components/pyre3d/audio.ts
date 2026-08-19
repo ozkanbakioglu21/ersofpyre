@@ -86,11 +86,18 @@ const SFX_MANIFEST: Record<string, string[]> = {
     "explosion_01.ogg", "explosion_02.ogg", "explosion_03.ogg",
     "explosion_04.ogg", "explosion_05.ogg", "explosion_06.ogg",
     "explosion_07.ogg", "dynamite.wav",
+    "blast_01.ogg", "blast_02.ogg", "blast_03.ogg", "blast_04.ogg",
   ],
   bigExplosion: [
-    "big_explosion.wav", "dynamite.wav",
+    "big_explosion.wav", "big_boom.wav", "dynamite.wav",
     "explosion_04.ogg", "explosion_05.ogg", "explosion_06.ogg", "explosion_07.ogg",
+    "blast_01.ogg", "blast_03.ogg",
   ],
+  mechExplosion: [
+    "mech_explosion.wav",
+    "metal_hit_01.ogg", "metal_hit_02.ogg", "metal_hit_03.ogg",
+  ],
+  distantBoom: ["distant_boom.wav"],
   glassBreak: [
     "glass_break_01.ogg", "glass_break_02.ogg", "glass_break_03.ogg",
     "glass_break_04.wav",
@@ -778,6 +785,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         } else {
           playSample(c, "explosion", { pitch: 0.8 + Math.random() * 0.4, vol: 0.7 * s });
         }
+        // Metal/mekanik patlama katmanı (orta-büyük)
+        if (s >= 0.8) {
+          playSample(c, "mechExplosion", {
+            pitch: 0.7 + Math.random() * 0.4,
+            vol: 0.45 * s,
+            delay: 0.015,
+          });
+        }
         // Prosedürel katman
         noiseBurst(c, {
           dur: 0.42 * s,
@@ -798,6 +813,12 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         });
         // Metal gıcırtısı
         playSample(c, "metalHit", { pitch: 0.7 + Math.random() * 0.6, vol: 0.3, delay: 0.04 });
+        // Uzak yankı — yankı gerçekçiliği için rastgele gecikme
+        playSample(c, "distantBoom", {
+          pitch: 0.6 + Math.random() * 0.2,
+          vol: 0.25 * s,
+          delay: 0.3 + Math.random() * 0.5,
+        });
       });
     },
     fireball() {
@@ -811,8 +832,9 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     bombHit() {
       withCtx((c) => {
-        // Büyük bomba sesi
+        // Büyük bomba sesi — çoklu patlama sample'ı
         playSample(c, "bigExplosion", { pitch: 0.7 + Math.random() * 0.3, vol: 0.9 });
+        playSample(c, "bigBoom", { pitch: 0.6 + Math.random() * 0.3, vol: 0.7, delay: 0.04 });
         // Prosedürel derin bass
         noiseBurst(c, {
           dur: 0.7,
@@ -823,6 +845,8 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           q: 0.6,
         });
         tone(c, { type: "sine", from: 85, to: 18, dur: 0.65, peak: 0.42 });
+        // Mekanik patlama katmanı
+        playSample(c, "mechExplosion", { pitch: 0.65 + Math.random() * 0.3, vol: 0.45, delay: 0.02 });
         // Cam kırığı
         playSample(c, "glassBreak", { pitch: 0.8 + Math.random() * 0.4, vol: 0.55, delay: 0.03 });
         // Tiz crack
@@ -846,6 +870,8 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           q: 1.2,
           delay: 0.12,
         });
+        // Uzak yankı
+        playSample(c, "distantBoom", { pitch: 0.55 + Math.random() * 0.2, vol: 0.35, delay: 0.4 + Math.random() * 0.4 });
       });
     },
     hit() {
