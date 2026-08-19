@@ -712,6 +712,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   let shadowsDropped = false;
   let firedOnce = false;
   let flamePushT = 0;
+  let screamT = 0;
   let lastPush: HudSnapshot | null = null;
 
   const markers = bridge.frame.markers;
@@ -1099,6 +1100,22 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       }
       updateBurning(g, dt);
       updateFireSpread(g, dt);
+
+      /* ---- sürekli çığlık sesleri ---- */
+      screamT -= dt;
+      if (screamT <= 0) {
+        // Ne kadar çok yangın/yıkım varsa o kadar sık bağırış
+        const burnCount = g.burning.length;
+        const destroyed = state.destroyed;
+        screamT = Math.max(0.6, 3 - burnCount * 0.08 - destroyed * 0.05);
+        if (burnCount > 0 || destroyed > 0) {
+          audio.scream();
+          // Kalabalık çığlığı: yıkım yoğunsa çift ses
+          if (destroyed > 5 && Math.random() < 0.4) {
+            audio.scream();
+          }
+        }
+      }
 
       state.comboT -= dt;
       if (state.comboT <= 0) state.combo = 1;
