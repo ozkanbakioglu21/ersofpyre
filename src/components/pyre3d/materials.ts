@@ -291,12 +291,12 @@ function patchChar<T extends THREE.Material>(m: T): T {
         "#include <map_fragment>",
         `#include <map_fragment>
         float vBurn = clamp( vState, 0.0, 1.0 );
-        diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.14, 0.06, 0.02 ), vBurn * 0.88 );`,
+        diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.55, 0.30, 0.10 ), vBurn * 0.6 );`,
       )
       .replace(
         "#include <emissivemap_fragment>",
         `#include <emissivemap_fragment>
-        totalEmissiveRadiance += vec3( 1.0, 0.72, 0.10 ) * vBurn * vBurn * 2.8;`,
+        totalEmissiveRadiance += vec3( 1.0, 0.75, 0.15 ) * vBurn * vBurn * 4.5;`,
       );
   };
   // Sabit anahtar olmadan three.js her materyal örneği için ayrı program

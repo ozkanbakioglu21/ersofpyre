@@ -1318,14 +1318,16 @@ export function createStructure(
           group.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const m = child as THREE.Mesh;
-              // Materyali karart (yanmış görünüm)
               const mat = m.material as THREE.MeshStandardMaterial;
               if (mat.color) {
-                mat.color.multiplyScalar(0.30);
+                mat.color.multiplyScalar(0.65);
+                // Rengi sarıya kaydır
+                mat.color.r = Math.min(1, mat.color.r + 0.15);
+                mat.color.g = Math.min(1, mat.color.g + 0.08);
               }
               if (mat.emissive) {
-                mat.emissive.setHex(0xffb020);
-                mat.emissiveIntensity = 1.4;
+                mat.emissive.setHex(0xffcc22);
+                mat.emissiveIntensity = 2.5;
               }
             }
           });
