@@ -187,6 +187,18 @@ export function updateBreath(g: Game, dt: number, firing: boolean, head: THREE.V
     e.hp -= BREATH.airshipDps * dmgMul * dt;
     e.burn = Math.min(1, e.burn + 1.6 * dt);
   }
+
+  // İnsanları yak — konik alev NPC'leri öldürür
+  const npcH = g.city?.npcs;
+  if (npcH) {
+    for (const npc of npcH.npcs) {
+      if (!npc.alive) continue;
+      if (hit(npc.group.position, 2.2)) {
+        npcH.emitDeathFx(npc.group.position, g.fx);
+        npcH.kill(npc);
+      }
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -237,6 +249,19 @@ export function explode(g: Game, at: THREE.Vector3, o: BlastOpts): void {
     if (d > o.radius + e.radius) continue;
     e.hp -= o.damage * (1 - Math.min(1, d / (o.radius + e.radius)) * 0.6);
     e.burn = Math.min(1, e.burn + o.ignite);
+  }
+
+  // İnsanları patlama dalgasıyla öldür — Köz Mermisi / şok dalgası
+  const npcH = g.city?.npcs;
+  if (npcH) {
+    for (const npc of npcH.npcs) {
+      if (!npc.alive) continue;
+      const d = npc.group.position.distanceTo(at);
+      if (d < o.radius) {
+        npcH.emitDeathFx(npc.group.position, g.fx);
+        npcH.kill(npc);
+      }
+    }
   }
 }
 

@@ -29,6 +29,8 @@ type Npc = {
 
 export type NpcHandle = {
   npcs: Npc[];
+  kill(npc: Npc): void;
+  emitDeathFx(pos: THREE.Vector3, fx: { ember(p: THREE.Vector3, count: number, spread: number): void }): void;
   projectiles: THREE.Group;
   update(dt: number, dragonPos: THREE.Vector3 | null, dragonFwd: THREE.Vector3): void;
   dispose(): void;
@@ -279,8 +281,22 @@ export function createNpcSystem(
     }
   };
 
+  /** Belirli bir NPC'yi öldür — alev/şok/darbe hasarı için. */
+  const kill = (npc: Npc) => {
+    if (!npc.alive) return;
+    npc.alive = false;
+    npc.group.visible = false;
+  };
+
+  /** Öldürülen NPC konumunda ember efekti — combat.ts'den çağrılır. */
+  const emitDeathFx = (pos: THREE.Vector3, fx: { ember(p: THREE.Vector3, count: number, spread: number): void }) => {
+    fx.ember(pos, 6, 3);
+  };
+
   return {
     npcs,
+    kill,
+    emitDeathFx,
     projectiles: projectileGroup,
     update,
     dispose() {
