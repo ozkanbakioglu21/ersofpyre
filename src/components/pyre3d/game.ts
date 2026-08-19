@@ -711,6 +711,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   let markerT = 0;
   let shadowsDropped = false;
   let firedOnce = false;
+  let flamePushT = 0;
   let lastPush: HudSnapshot | null = null;
 
   const markers = bridge.frame.markers;
@@ -932,6 +933,11 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       flameAnchor.copy(headPos);
       dragon.root.worldToLocal(flameAnchor);
       flameRig.position.copy(flameAnchor);
+      // Közermisi atıldığında alev ileri doğru kayar
+      if (flamePushT > 0) {
+        flameRig.position.z += flamePushT * 18;
+        flamePushT = Math.max(0, flamePushT - dt * 3.5);
+      }
 
       updateBreath(g, dt, firing, headPos);
       (dragon.maw.material as THREE.MeshStandardMaterial).emissiveIntensity =
@@ -987,6 +993,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           fireballs.spawn(headPos, tmp.set(rvx, vy, rvz));
           audio.fireball();
           fx.ember(headPos, 8, 6);
+          flamePushT = 1;
         }
       }
 
