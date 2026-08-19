@@ -19,6 +19,8 @@ export type AudioEngine = {
   siren(on: boolean): void;
   /** Bomba/alev topu çarpması — derin toprak patlaması. */
   bombHit(): void;
+  /** Savaş müziği — karanlık drone + nabız + gerilim. */
+  music(on: boolean): void;
   explosion(size: number): void;
   fireball(): void;
   hit(): void;
@@ -51,6 +53,7 @@ const NOOP: AudioEngine = {
   ambient() {},
   siren() {},
   bombHit() {},
+  music() {},
   explosion() {},
   fireball() {},
   hit() {},
@@ -113,6 +116,20 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   let flameWanted = false;
   let ambientWanted = false;
   let sirenWanted = false;
+  let musicWanted = false;
+  let musicNodes: {
+    pad1: OscillatorNode;
+    pad2: OscillatorNode;
+    padGain: GainNode;
+    subPulse: OscillatorNode;
+    subPulseGain: GainNode;
+    tension: OscillatorNode;
+    tensionGain: GainNode;
+    metallic: AudioBufferSourceNode;
+    metallicGain: GainNode;
+    lfo: OscillatorNode;
+    lfoGain: GainNode;
+  } | null = null;
 
   const ensure = (): Ctx | null => {
     if (ctx) return ctx;
@@ -420,6 +437,170 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     };
   };
 
+  /* ---- prosedürel savaş müziği ---- */
+  const startMusic = (c: Ctx) => {
+    if (musicNodes) return;
+    const t = c.ac.currentTime;
+
+    // Katman 1: Karanlık drone pad — iki detune sawtooth, derin lowpass
+    const pad1 = c.ac.createOscillator();
+    pad1.type = "sawtooth";
+    pad1.frequency.value = 55;
+    const pad2 = c.ac.createOscillator();
+    pad2.type = "sawtooth";
+    pad2.frequency.value = 55.7; // hafif detune → chorusing
+    const padGain = c.ac.createGain();
+    padGain.gain.setValueAtTime(0.0001, t);
+    padGain.gain.exponentialRampToValueAtTime(0.11, t + 3);
+    const padFilter = c.ac.createBiquadFilter();
+    padFilter.type = "lowpass";
+    padFilter.frequency.value = 280;
+    padFilter.Q.value = 1.4;
+    pad1.connect(padFilter);
+    pad2.connect(padFilter);
+    padFilter.connect(padGain);
+    padGain.connect(c.master);
+
+    // Katman 2: Sub-bass nabız — kalp atışı ritmi
+    const subPulse = c.ac.createOscillator();
+    subPulse.type = "sine";
+    subPulse.frequency.value = 42;
+    const subPulseGain = c.ac.createGain();
+    subPulseGain.gain.setValueAtTime(0.0001, t);
+    subPulseGain.gain.exponentialRampToValueAtTime(0.14, t + 2);
+    // LFO ile nabız: sine 0.35 Hz → sub-bass gain'i açıp kapatır
+    const pulseLfo = c.ac.createOscillator();
+    pulseLfo.type = "sine";
+    pulseLfo.frequency.value = 0.35;
+    const pulseLfoGain = c.ac.createGain();
+    pulseLfoGain.gain.value = 0.12;
+    pulseLfo.connect(pulseLfoGain).connect(subPulseGain.gain);
+    subPulse.connect(subPulseGain);
+    subPulseGain.connect(c.master);
+
+    // Katman 3: Gerilim teli — yavaş taramalı triangle, urgilan
+    const tension = c.ac.createOscillator();
+    tension.type = "triangle";
+    tension.frequency.value = 110;
+    const tensionGain = c.ac.createGain();
+    tensionGain.gain.setValueAtTime(0.0001, t);
+    tensionGain.gain.exponentialRampToValueAtTime(0.055, t + 4);
+    // Yavaş frekans tarama: 90-165 Hz arası 12 saniyede
+    tension.frequency.setValueAtTime(90, t);
+    tension.frequency.linearRampToValueAtTime(165, t + 12);
+    const tensionFilter = c.ac.createBiquadFilter();
+    tensionFilter.type = "bandpass";
+    tensionFilter.frequency.value = 220;
+    tensionFilter.Q.value = 2.5;
+    tension.connect(tensionFilter);
+    tensionFilter.connect(tensionGain);
+    tensionGain.connect(c.master);
+
+    // Katman 4: Metalik doku — filtrelenmiş gürültü, çok yavaş LFO
+    const metallic = c.ac.createBufferSource();
+    metallic.buffer = c.noise;
+    metallic.loop = true;
+    const metalFilter = c.ac.createBiquadFilter();
+    metalFilter.type = "bandpass";
+    metalFilter.frequency.value = 1800;
+    metalFilter.Q.value = 6;
+    const metallicGain = c.ac.createGain();
+    metallicGain.gain.setValueAtTime(0.0001, t);
+    metallicGain.gain.exponentialRampToValueAtTime(0.025, t + 5);
+    // LFO: bandpass frekansını gezdirir → metalik tınlama
+    const lfo = c.ac.createOscillator();
+    lfo.type = "sine";
+    lfo.frequency.value = 0.12;
+    const lfoGain = c.ac.createGain();
+    lfoGain.gain.value = 900;
+    lfo.connect(lfoGain).connect(metalFilter.frequency);
+    metallic.connect(metalFilter);
+    metalFilter.connect(metallicGain);
+    metallicGain.connect(c.master);
+
+    // Gerilim periyodik tarama — her 12 saniyede bir
+    const scheduleTension = () => {
+      if (!musicNodes) return;
+      const now = c.ac.currentTime;
+      tension.frequency.setValueAtTime(90, now);
+      tension.frequency.linearRampToValueAtTime(165, now + 12);
+      tensionTimer = setTimeout(scheduleTension, 12000);
+    };
+    let tensionTimer = setTimeout(scheduleTension, 12000);
+
+    pad1.start(t);
+    pad2.start(t);
+    subPulse.start(t);
+    pulseLfo.start(t);
+    tension.start(t);
+    metallic.start(t);
+    lfo.start(t);
+
+    musicNodes = {
+      pad1, pad2, padGain,
+      subPulse, subPulseGain,
+      tension, tensionGain,
+      metallic, metallicGain,
+      lfo, lfoGain,
+    };
+    (musicNodes as unknown as { _timer: ReturnType<typeof setTimeout> })._timer = tensionTimer;
+    // Also store pulseLfo reference for cleanup
+    (musicNodes as unknown as { _pulseLfo: OscillatorNode })._pulseLfo = pulseLfo;
+    (musicNodes as unknown as { _tensionFilter: BiquadFilterNode })._tensionFilter = tensionFilter;
+    (musicNodes as unknown as { _padFilter: BiquadFilterNode })._padFilter = padFilter;
+  };
+
+  const stopMusic = (c: Ctx) => {
+    if (!musicNodes) return;
+    const timerId = (musicNodes as unknown as { _timer: ReturnType<typeof setTimeout> })._timer;
+    const pulseLfo = (musicNodes as unknown as { _pulseLfo: OscillatorNode })._pulseLfo;
+    const m = musicNodes;
+    musicNodes = null;
+    clearTimeout(timerId);
+    const t = c.ac.currentTime;
+
+    // Tüm gain'leri kademeli olarak sustur
+    m.padGain.gain.cancelScheduledValues(t);
+    m.padGain.gain.setValueAtTime(Math.max(0.0001, m.padGain.gain.value), t);
+    m.padGain.gain.exponentialRampToValueAtTime(0.0001, t + 2);
+    m.subPulseGain.gain.cancelScheduledValues(t);
+    m.subPulseGain.gain.setValueAtTime(Math.max(0.0001, m.subPulseGain.gain.value), t);
+    m.subPulseGain.gain.exponentialRampToValueAtTime(0.0001, t + 2);
+    m.tensionGain.gain.cancelScheduledValues(t);
+    m.tensionGain.gain.setValueAtTime(Math.max(0.0001, m.tensionGain.gain.value), t);
+    m.tensionGain.gain.exponentialRampToValueAtTime(0.0001, t + 2.5);
+    m.metallicGain.gain.cancelScheduledValues(t);
+    m.metallicGain.gain.setValueAtTime(Math.max(0.0001, m.metallicGain.gain.value), t);
+    m.metallicGain.gain.exponentialRampToValueAtTime(0.0001, t + 2);
+
+    // Tüm oscillator'ları durdur
+    const stopTime = t + 3;
+    m.pad1.stop(stopTime);
+    m.pad2.stop(stopTime);
+    m.subPulse.stop(stopTime);
+    pulseLfo.stop(stopTime);
+    m.tension.stop(stopTime);
+    m.metallic.stop(stopTime);
+    m.lfo.stop(stopTime);
+
+    m.pad1.onended = () => {
+      m.pad1.disconnect();
+      m.pad2.disconnect();
+      (m as unknown as { _padFilter: BiquadFilterNode })._padFilter.disconnect();
+      m.padGain.disconnect();
+      m.subPulse.disconnect();
+      pulseLfo.disconnect();
+      m.subPulseGain.disconnect();
+      m.tension.disconnect();
+      (m as unknown as { _tensionFilter: BiquadFilterNode })._tensionFilter.disconnect();
+      m.tensionGain.disconnect();
+      m.metallic.disconnect();
+      m.metallicGain.disconnect();
+      m.lfo.disconnect();
+      m.lfoGain.disconnect();
+    };
+  };
+
   const withCtx = (fn: (c: Ctx) => void) => {
     if (muted) return;
     const c = ctx;
@@ -435,6 +616,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (flameWanted) startFlame(c);
       if (ambientWanted) startAmbient(c);
       if (sirenWanted) startSiren(c);
+      if (musicWanted) startMusic(c);
     },
     setMuted(m) {
       muted = m;
@@ -444,9 +626,11 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (m) {
         stopFlame(c);
         stopSiren(c);
+        stopMusic(c);
       } else {
         if (flameWanted) startFlame(c);
         if (sirenWanted) startSiren(c);
+        if (musicWanted) startMusic(c);
       }
     },
     setVolume(v) {
@@ -475,6 +659,13 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (!c || muted || c.ac.state !== "running") return;
       if (on) startSiren(c);
       else stopSiren(c);
+    },
+    music(on) {
+      musicWanted = on;
+      const c = ctx;
+      if (!c || muted || c.ac.state !== "running") return;
+      if (on) startMusic(c);
+      else stopMusic(c);
     },
     explosion(size) {
       withCtx((c) => {
@@ -626,9 +817,11 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       stopFlame(c);
       stopAmbient(c);
       stopSiren(c);
+      stopMusic(c);
       flameWanted = false;
       ambientWanted = false;
       sirenWanted = false;
+      musicWanted = false;
     },
     dispose() {
       const c = ctx;
@@ -636,6 +829,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       stopFlame(c);
       stopAmbient(c);
       stopSiren(c);
+      stopMusic(c);
       ctx = null;
       void c.ac.close().catch(() => {});
     },

@@ -631,6 +631,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       state.status = outcome;
       audio.flame(false);
       audio.siren(false);
+      audio.music(false);
       if (outcome === "won") audio.win();
       else audio.lose();
       o.onResult(result());
@@ -1366,6 +1367,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       // Duraklatıldı: sahne çizilmeye devam ediyor ama simülasyon durdu.
       audio.flame(false);
       audio.siren(false);
+      audio.music(false);
     }
 
     /* ---- her durumda ---- */
@@ -1505,6 +1507,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
 
   audio.ambient(true);
   audio.siren(true);
+  audio.music(true);
   o.onReady();
   last = performance.now();
   raf = requestAnimationFrame(loop);
@@ -1516,6 +1519,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           g.paused = true;
           audio.flame(false);
           audio.siren(false);
+          audio.music(false);
           // Basılı kalan girdiler duraklatmayı aşmasın: menüden dönünce
           // ejderha kendi kendine alev püskürtüyor ya da frende kalıyordu.
           ctrl.current.fire = false;
@@ -1529,6 +1533,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         case "resume":
           g.paused = false;
           audio.siren(true);
+          audio.music(true);
           last = performance.now();
           break;
         case "skipLine":
