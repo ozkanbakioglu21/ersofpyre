@@ -1183,14 +1183,14 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         for (const gt of city.gateTurrets) {
           gt.cool -= dt;
           const d = gt.pos.distanceTo(dp);
-          const rate = state.marked > 0 ? 0.62 : 1;
-          if (gt.cool <= 0 && d < 180) {
-            gt.cool = (2.5 + Math.random() * 0.8) * rate;
+          const rate = state.marked > 0 ? 0.5 : 1;
+          if (gt.cool <= 0 && d < 220) {
+            gt.cool = (1.2 + Math.random() * 0.5) * rate;
             tmp.copy(dp).sub(gt.pos).normalize();
-            tmp.x += (Math.random() - 0.5) * 0.12;
-            tmp.z += (Math.random() - 0.5) * 0.12;
+            tmp.x += (Math.random() - 0.5) * 0.14;
+            tmp.z += (Math.random() - 0.5) * 0.14;
             tmp2.copy(gt.pos);
-            shots.spawn("bolt", tmp2, tmp.normalize().multiplyScalar(80), 6, 0);
+            shots.spawn("bolt", tmp2, tmp.normalize().multiplyScalar(90), 7, 0);
             audio.enemyShot();
           }
         }
@@ -1199,16 +1199,20 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         for (const gf of city.groundFires) {
           gf.cool -= dt;
           const d = gf.pos.distanceTo(dp);
-          if (gf.cool <= 0 && d < 200) {
-            gf.cool = 0.35 + Math.random() * 0.3;
-            tmp.copy(dp).sub(gf.pos).normalize();
-            tmp.x += (Math.random() - 0.5) * 0.2;
-            tmp.z += (Math.random() - 0.5) * 0.2;
-            const speed = 60 + Math.random() * 20;
-            tmp2.copy(gf.pos);
-            shots.spawn("firebolt", tmp2, tmp.normalize().multiplyScalar(speed), 4, 0);
+          if (gf.cool <= 0 && d < 240) {
+            gf.cool = 0.18 + Math.random() * 0.15;
+            // Her atışta 1-3 mermi
+            const burst = 1 + Math.floor(Math.random() * 3);
+            for (let b = 0; b < burst; b++) {
+              tmp.copy(dp).sub(gf.pos).normalize();
+              tmp.x += (Math.random() - 0.5) * 0.28;
+              tmp.z += (Math.random() - 0.5) * 0.28;
+              const speed = 55 + Math.random() * 30;
+              tmp2.copy(gf.pos);
+              shots.spawn("firebolt", tmp2, tmp.normalize().multiplyScalar(speed), 5, 0);
+            }
             // Alev efekti
-            fx.flameJet(gf.pos, 5, new THREE.Vector3(0, 1, 0));
+            fx.flameJet(gf.pos, 7, new THREE.Vector3(0, 1, 0));
             audio.enemyShot();
           }
         }
@@ -1338,8 +1342,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
 
         // Alev topu izi — ateş parçacıkları
         if (s.kind === "firebolt") {
-          if (Math.random() < dt * 30) {
-            fx.ember(s.mesh.position, 1, 2);
+          if (Math.random() < dt * 40) {
+            fx.ember(s.mesh.position, 2, 3);
           }
           (s.mesh.material as THREE.MeshBasicMaterial).color.setHex(
             Math.random() < 0.5 ? 0xffcc22 : 0xff8800,

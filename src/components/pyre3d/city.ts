@@ -1417,13 +1417,13 @@ export async function createCity(
 
   // Yer ateş kaynakları — şehirdeki çıralar, ocaklar, savunma mevzileri
   const groundFires: GroundFire[] = [];
-  const gfCount = Math.floor(R * 0.18);
+  const gfCount = Math.floor(R * 0.35);
   for (let i = 0; i < gfCount; i++) {
     const a = rng.range(0, Math.PI * 2);
-    const d = rng.range(R * 0.15, R * 0.95);
+    const d = rng.range(R * 0.1, R * 0.98);
     const gx = spec.cx + Math.cos(a) * d;
     const gz = spec.cz + Math.sin(a) * d;
-    groundFires.push({ pos: new THREE.Vector3(gx, baseY + 2, gz), cool: rng.range(0, 3) });
+    groundFires.push({ pos: new THREE.Vector3(gx, baseY + 2, gz), cool: rng.range(0, 2) });
   }
 
   return {

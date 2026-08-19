@@ -36,7 +36,7 @@ export type ShotPool = {
   dispose(): void;
 };
 
-const SHOT_CAP = 90;
+const SHOT_CAP = 140;
 
 export function createShotPool(scene: THREE.Scene): ShotPool {
   const boltGeo = new THREE.SphereGeometry(0.9, 6, 6);
@@ -59,7 +59,7 @@ export function createShotPool(scene: THREE.Scene): ShotPool {
   };
   // Üç türden de havuzda örnek bulunsun ki ilk atışta materyal derlenmesin.
   for (let i = 0; i < SHOT_CAP; i++) {
-    const kind: ShotKind = i % 5 === 0 ? "flak" : i % 7 === 0 ? "harpoon" : i % 11 === 0 ? "firebolt" : "bolt";
+    const kind: ShotKind = i % 5 === 0 ? "flak" : i % 7 === 0 ? "harpoon" : i % 3 === 0 ? "firebolt" : "bolt";
     shots.push({
       active: false,
       kind,
