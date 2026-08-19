@@ -266,17 +266,8 @@ export function updateFlight(g: Game, dt: number): void {
   g.dive = a.diveAccum;
 
   /* ---- hız hesapla ---- */
-  const rushMul = s.emberRush > 0 ? 1.35 : 1;
-  const snareMul = s.snared > 0 ? 0.6 : 1;
-  const throttleBoost = c.throttle * (FLIGHT.boostSpeed - FLIGHT.baseSpeed);
-  const diveBoost = a.diveAccum * FLIGHT.diveGain;
-  // Ejderha DAİMA ileri uçar. Eskiden hız `|pitch| > 0.05` kapısının
-  // arkasındaydı: çubuğu dikeyde tutmayan oyuncu havada asılı kalıyordu ve
-  // "ileri gitmiyor" hissi buradan geliyordu. Artık taban hız hep var,
-  // gaz ve dalış onun üstüne biner.
-  const targetSpeed = braking
-    ? 0
-    : (FLIGHT.baseSpeed + throttleBoost + diveBoost) * rushMul * snareMul;
+  // Hız sabit — ejderha daima aynı hızla uçar
+  const targetSpeed = braking ? 0 : FLIGHT.baseSpeed;
   s.speed +=
     (targetSpeed - s.speed) * Math.min(1, dt * (braking ? FLIGHT.brakeLerp : FLIGHT.speedLerp));
 
