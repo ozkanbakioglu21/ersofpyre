@@ -649,21 +649,21 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     ambient(on) {
       ambientWanted = on;
       const c = ctx;
-      if (!c || muted || c.ac.state !== "running") return;
+      if (!c || muted) return;
       if (on) startAmbient(c);
       else stopAmbient(c);
     },
     siren(on) {
       sirenWanted = on;
       const c = ctx;
-      if (!c || muted || c.ac.state !== "running") return;
+      if (!c || muted) return;
       if (on) startSiren(c);
       else stopSiren(c);
     },
     music(on) {
       musicWanted = on;
       const c = ctx;
-      if (!c || muted || c.ac.state !== "running") return;
+      if (!c || muted) return;
       if (on) startMusic(c);
       else stopMusic(c);
     },
