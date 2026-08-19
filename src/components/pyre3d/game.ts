@@ -502,6 +502,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   };
 
   let finished = false;
+  let musicStarted = false;
   let slowmoT = 0;
 
   const g: Game = {
@@ -1507,7 +1508,13 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
 
   audio.ambient(true);
   audio.siren(true);
-  audio.music(true);
+  // İlk 5 saniye siren, ardından müzik başlar
+  setTimeout(() => {
+    if (finished) return;
+    musicStarted = true;
+    audio.siren(false);
+    audio.music(true);
+  }, 5000);
   o.onReady();
   last = performance.now();
   raf = requestAnimationFrame(loop);
@@ -1532,8 +1539,11 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           break;
         case "resume":
           g.paused = false;
-          audio.siren(true);
-          audio.music(true);
+          if (musicStarted) {
+            audio.music(true);
+          } else {
+            audio.siren(true);
+          }
           last = performance.now();
           break;
         case "skipLine":
