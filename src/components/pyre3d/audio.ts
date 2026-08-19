@@ -1,25 +1,16 @@
 /**
- * Prosedürel ses motoru — tek bir ses dosyası yok, her şey WebAudio ile
- * sentezleniyor. GDD'nin ses yönü: "derin buhar homurtusu, metal gıcırtısı,
- * alev püskürtmede alçak frekanslı basınç patlaması."
- *
- * AudioContext ilk kullanıcı jestine kadar kurulmuyor: tarayıcılar jestsiz
- * başlatılan bağlamı askıya alır ve konsola uyarı basar.
+ * Hibrit ses motoru — gerçek CC0 ses dosyaları (WAV/OGG) + prosedürel yedek.
+ * AudioContext ilk kullanıcı jestine kadar kurulmuyor.
  */
 
 export type AudioEngine = {
-  /** İlk kullanıcı jestinde çağrılır; bağlamı kurar veya devam ettirir. */
   unlock(): void;
   setMuted(muted: boolean): void;
   setVolume(v: number): void;
-  /** Konik alev döngüsü — basılı tutuldukça açık kalır. */
   flame(on: boolean): void;
   ambient(on: boolean): void;
-  /** Hava saldırısı siren — şehirde alarm. */
   siren(on: boolean): void;
-  /** Bomba/alev topu çarpması — derin toprak patlaması. */
   bombHit(): void;
-  /** Savaş müziği — karanlık drone + nabız + gerilim. */
   music(on: boolean): void;
   explosion(size: number): void;
   fireball(): void;
@@ -86,6 +77,32 @@ function makeNoise(ac: AudioContext): AudioBuffer {
   return buf;
 }
 
+/* ───── sample bazlı ses dosyası sistemi ───── */
+const SFX_BASE = "/sfx/";
+
+/** Her ses kategorisi için birden fazla dosya — rastgele seçim */
+const SFX_MANIFEST: Record<string, string[]> = {
+  explosion: [
+    "explosion_01.ogg", "explosion_02.ogg", "explosion_03.ogg",
+    "explosion_04.ogg", "explosion_05.ogg", "explosion_06.ogg",
+    "explosion_07.ogg", "dynamite.wav",
+  ],
+  glassBreak: [
+    "glass_break_01.ogg", "glass_break_02.ogg", "glass_break_03.ogg",
+    "glass_break_04.wav",
+  ],
+  metalHit: ["metal_hit_01.ogg", "metal_hit_02.ogg", "metal_hit_03.ogg"],
+  metalFall: ["metal_fall_01.ogg", "metal_fall_02.ogg"],
+  rockBreak: ["rock_break_01.ogg", "rock_break_02.ogg"],
+  debris: ["debris_01.ogg", "debris_02.ogg", "debris_03.ogg"],
+  woodBreak: ["wood_break_01.ogg", "wood_break_02.ogg"],
+  crack: ["crack_01.ogg", "crack_02.ogg"],
+};
+
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)] as T;
+}
+
 export function createAudio(initial: { muted: boolean; volume: number }): AudioEngine {
   if (typeof window === "undefined") return NOOP;
   const AC: typeof AudioContext | undefined =
@@ -103,6 +120,71 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   let voices = 0;
   const MAX_VOICES = 24;
   let lastExplosion = 0;
+
+  /* ── sample buffer önbellek ── */
+  const sfxCache = new Map<string, AudioBuffer>();
+  let sfxLoading = false;
+
+  /** Dosyayı indirip decode eder; hata olursa null döner. */
+  const loadSample = async (file: string): Promise<AudioBuffer | null> => {
+    const cached = sfxCache.get(file);
+    if (cached) return cached;
+    try {
+      const url = SFX_BASE + file;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const ab = await res.arrayBuffer();
+      const c = ctx;
+      if (!c) return null;
+      const buf = await c.ac.decodeAudioData(ab);
+      sfxCache.set(file, buf);
+      return buf;
+    } catch {
+      return null;
+    }
+  };
+
+  /** Kategorideki dosyalardan rastgele birini yükler (eş zamanlı). */
+  const preloadCategory = (cat: string) => {
+    const files = SFX_MANIFEST[cat];
+    if (!files) return;
+    for (const f of files) void loadSample(f);
+  };
+
+  /** Tüm ses dosyalarını arka planda yükle. */
+  const preloadAll = () => {
+    if (sfxLoading) return;
+    sfxLoading = true;
+    for (const cat of Object.keys(SFX_MANIFEST)) preloadCategory(cat);
+  };
+
+  /** Rastgele bir sample oynat; deterministik parameterentering ile. */
+  const playSample = (
+    c: Ctx,
+    cat: string,
+    opts?: { pitch?: number; vol?: number; delay?: number },
+  ) => {
+    const files = SFX_MANIFEST[cat];
+    if (!files) return;
+    const file = pickRandom(files);
+    const buf = sfxCache.get(file);
+    if (!buf) return; // henüz yüklenmedi — prosedürel yedek çalışır
+    if (voices > MAX_VOICES) return;
+
+    const t = c.ac.currentTime + (opts?.delay ?? 0);
+    const src = c.ac.createBufferSource();
+    src.buffer = buf;
+    // Rastgele pitch varyasyonu: %10
+    src.playbackRate.value = opts?.pitch ?? (0.9 + Math.random() * 0.2);
+    const gain = c.ac.createGain();
+    const vol = opts?.vol ?? 1;
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.setValueAtTime(vol, t + buf.duration - 0.05);
+    gain.gain.linearRampToValueAtTime(0, t + buf.duration);
+    src.connect(gain).connect(c.master);
+    src.start(t);
+    track(src, t + buf.duration + 0.02);
+  };
 
   let flameNodes: {
     src: AudioBufferSourceNode;
@@ -615,6 +697,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (ambientWanted) startAmbient(c);
       if (sirenWanted) startSiren(c);
       if (musicWanted) startMusic(c);
+      preloadAll();
     },
     setMuted(m) {
       muted = m;
@@ -671,6 +754,9 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         if (now - lastExplosion < 0.045) return;
         lastExplosion = now;
         const s = Math.min(2, Math.max(0.5, size));
+        // Gerçek patlama sesi
+        playSample(c, "explosion", { pitch: 0.8 + Math.random() * 0.4, vol: 0.7 * s });
+        // Prosedürel katman: derin bass + tiz crack
         noiseBurst(c, {
           dur: 0.42 * s,
           peak: 0.34 * s,
@@ -680,7 +766,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           q: 0.8,
         });
         tone(c, { type: "sine", from: 130 * s, to: 26, dur: 0.5 * s, peak: 0.36 });
-        // Tiz crack — patlama anı
         noiseBurst(c, {
           dur: 0.1,
           peak: 0.3 * s,
@@ -689,29 +774,23 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           to: 2000,
           q: 2.5,
         });
-        tone(c, { type: "sawtooth", from: 2800, to: 900, dur: 0.12, peak: 0.18 * s });
-        // Metal gıcırtısı: enkazın kendi üstüne çökmesi.
-        noiseBurst(c, {
-          dur: 0.3,
-          peak: 0.12,
-          type: "bandpass",
-          from: 2600,
-          to: 900,
-          q: 5,
-          delay: 0.06,
-        });
+        // Metal gıcırtısı
+        playSample(c, "metalHit", { pitch: 0.7 + Math.random() * 0.6, vol: 0.3, delay: 0.04 });
       });
     },
     fireball() {
       withCtx((c) => {
-        // Fırlatma sesi — kısa ve sert
+        // Gerçek fırlatma sesi
+        playSample(c, "crack", { pitch: 1 + Math.random() * 0.3, vol: 0.4 });
         noiseBurst(c, { dur: 0.18, peak: 0.18, type: "bandpass", from: 1100, to: 320, q: 1.6 });
         tone(c, { type: "sawtooth", from: 380, to: 120, dur: 0.16, peak: 0.12 });
       });
     },
     bombHit() {
       withCtx((c) => {
-        // Katman 1: Derin toprak patlaması — çok düşük frekans
+        // Gerçek bomba sesi (dynamite)
+        playSample(c, "explosion", { pitch: 0.7 + Math.random() * 0.3, vol: 0.85 });
+        // Prosedürel derin bass
         noiseBurst(c, {
           dur: 0.7,
           peak: 0.44,
@@ -720,9 +799,10 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           to: 55,
           q: 0.6,
         });
-        // Katman 2: Sub-bass thump — göğsü titreten dip
         tone(c, { type: "sine", from: 85, to: 18, dur: 0.65, peak: 0.42 });
-        // Katman 3: Tiz patlama cracki — ani sert kırılma
+        // Cam kırığı
+        playSample(c, "glassBreak", { pitch: 0.8 + Math.random() * 0.4, vol: 0.55, delay: 0.03 });
+        // Tiz crack
         noiseBurst(c, {
           dur: 0.12,
           peak: 0.38,
@@ -732,29 +812,8 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           q: 3,
           delay: 0.01,
         });
-        // Katman 4: Metalik çığlık — patlama dalgasının metal yüzeyden sekmesi
-        tone(c, { type: "sawtooth", from: 3200, to: 800, dur: 0.18, peak: 0.22, delay: 0.02 });
-        tone(c, { type: "square", from: 2400, to: 600, dur: 0.14, peak: 0.16, delay: 0.03 });
-        // Katman 5: Cam kırığı / tiz taneler — çok tiz gürültü süpürmesi
-        noiseBurst(c, {
-          dur: 0.08,
-          peak: 0.28,
-          type: "highpass",
-          from: 7000,
-          to: 4500,
-          q: 2,
-          delay: 0.03,
-        });
-        noiseBurst(c, {
-          dur: 0.14,
-          peak: 0.16,
-          type: "bandpass",
-          from: 5500,
-          to: 3200,
-          q: 4,
-          delay: 0.06,
-        });
-        // Katman 6: Enkaz düşmesi — yavaş taneli gürültü
+        // Enkaz düşmesi
+        playSample(c, "debris", { pitch: 0.8 + Math.random() * 0.4, vol: 0.4, delay: 0.1 });
         noiseBurst(c, {
           dur: 0.55,
           peak: 0.08,
@@ -768,14 +827,16 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     hit() {
       withCtx((c) => {
+        // Gerçek çarpm sesi
+        playSample(c, "metalHit", { pitch: 0.8 + Math.random() * 0.4, vol: 0.6 });
+        playSample(c, "crack", { pitch: 0.9 + Math.random() * 0.2, vol: 0.35, delay: 0.01 });
         noiseBurst(c, { dur: 0.16, peak: 0.26, type: "lowpass", from: 1200, to: 160 });
         tone(c, { type: "square", from: 190, to: 60, dur: 0.14, peak: 0.14 });
-        noiseBurst(c, { dur: 0.08, peak: 0.18, type: "highpass", from: 3600, to: 1800, q: 2.5 });
-        tone(c, { type: "sawtooth", from: 1800, to: 500, dur: 0.1, peak: 0.1 });
       });
     },
     enemyShot() {
       withCtx((c) => {
+        playSample(c, "crack", { pitch: 1.2 + Math.random() * 0.4, vol: 0.3 });
         tone(c, { type: "triangle", from: 880, to: 420, dur: 0.1, peak: 0.06 });
       });
     },
