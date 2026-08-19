@@ -461,6 +461,58 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       }
     }
 
+    // Surlarda nöbet tutan askerler
+    const soldierMat = cityMat(0x1a1410);
+    const soldierCloth = cityMat(0x2a2418);
+    const soldierSkin = cityMat(0x3a3028);
+    const rifleMat = cityMat(0x2a1e14, 0.7, 0.4);
+    for (let i = 0; i < seg; i++) {
+      if (rng.chance(0.55)) continue; // her duvar parçasında %45 şansla asker
+      const a = (i / seg) * Math.PI * 2;
+      const soldier = new THREE.Group();
+      // Kafa
+      const sHead = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), soldierSkin);
+      sHead.position.y = 2.3;
+      soldier.add(sHead);
+      // Miğfer
+      const sHelmet = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.25, 0.6), soldierMat);
+      sHelmet.position.y = 2.65;
+      soldier.add(sHelmet);
+      // Gövde
+      const sBody = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.9, 0.4), soldierCloth);
+      sBody.position.y = 1.6;
+      soldier.add(sBody);
+      // Kollar
+      const sArmL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.8, 0.22), soldierCloth);
+      sArmL.position.set(-0.5, 1.65, 0);
+      soldier.add(sArmL);
+      const sArmR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.8, 0.22), soldierCloth);
+      sArmR.position.set(0.5, 1.65, 0);
+      soldier.add(sArmR);
+      // Tüfek
+      const sRifle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.4), rifleMat);
+      sRifle.position.set(0.5, 1.9, 0.5);
+      sRifle.rotation.x = -0.6;
+      soldier.add(sRifle);
+      // Bacaklar
+      const sLegL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.85, 0.28), soldierMat);
+      sLegL.position.set(-0.18, 0.6, 0);
+      soldier.add(sLegL);
+      const sLegR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.85, 0.28), soldierMat);
+      sLegR.position.set(0.18, 0.6, 0);
+      soldier.add(sLegR);
+
+      const wallH_here = 11.5; // ortalama duvar yüksekliği
+      const offset = rng.range(-1.5, 1.5);
+      soldier.position.set(
+        spec.cx + Math.cos(a) * wallR + Math.cos(a + Math.PI / 2) * offset,
+        baseY + wallH_here,
+        spec.cz + Math.sin(a) * wallR + Math.sin(a + Math.PI / 2) * offset,
+      );
+      soldier.rotation.y = a + Math.PI; // duvarın dışına bakacak
+      parts.add(soldier);
+    }
+
     // Gözetleme kuleleri — kapıların yanına ve duvar köşelerine
     const towerPositions = [0, 2, 4, 6].map((s) => s * da + da / 2);
     for (const ta of towerPositions) {
