@@ -19,10 +19,10 @@ import type { Game } from "./game";
 
 export const FLIGHT = {
   /* ---- hız ---- */
-  baseSpeed: 62,
-  boostSpeed: 118,
+  baseSpeed: 52,
+  boostSpeed: 100,
   accel: 3.6,
-  altSpeed: 88,
+  altSpeed: 78,
   minClearance: 12,
   maxAltitude: 320,
   /** Hedef hıza yaklaşma katsayısı. */
