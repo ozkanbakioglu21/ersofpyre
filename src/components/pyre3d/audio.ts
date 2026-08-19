@@ -8,6 +8,7 @@ export type AudioEngine = {
   setMuted(muted: boolean): void;
   setVolume(v: number): void;
   flame(on: boolean): void;
+  tickFlame(dt: number): void;
   ambient(on: boolean): void;
   siren(on: boolean): void;
   bombHit(): void;
@@ -41,6 +42,7 @@ const NOOP: AudioEngine = {
   setMuted() {},
   setVolume() {},
   flame() {},
+  tickFlame() {},
   ambient() {},
   siren() {},
   bombHit() {},
@@ -217,6 +219,9 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     lfo: OscillatorNode;
     sub: OscillatorNode;
     subGain: GainNode;
+    loopSrc: AudioBufferSourceNode;
+    loopGain: GainNode;
+    crackleTimer: number;
   } | null = null;
   let ambientNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
   let sirenNodes: { osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null = null;
@@ -345,7 +350,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     const curve = new Float32Array(256);
     for (let i = 0; i < 256; i++) {
       const x = (i / 128) - 1;
-      //-tanh benzeri eğri — sert doyma
       curve[i] = Math.tanh(x * 3.5);
     }
     ws.curve = curve;
@@ -356,18 +360,25 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     low.type = "lowpass";
     low.frequency.value = 1800;
 
-    // Ana kazanç — korkunç seviyede yüksek
+    // Ana kazanç
     const gain = c.ac.createGain();
     gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.52, t + 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.42, t + 0.06);
 
-    // Sub-bass osc — göğsü titreten dip frekans
+    // Sub-bass osc — göğsü titreten dip frekans (LFO ile modüle)
     const sub = c.ac.createOscillator();
     sub.type = "sine";
     sub.frequency.value = 55;
     const subGain = c.ac.createGain();
     subGain.gain.setValueAtTime(0.0001, t);
-    subGain.gain.exponentialRampToValueAtTime(0.22, t + 0.08);
+    subGain.gain.exponentialRampToValueAtTime(0.18, t + 0.08);
+    // Sub-bass LFO — hafif frekans titreşimi
+    const subLfo = c.ac.createOscillator();
+    subLfo.type = "sine";
+    subLfo.frequency.value = 0.6;
+    const subLfoGain = c.ac.createGain();
+    subLfoGain.gain.value = 5;
+    subLfo.connect(subLfoGain).connect(sub.frequency);
 
     // LFO — hızlı nabız, alevin"hırlaması"
     const lfo = c.ac.createOscillator();
@@ -385,6 +396,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     lfo2Gain.gain.value = 0.14;
     lfo2.connect(lfo2Gain).connect(gain.gain);
 
+    // Üçüncü LFO — çok yavaş, alevin doğal "nefes alması"
+    const lfo3 = c.ac.createOscillator();
+    lfo3.type = "sine";
+    lfo3.frequency.value = 0.18;
+    const lfo3Gain = c.ac.createGain();
+    lfo3Gain.gain.value = 0.08;
+    lfo3.connect(lfo3Gain).connect(gain.gain);
+
     // Sinyal zinciri: gürültü → bant → bant2 → bozulma → lowpass → gain
     src.connect(band);
     src.connect(band2);
@@ -401,13 +420,43 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     src.start(t);
     lfo.start(t);
     lfo2.start(t);
+    lfo3.start(t);
     sub.start(t);
-    flameNodes = { src, gain, lfo, sub, subGain };
+    subLfo.start(t);
+
+    // ── flame_loop sample katmanı — sürekli yanan ateş sesi ──
+    let loopSrc: AudioBufferSourceNode | null = null;
+    let loopGain: AudioBufferSourceNode | null = null;
+    const flameBuf = sfxCache.get("flame_loop.ogg");
+    if (flameBuf) {
+      const lSrc = c.ac.createBufferSource();
+      lSrc.buffer = flameBuf;
+      lSrc.loop = true;
+      const lGain = c.ac.createGain();
+      lGain.gain.setValueAtTime(0.0001, t);
+      lGain.gain.exponentialRampToValueAtTime(0.3, t + 0.15);
+      // Bandpass ile orta frekansları vurgula
+      const lBand = c.ac.createBiquadFilter();
+      lBand.type = "bandpass";
+      lBand.frequency.value = 520;
+      lBand.Q.value = 0.8;
+      lSrc.connect(lBand).connect(lGain).connect(c.master);
+      lSrc.start(t);
+      loopSrc = lSrc;
+      loopGain = lGain as unknown as AudioBufferSourceNode;
+    }
+
+    flameNodes = {
+      src, gain, lfo, sub, subGain,
+      loopSrc: loopSrc as unknown as AudioBufferSourceNode,
+      loopGain: loopGain as unknown as GainNode,
+      crackleTimer: 0,
+    };
   };
 
   const stopFlame = (c: Ctx) => {
     if (!flameNodes) return;
-    const { src, gain, lfo, sub, subGain } = flameNodes;
+    const { src, gain, lfo, sub, subGain, loopSrc, loopGain } = flameNodes;
     flameNodes = null;
     const t = c.ac.currentTime;
     gain.gain.cancelScheduledValues(t);
@@ -416,15 +465,25 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     subGain.gain.cancelScheduledValues(t);
     subGain.gain.setValueAtTime(Math.max(0.0001, subGain.gain.value), t);
     subGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    if (loopGain) {
+      const lg = loopGain as unknown as GainNode;
+      lg.gain.cancelScheduledValues(t);
+      lg.gain.setValueAtTime(Math.max(0.0001, lg.gain.value), t);
+      lg.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    }
     src.stop(t + 0.18);
     lfo.stop(t + 0.18);
     sub.stop(t + 0.18);
+    const loopSrcNode = loopSrc as unknown as AudioBufferSourceNode | null;
+    if (loopSrcNode) loopSrcNode.stop(t + 0.25);
     src.onended = () => {
       src.disconnect();
       gain.disconnect();
       lfo.disconnect();
       sub.disconnect();
       subGain.disconnect();
+      if (loopSrcNode) { loopSrcNode.disconnect(); }
+      if (loopGain) { (loopGain as unknown as GainNode).disconnect(); }
     };
   };
 
@@ -751,6 +810,33 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (!c || muted || c.ac.state !== "running") return;
       if (on) startFlame(c);
       else stopFlame(c);
+    },
+    tickFlame(dt) {
+      if (!flameNodes) return;
+      const c = ctx;
+      if (!c || muted || c.ac.state !== "running") return;
+      flameNodes.crackleTimer -= dt;
+      if (flameNodes.crackleTimer <= 0) {
+        flameNodes.crackleTimer = 0.06 + Math.random() * 0.14;
+        const t = c.ac.currentTime;
+        // Kısa tiz gürültü patlaması — çıtırtı
+        if (voices < MAX_VOICES) {
+          const crSrc = c.ac.createBufferSource();
+          crSrc.buffer = c.noise;
+          const crFilt = c.ac.createBiquadFilter();
+          crFilt.type = "highpass";
+          crFilt.frequency.value = 3200 + Math.random() * 4800;
+          crFilt.Q.value = 1.5;
+          const crGain = c.ac.createGain();
+          const dur = 0.02 + Math.random() * 0.04;
+          crGain.gain.setValueAtTime(0.0001, t);
+          crGain.gain.exponentialRampToValueAtTime(0.12 + Math.random() * 0.18, t + 0.005);
+          crGain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+          crSrc.connect(crFilt).connect(crGain).connect(c.master);
+          crSrc.start(t);
+          track(crSrc, t + dur + 0.01);
+        }
+      }
     },
     ambient(on) {
       ambientWanted = on;

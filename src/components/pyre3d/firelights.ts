@@ -96,11 +96,14 @@ export function createFireLights(scene: THREE.Scene): FireLightPool {
           l.intensity = Math.max(0, l.intensity - 200 * dt);
           continue;
         }
-        // Hedefe yumuşak geçiş: ışığın bir bloktan diğerine zıplaması göze batıyor.
         l.position.lerp(goals[i]!, Math.min(1, dt * 4));
-        const target = Math.min(150, 20 + p * 9) + Math.sin(now * 0.011 + l.position.x) * 10;
+        // Çok frekanslı titreşim — doğal yangın ışığı
+        const flicker =
+          Math.sin(now * 0.011 + l.position.x) * 10 +
+          Math.sin(now * 0.037 + l.position.z) * 6 +
+          Math.sin(now * 0.089 + l.position.x * 0.5) * 3;
+        const target = Math.min(150, 20 + p * 9) + flicker;
         l.intensity += (target - l.intensity) * Math.min(1, dt * 8);
-        // Yanan bir blok tek bir binadan çok daha geniş bir alanı aydınlatır.
         l.distance = 46 + Math.min(74, p * 7);
       }
     },

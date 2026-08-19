@@ -26,6 +26,7 @@ export type FxSystem = {
 
 const EMBERS = 700;
 const FLAME = 340;
+const SMOKE = 120;
 const BLASTS = 10;
 
 export function createFx(scene: THREE.Scene): FxSystem {
@@ -87,6 +88,33 @@ export function createFx(scene: THREE.Scene): FxSystem {
   for (let i = 0; i < FLAME; i++) {
     fpLife[i] = 0;
     fpPos[i * 3 + 1] = -9999;
+  }
+
+  /* ---- duman trail (alev jetinin arkasında koyu duman) ---- */
+  const smPos = new Float32Array(SMOKE * 3);
+  const smVel = new Float32Array(SMOKE * 3);
+  const smLife = new Float32Array(SMOKE);
+  const smMax = new Float32Array(SMOKE);
+  const smSize = new Float32Array(SMOKE);
+  const smGeo = new THREE.BufferGeometry();
+  smGeo.setAttribute("position", new THREE.BufferAttribute(smPos, 3));
+  const smokeMat = new THREE.PointsMaterial({
+    color: 0x222222,
+    map: softParticleTexture(),
+    size: 5,
+    transparent: true,
+    opacity: 0.4,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+    sizeAttenuation: true,
+  });
+  const smokePts = new THREE.Points(smGeo, smokeMat);
+  smokePts.frustumCulled = false;
+  scene.add(smokePts);
+  let smIdx = 0;
+  for (let i = 0; i < SMOKE; i++) {
+    smLife[i] = 0;
+    smPos[i * 3 + 1] = -9999;
   }
 
   /* ---- patlama küreleri ---- */
@@ -183,12 +211,8 @@ export function createFx(scene: THREE.Scene): FxSystem {
     },
     flameJet(p, n, dir) {
       const count = Math.max(1, Math.round(n * density));
-      // Jet ejderhanın baktığı YÖNE atılıyor. Eskiden hız doğrudan dünya
-      // +Z'ye yazılıyordu: heading 0'dan saptığın anda alev ileri değil yana
-      // savruluyor, batıya uçarken de tamamen geriye kalıyordu.
       const sx = dir.x;
       const sz = dir.z;
-      // Yöne dik vektör: saçılmayı jetin etrafına dağıtmak için.
       const px = dir.z;
       const pz = -dir.x;
       for (let i = 0; i < count; i++) {
@@ -208,6 +232,23 @@ export function createFx(scene: THREE.Scene): FxSystem {
         fpCol[i3 + 1] = fpA.g;
         fpCol[i3 + 2] = fpA.b;
         fpIdx = (fpIdx + 1) % FLAME;
+      }
+      // Duman trail — alevin gerisinde koyu duman
+      const smokeCount = Math.max(1, Math.round(count * 0.3));
+      for (let i = 0; i < smokeCount; i++) {
+        const i3 = smIdx * 3;
+        // Duman alevin gerisinde başlar (eksi yön)
+        smPos[i3] = p.x - sx * rand(1, 4) + rand(-1, 1);
+        smPos[i3 + 1] = p.y + rand(0.5, 2.5);
+        smPos[i3 + 2] = p.z - sz * rand(1, 4) + rand(-1, 1);
+        smVel[i3] = -sx * rand(4, 12) + rand(-3, 3);
+        smVel[i3 + 1] = rand(5, 14);
+        smVel[i3 + 2] = -sz * rand(4, 12) + rand(-3, 3);
+        const life = rand(0.6, 1.6);
+        smLife[smIdx] = life;
+        smMax[smIdx] = life;
+        smSize[smIdx] = rand(4, 8);
+        smIdx = (smIdx + 1) % SMOKE;
       }
     },
     explosion(p, size) {
@@ -278,6 +319,28 @@ export function createFx(scene: THREE.Scene): FxSystem {
       (fpGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
       (fpGeo.attributes["color"] as THREE.BufferAttribute).needsUpdate = true;
 
+      /* ---- duman trail güncellemesi ---- */
+      for (let i = 0; i < SMOKE; i++) {
+        if (smLife[i]! <= 0) continue;
+        smLife[i] = smLife[i]! - dt;
+        const i3 = i * 3;
+        smVel[i3] = smVel[i3]! * Math.max(0, 1 - 0.6 * dt);
+        smVel[i3 + 1] = smVel[i3 + 1]! * Math.max(0, 1 - 0.5 * dt);
+        smVel[i3 + 2] = smVel[i3 + 2]! * Math.max(0, 1 - 0.6 * dt);
+        smVel[i3] = smVel[i3]! + Math.sin(now * 0.008 + i * 0.5) * 3 * dt;
+        smPos[i3] = smPos[i3]! + smVel[i3]! * dt;
+        smPos[i3 + 1] = smPos[i3 + 1]! + smVel[i3 + 1]! * dt;
+        smPos[i3 + 2] = smPos[i3 + 2]! + smVel[i3 + 2]! * dt;
+        // Boyut yaşla büyür (duman genişler)
+        const age = 1 - Math.max(0, smLife[i]!) / Math.max(1e-5, smMax[i]!);
+        smSize[i] = smSize[i]! * (1 + age * 0.5);
+        if (smLife[i]! <= 0) smPos[i3 + 1] = -9999;
+      }
+      (smGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
+      // Duman opaklığı: aktif duman yoksa sıfırla
+      const hasSmoke = smLife.some((l) => l > 0);
+      smokeMat.opacity = hasSmoke ? 0.32 : 0;
+
       for (const b of blasts) {
         if (b.t < 0) continue;
         b.t += dt;
@@ -310,10 +373,12 @@ export function createFx(scene: THREE.Scene): FxSystem {
     dispose() {
       emGeo.dispose();
       fpGeo.dispose();
+      smGeo.dispose();
       blastGeo.dispose();
       shockMesh.geometry.dispose();
       emberMat.dispose();
       flameMat.dispose();
+      smokeMat.dispose();
       shockMat.dispose();
       craterBaseMat.dispose();
       craterRimMat.dispose();

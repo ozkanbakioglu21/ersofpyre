@@ -898,6 +898,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         g.mission.emit({ kind: "firstFlame" });
       }
       audio.flame(firing);
+      if (firing) audio.tickFlame(dt);
       dragon.jaw.rotation.x = firing ? 0.45 : 0.06;
       if (firing) {
         dragon.glow.intensity = 26 + Math.sin(now * 0.03) * 8;
@@ -907,14 +908,18 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         flameOuter.mat.opacity = 0.42 + Math.random() * 0.18;
         flameMid.mat.opacity = 0.6 + Math.random() * 0.2;
         flameCore.mat.opacity = 0.7 + Math.random() * 0.2;
-        // Boy yerel Y'de, kalınlık X/Z'de.
         const wOuter = 1 + Math.random() * 0.16;
         const wMid = 1 + Math.random() * 0.1;
         const wCore = 1 + Math.random() * 0.08;
+        // Alev titreşimi — koniler hafifçe sağa-sola sallanır
+        const sway = Math.sin(now * 0.04) * 0.08 + Math.sin(now * 0.07) * 0.04;
         flameOuter.mesh.scale.set(wOuter, len, wOuter);
+        flameOuter.mesh.rotation.z = sway;
         const midLen = len * (0.8 + Math.random() * 0.2);
         flameMid.mesh.scale.set(wMid, midLen, wMid);
+        flameMid.mesh.rotation.z = sway * 1.3 + Math.sin(now * 0.09) * 0.03;
         flameCore.mesh.scale.set(wCore, len * 0.72, wCore);
+        flameCore.mesh.rotation.z = -sway * 0.6;
         fx.flameJet(headPos, 7, g.fwd);
         fx.ember(headPos, 3, 5);
       } else {
