@@ -1194,6 +1194,24 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             audio.enemyShot();
           }
         }
+
+        /* ---- yer ateş kaynakları — sürekli alev topu ---- */
+        for (const gf of city.groundFires) {
+          gf.cool -= dt;
+          const d = gf.pos.distanceTo(dp);
+          if (gf.cool <= 0 && d < 200) {
+            gf.cool = 0.35 + Math.random() * 0.3;
+            tmp.copy(dp).sub(gf.pos).normalize();
+            tmp.x += (Math.random() - 0.5) * 0.2;
+            tmp.z += (Math.random() - 0.5) * 0.2;
+            const speed = 60 + Math.random() * 20;
+            tmp2.copy(gf.pos);
+            shots.spawn("firebolt", tmp2, tmp.normalize().multiplyScalar(speed), 4, 0);
+            // Alev efekti
+            fx.flameJet(gf.pos, 5, new THREE.Vector3(0, 1, 0));
+            audio.enemyShot();
+          }
+        }
       }
 
       /* ---- zeplinler ---- */
@@ -1317,6 +1335,16 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         if (!s.active) continue;
         s.mesh.position.addScaledVector(s.vel, dt);
         s.life -= dt;
+
+        // Alev topu izi — ateş parçacıkları
+        if (s.kind === "firebolt") {
+          if (Math.random() < dt * 30) {
+            fx.ember(s.mesh.position, 1, 2);
+          }
+          (s.mesh.material as THREE.MeshBasicMaterial).color.setHex(
+            Math.random() < 0.5 ? 0xffcc22 : 0xff8800,
+          );
+        }
 
         // Flak fünyesi: hedef irtifayı geçince havada patlar.
         if (s.kind === "flak" && Math.sign(s.fuseY - s.mesh.position.y) !== s.fuseSign) {

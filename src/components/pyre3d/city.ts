@@ -56,6 +56,7 @@ export type CityBlock = {
 };
 
 export type GateTurret = { pos: THREE.Vector3; y: number; cool: number };
+export type GroundFire = { pos: THREE.Vector3; cool: number };
 
 export type CityHandle = {
   group: THREE.Group;
@@ -64,6 +65,7 @@ export type CityHandle = {
   spec: CitySpec;
   npcs: NpcHandle;
   gateTurrets: GateTurret[];
+  groundFires: GroundFire[];
   /** Cadde/meydan testi — yangının blok atlamasını zorlaştırır. */
   streetAt(x: number, z: number): boolean;
   dispose(): void;
@@ -1413,6 +1415,17 @@ export async function createCity(
     }
   }
 
+  // Yer ateş kaynakları — şehirdeki çıralar, ocaklar, savunma mevzileri
+  const groundFires: GroundFire[] = [];
+  const gfCount = Math.floor(R * 0.18);
+  for (let i = 0; i < gfCount; i++) {
+    const a = rng.range(0, Math.PI * 2);
+    const d = rng.range(R * 0.15, R * 0.95);
+    const gx = spec.cx + Math.cos(a) * d;
+    const gz = spec.cz + Math.sin(a) * d;
+    groundFires.push({ pos: new THREE.Vector3(gx, baseY + 2, gz), cool: rng.range(0, 3) });
+  }
+
   return {
     group,
     blocks,
@@ -1420,6 +1433,7 @@ export async function createCity(
     spec,
     npcs,
     gateTurrets,
+    groundFires,
     streetAt: streetTest,
     dispose() {
       npcs.dispose();

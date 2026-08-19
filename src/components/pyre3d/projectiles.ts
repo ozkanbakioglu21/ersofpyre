@@ -9,7 +9,7 @@ import { rand } from "./rng";
  * kullanımda shader derlemesi riski taşıyor.
  */
 
-export type ShotKind = "bolt" | "flak" | "harpoon";
+export type ShotKind = "bolt" | "flak" | "harpoon" | "firebolt";
 
 export type Shot = {
   active: boolean;
@@ -42,14 +42,16 @@ export function createShotPool(scene: THREE.Scene): ShotPool {
   const boltGeo = new THREE.SphereGeometry(0.9, 6, 6);
   const flakGeo = new THREE.SphereGeometry(1.2, 6, 6);
   const harpoonGeo = new THREE.CylinderGeometry(0.16, 0.16, 4.4, 5);
+  const fireboltGeo = new THREE.SphereGeometry(1.1, 6, 6);
   const boltMat = new THREE.MeshBasicMaterial({ color: 0x7fe4ff });
   const flakMat = new THREE.MeshBasicMaterial({ color: 0xffd08a });
   const harpoonMat = new THREE.MeshBasicMaterial({ color: 0xc7a15a });
+  const fireboltMat = new THREE.MeshBasicMaterial({ color: 0xffcc22 });
 
   const shots: Shot[] = [];
   const make = (kind: ShotKind) => {
-    const geo = kind === "bolt" ? boltGeo : kind === "flak" ? flakGeo : harpoonGeo;
-    const mat = kind === "bolt" ? boltMat : kind === "flak" ? flakMat : harpoonMat;
+    const geo = kind === "bolt" ? boltGeo : kind === "flak" ? flakGeo : kind === "harpoon" ? harpoonGeo : fireboltGeo;
+    const mat = kind === "bolt" ? boltMat : kind === "flak" ? flakMat : kind === "harpoon" ? harpoonMat : fireboltMat;
     const mesh = new THREE.Mesh(geo, mat);
     mesh.visible = false;
     scene.add(mesh);
@@ -57,7 +59,7 @@ export function createShotPool(scene: THREE.Scene): ShotPool {
   };
   // Üç türden de havuzda örnek bulunsun ki ilk atışta materyal derlenmesin.
   for (let i = 0; i < SHOT_CAP; i++) {
-    const kind: ShotKind = i % 5 === 0 ? "flak" : i % 7 === 0 ? "harpoon" : "bolt";
+    const kind: ShotKind = i % 5 === 0 ? "flak" : i % 7 === 0 ? "harpoon" : i % 11 === 0 ? "firebolt" : "bolt";
     shots.push({
       active: false,
       kind,
@@ -99,9 +101,11 @@ export function createShotPool(scene: THREE.Scene): ShotPool {
       boltGeo.dispose();
       flakGeo.dispose();
       harpoonGeo.dispose();
+      fireboltGeo.dispose();
       boltMat.dispose();
       flakMat.dispose();
       harpoonMat.dispose();
+      fireboltMat.dispose();
     },
   };
 }
