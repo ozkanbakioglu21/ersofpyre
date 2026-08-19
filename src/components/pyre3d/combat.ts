@@ -61,9 +61,16 @@ export function killTarget(g: Game, t: Target): void {
   g.state.score += t.score * g.state.combo;
   g.state.embers += t.score * 0.35;
   g.state.rage = Math.min(100, g.state.rage + 1.2 * g.state.combo);
+  // Patlama — bina boyutuna göre
+  const eSize = t.kind === "factory" || t.kind === "elevator" ? 1.8 : 1.3;
   tmp.copy(t.pos).setY(t.pos.y + Math.min(10, t.height * 0.4));
-  g.fx.explosion(tmp, t.kind === "factory" || t.kind === "elevator" ? 1.5 : 1);
-  g.audio.explosion(t.kind === "factory" ? 1.6 : 1);
+  g.fx.explosion(tmp, eSize);
+  g.audio.explosion(t.kind === "factory" ? 1.6 : 1.2);
+  // İkincil patlama — daha yüksekte, daha küçük (çatı patlaması)
+  tmp.y += t.height * 0.3;
+  g.fx.explosion(tmp, eSize * 0.6);
+  // Ek kor sıçraması
+  g.fx.ember(t.pos, Math.round(20 * eSize), 8);
   g.mission.emit({ kind: "targetDestroyed", target: t.kind });
 }
 

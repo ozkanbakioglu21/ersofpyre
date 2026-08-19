@@ -1038,13 +1038,18 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         // Rastgele çığlık türü seç: erkek (%50), kadın (%25), tiz (%15), kalabalık (%10)
         const r = Math.random();
         if (r < 0.50) {
-          playSample(c, "screamMale", { pitch: 0.8 + Math.random() * 0.4, vol: 0.35 });
+          playSample(c, "screamMale", { pitch: 0.8 + Math.random() * 0.4, vol: 0.55 });
+          // İkinci çığlık — hafif gecikme ile çoğaltma efekti
+          playSample(c, "screamMale", { pitch: 0.7 + Math.random() * 0.5, vol: 0.3, delay: 0.06 + Math.random() * 0.12 });
         } else if (r < 0.75) {
-          playSample(c, "screamFemale", { pitch: 0.85 + Math.random() * 0.3, vol: 0.3 });
+          playSample(c, "screamFemale", { pitch: 0.85 + Math.random() * 0.3, vol: 0.5 });
+          playSample(c, "screamFemale", { pitch: 0.75 + Math.random() * 0.4, vol: 0.25, delay: 0.08 });
         } else if (r < 0.90) {
-          playSample(c, "screamHigh", { pitch: 0.9 + Math.random() * 0.2, vol: 0.28 });
+          playSample(c, "screamHigh", { pitch: 0.9 + Math.random() * 0.2, vol: 0.45 });
+          playSample(c, "screamMale", { pitch: 0.9 + Math.random() * 0.3, vol: 0.25, delay: 0.05 });
         } else {
-          playSample(c, "crowdScream", { pitch: 0.9 + Math.random() * 0.2, vol: 0.2 });
+          playSample(c, "crowdScream", { pitch: 0.9 + Math.random() * 0.2, vol: 0.4 });
+          playSample(c, "crowdScream", { pitch: 0.8 + Math.random() * 0.3, vol: 0.2, delay: 0.1 });
         }
       });
     },
