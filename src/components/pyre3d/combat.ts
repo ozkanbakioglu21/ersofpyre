@@ -53,6 +53,7 @@ export function addCombo(g: Game): void {
 export function killTarget(g: Game, t: Target): void {
   if (t.dead) return;
   t.dead = true;
+  t.burn = 1;
   t.apply(t);
   // Kule donanımlarını gizle (ışıldak, tesla); binalar apply'da ayrışıyor
   if (t.rig && t.tower) t.rig.visible = false;
@@ -335,10 +336,29 @@ export function explode(g: Game, at: THREE.Vector3, o: BlastOpts): void {
 
 export function updateBurning(g: Game, dt: number): void {
   for (const t of g.burning) {
-    if (t.dead) continue;
+    if (t.dead) {
+      // Ölü binalar: sadece yangın görselleri (hasar yok)
+      if (t.burn > 0.04) {
+        if (Math.random() < dt * 8) {
+          tmp.set(
+            t.pos.x + (Math.random() - 0.5) * t.radius * 2,
+            t.pos.y + 1 + Math.random() * Math.min(10, t.height * 0.6),
+            t.pos.z + (Math.random() - 0.5) * t.radius * 2,
+          );
+          g.fx.ember(tmp, 2, 4);
+        }
+        if (Math.random() < dt * 4) {
+          tmp.set(
+            t.pos.x + (Math.random() - 0.5) * t.radius,
+            t.pos.y + 0.5,
+            t.pos.z + (Math.random() - 0.5) * t.radius,
+          );
+          g.fx.flameJet(tmp, 3, new THREE.Vector3(0, 1, 0));
+        }
+      }
+      continue;
+    }
     t.hp -= t.burn * 16 * dt;
-    // Görsel durum sadece gözle görülür değiştiğinde yazılıyor: her karede
-    // yüzlerce binanın vertex aralığını güncellemek gereksiz.
     if (Math.abs(t.burn - t.wrote) > 0.03) {
       t.wrote = t.burn;
       t.apply(t);
