@@ -451,7 +451,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     pad2.frequency.value = 55.7; // hafif detune → chorusing
     const padGain = c.ac.createGain();
     padGain.gain.setValueAtTime(0.0001, t);
-    padGain.gain.exponentialRampToValueAtTime(0.22, t + 2);
+    padGain.gain.exponentialRampToValueAtTime(0.45, t + 1.5);
     const padFilter = c.ac.createBiquadFilter();
     padFilter.type = "lowpass";
     padFilter.frequency.value = 280;
@@ -467,13 +467,13 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     subPulse.frequency.value = 42;
     const subPulseGain = c.ac.createGain();
     subPulseGain.gain.setValueAtTime(0.0001, t);
-    subPulseGain.gain.exponentialRampToValueAtTime(0.28, t + 1.5);
+    subPulseGain.gain.exponentialRampToValueAtTime(0.55, t + 1);
     // LFO ile nabız: sine 0.35 Hz → sub-bass gain'i açıp kapatır
     const pulseLfo = c.ac.createOscillator();
     pulseLfo.type = "sine";
     pulseLfo.frequency.value = 0.35;
     const pulseLfoGain = c.ac.createGain();
-    pulseLfoGain.gain.value = 0.24;
+    pulseLfoGain.gain.value = 0.45;
     pulseLfo.connect(pulseLfoGain).connect(subPulseGain.gain);
     subPulse.connect(subPulseGain);
     subPulseGain.connect(c.master);
@@ -484,7 +484,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     tension.frequency.value = 110;
     const tensionGain = c.ac.createGain();
     tensionGain.gain.setValueAtTime(0.0001, t);
-    tensionGain.gain.exponentialRampToValueAtTime(0.12, t + 3);
+    tensionGain.gain.exponentialRampToValueAtTime(0.25, t + 2);
     // Yavaş frekans tarama: 90-165 Hz arası 12 saniyede
     tension.frequency.setValueAtTime(90, t);
     tension.frequency.linearRampToValueAtTime(165, t + 12);
@@ -506,7 +506,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     metalFilter.Q.value = 6;
     const metallicGain = c.ac.createGain();
     metallicGain.gain.setValueAtTime(0.0001, t);
-    metallicGain.gain.exponentialRampToValueAtTime(0.06, t + 3);
+    metallicGain.gain.exponentialRampToValueAtTime(0.12, t + 2);
     // LFO: bandpass frekansını gezdirir → metalik tınlama
     const lfo = c.ac.createOscillator();
     lfo.type = "sine";
