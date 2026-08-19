@@ -1020,6 +1020,10 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       for (const b of fireballs.balls) {
         if (!b.active) continue;
         b.vel.y += FIREBALL.gravity * dt;
+        // Hava sürtünmesi — yatay hızı yavaşlatır, bomba gibi dik düşüş sağlar
+        const dragFactor = 1 - FIREBALL.drag * dt;
+        b.vel.x *= dragFactor;
+        b.vel.z *= dragFactor;
         b.mesh.position.addScaledVector(b.vel, dt);
         b.life -= dt;
         fx.ember(b.mesh.position, 1, 3);

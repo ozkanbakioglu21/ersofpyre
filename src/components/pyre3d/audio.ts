@@ -98,7 +98,13 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   const MAX_VOICES = 14;
   let lastExplosion = 0;
 
-  let flameNodes: { src: AudioBufferSourceNode; gain: GainNode; lfo: OscillatorNode } | null = null;
+  let flameNodes: {
+    src: AudioBufferSourceNode;
+    gain: GainNode;
+    lfo: OscillatorNode;
+    sub: OscillatorNode;
+    subGain: GainNode;
+  } | null = null;
   let ambientNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
   let sirenNodes: { osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null = null;
   let flameWanted = false;
@@ -189,46 +195,109 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   const startFlame = (c: Ctx) => {
     if (flameNodes) return;
     const t = c.ac.currentTime;
+
+    // Ana gürültü kaynağı — kahverengi gürültü
     const src = c.ac.createBufferSource();
     src.buffer = c.noise;
     src.loop = true;
+
+    // Bantgeçiren filtre — ateşin "hırlaması"
     const band = c.ac.createBiquadFilter();
     band.type = "bandpass";
-    band.frequency.value = 620;
-    band.Q.value = 0.8;
+    band.frequency.value = 680;
+    band.Q.value = 1.1;
+
+    // Düşük frekans tırmalama — sub-bass katmanı
+    const band2 = c.ac.createBiquadFilter();
+    band2.type = "bandpass";
+    band2.frequency.value = 320;
+    band2.Q.value = 1.8;
+
+    // Bozulma — waveshaper ile korkunç tırtıklı doku
+    const ws = c.ac.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = (i / 128) - 1;
+      //-tanh benzeri eğri — sert doyma
+      curve[i] = Math.tanh(x * 3.5);
+    }
+    ws.curve = curve;
+    ws.oversample = "2x";
+
+    // Düşük geçiren — tiz sızırtıyı kes
     const low = c.ac.createBiquadFilter();
     low.type = "lowpass";
-    low.frequency.value = 2400;
+    low.frequency.value = 1800;
+
+    // Ana kazanç — korkunç seviyede yüksek
     const gain = c.ac.createGain();
     gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.32, t + 0.08);
-    // Alev düz bir "şşş" değil; yavaş bir LFO basınç dalgalanmasını taşıyor.
+    gain.gain.exponentialRampToValueAtTime(0.52, t + 0.06);
+
+    // Sub-bass osc — göğsü titreten dip frekans
+    const sub = c.ac.createOscillator();
+    sub.type = "sine";
+    sub.frequency.value = 55;
+    const subGain = c.ac.createGain();
+    subGain.gain.setValueAtTime(0.0001, t);
+    subGain.gain.exponentialRampToValueAtTime(0.22, t + 0.08);
+
+    // LFO — hızlı nabız, alevin"hırlaması"
     const lfo = c.ac.createOscillator();
     lfo.type = "sine";
-    lfo.frequency.value = 7.5;
+    lfo.frequency.value = 11;
     const lfoGain = c.ac.createGain();
-    lfoGain.gain.value = 260;
+    lfoGain.gain.value = 320;
     lfo.connect(lfoGain).connect(band.frequency);
-    src.connect(band).connect(low).connect(gain).connect(c.master);
+
+    // İkinci LFO — daha yavaş, genlik dalgalanması
+    const lfo2 = c.ac.createOscillator();
+    lfo2.type = "triangle";
+    lfo2.frequency.value = 2.8;
+    const lfo2Gain = c.ac.createGain();
+    lfo2Gain.gain.value = 0.14;
+    lfo2.connect(lfo2Gain).connect(gain.gain);
+
+    // Sinyal zinciri: gürültü → bant → bant2 → bozulma → lowpass → gain
+    src.connect(band);
+    src.connect(band2);
+    band2.connect(ws);
+    band.connect(ws);
+    ws.connect(low);
+    low.connect(gain);
+    gain.connect(c.master);
+
+    // Sub-bass bağımsız yol
+    sub.connect(subGain);
+    subGain.connect(c.master);
+
     src.start(t);
     lfo.start(t);
-    flameNodes = { src, gain, lfo };
+    lfo2.start(t);
+    sub.start(t);
+    flameNodes = { src, gain, lfo, sub, subGain };
   };
 
   const stopFlame = (c: Ctx) => {
     if (!flameNodes) return;
-    const { src, gain, lfo } = flameNodes;
+    const { src, gain, lfo, sub, subGain } = flameNodes;
     flameNodes = null;
     const t = c.ac.currentTime;
     gain.gain.cancelScheduledValues(t);
     gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
-    src.stop(t + 0.16);
-    lfo.stop(t + 0.16);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    subGain.gain.cancelScheduledValues(t);
+    subGain.gain.setValueAtTime(Math.max(0.0001, subGain.gain.value), t);
+    subGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    src.stop(t + 0.18);
+    lfo.stop(t + 0.18);
+    sub.stop(t + 0.18);
     src.onended = () => {
       src.disconnect();
       gain.disconnect();
       lfo.disconnect();
+      sub.disconnect();
+      subGain.disconnect();
     };
   };
 

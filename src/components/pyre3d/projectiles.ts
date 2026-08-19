@@ -152,7 +152,7 @@ export function createFireballPool(scene: THREE.Scene): FireballPool {
         b.mesh.position.copy(from);
         b.mesh.scale.setScalar(rand(0.85, 1.15));
         b.vel.copy(vel);
-        b.life = 4;
+        b.life = 3;
         return true;
       }
       return false;
@@ -166,7 +166,9 @@ export function createFireballPool(scene: THREE.Scene): FireballPool {
 
 export const FIREBALL = {
   speed: 150,
-  gravity: -38,
+  gravity: -62,
+  /** Hava sürtünmesi — yatay hızı yavaşlatır, bomba gibi düşürür. */
+  drag: 0.18,
   /** Çarpma yarıçapı ve hasarı. */
   blastRadius: 34,
   damage: 220,
