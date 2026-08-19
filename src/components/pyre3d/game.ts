@@ -1514,7 +1514,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     musicStarted = true;
     audio.siren(false);
     audio.music(true);
-  }, 5000);
+  }, 10000);
   o.onReady();
   last = performance.now();
   raf = requestAnimationFrame(loop);
