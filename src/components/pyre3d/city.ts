@@ -378,12 +378,12 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       const m = ((a % da) + da) % da;
       if (Math.min(m, da - m) * wallR < AVENUE_HALF + 6) continue;
 
-      const wallLen = (Math.PI * 2 * wallR) / seg + 1;
+      const wallLen = (Math.PI * 2 * wallR) / seg + 5;
 
       // Ana palisade duvarı — ahşap kütükler
       const wallH = rng.range(10, 13);
       const wall = new THREE.Mesh(
-        new THREE.BoxGeometry(2.2, wallH, wallLen),
+        new THREE.BoxGeometry(3, wallH, wallLen),
         palisadeMat,
       );
       wall.position.set(spec.cx + Math.cos(a) * wallR, baseY + wallH / 2, spec.cz + Math.sin(a) * wallR);
@@ -410,7 +410,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       // Metal destek direkleri — her 3 parçada bir
       if (i % 3 === 0) {
         const support = new THREE.Mesh(
-          new THREE.BoxGeometry(0.4, wallH + 2, 0.4),
+          new THREE.BoxGeometry(0.5, wallH + 2, 0.5),
           metalMat,
         );
         support.position.set(
@@ -1058,18 +1058,26 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       }
     }
 
-    // Kapı ile duvar arasındaki dolgu parçaları
+    // Kapı ile duvar arasındaki dolgu parçaları + kule-duvar bağlantıları
     const skipRad = (AVENUE_HALF + 6) / wallR;
     for (let j = 0; j < SECTORS; j++) {
       const gateA = j * da;
+      const gx2 = spec.cx + Math.cos(gateA) * wallR;
+      const gz2 = spec.cz + Math.sin(gateA) * wallR;
+      const perpX2 = Math.cos(gateA + Math.PI / 2);
+      const perpZ2 = Math.sin(gateA + Math.PI / 2);
+      const radX2 = Math.cos(gateA);
+      const radZ2 = Math.sin(gateA);
+
       for (const side of [-1, 1]) {
+        // Dolgu parçası — duvar hizasında, kuleye kadar
         const edgeA = gateA + side * skipRad;
-        const fillLen = skipRad * wallR + 2;
+        const fillLen = skipRad * wallR + 3;
         const fx = spec.cx + Math.cos(edgeA) * wallR;
         const fz = spec.cz + Math.sin(edgeA) * wallR;
         const fillH = rng.range(10, 13);
         const fill = new THREE.Mesh(
-          new THREE.BoxGeometry(2.2, fillH, fillLen),
+          new THREE.BoxGeometry(3, fillH, fillLen),
           palisadeMat,
         );
         fill.position.set(fx, baseY + fillH / 2, fz);
@@ -1091,6 +1099,35 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
           log.rotation.y = -edgeA;
           parts.add(log);
         }
+
+        // Kuleye bağlama parçası — duvar ile kule arasını doldurur
+        const towerX = gx2 + perpX2 * side * (gateW / 2 + towerR + 0.8);
+        const towerZ = gz2 + perpZ2 * side * (gateW / 2 + towerR + 0.8);
+        const fillEndX = fx + Math.cos(edgeA + Math.PI / 2) * (fillLen / 2) * side;
+        const fillEndZ = fz + Math.sin(edgeA + Math.PI / 2) * (fillLen / 2) * side;
+
+        // Bağlantı duvarı — dolgu ucundan kule temeline
+        const connLen = Math.hypot(towerX - fillEndX, towerZ - fillEndZ) + 2;
+        const connAngle = Math.atan2(towerZ - fillEndZ, towerX - fillEndX);
+        const connCX = (fillEndX + towerX) / 2;
+        const connCZ = (fillEndZ + towerZ) / 2;
+        const connH = rng.range(8, 11);
+        const conn = new THREE.Mesh(
+          new THREE.BoxGeometry(3, connH, connLen),
+          palisadeMat,
+        );
+        conn.position.set(connCX, baseY + connH / 2, connCZ);
+        conn.rotation.y = -connAngle;
+        parts.add(conn);
+
+        // Taş temel – bağlantı parçasının altında
+        const connBase = new THREE.Mesh(
+          new THREE.BoxGeometry(3.6, 2, connLen + 0.5),
+          cityMat(0x3a3228, 0.85, 0.15),
+        );
+        connBase.position.set(connCX, baseY + 1, connCZ);
+        connBase.rotation.y = -connAngle;
+        parts.add(connBase);
       }
     }
 
