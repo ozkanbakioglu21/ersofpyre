@@ -558,7 +558,7 @@ export function makeSandbox(seed: number): ChapterDef {
   return {
     id: "sandbox",
     index: 0,
-    title: "Serbest Yıkım",
+    title: "Şehre Saldır",
     subtitle: "Kural yok, hedef yüzdesi var",
     briefing: {
       lore:

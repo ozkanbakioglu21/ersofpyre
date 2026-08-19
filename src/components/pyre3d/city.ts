@@ -368,35 +368,264 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
 
   if (spec.wall) {
     const wallR = R * 1.06;
-    const wallMat = cityMat(0x2f2820, 1);
+    const da = (Math.PI * 2) / SECTORS;
+    // Askeri kamp duvarı — ahşap palisad + metal destekler
+    const palisadeMat = cityMat(0x3d2b1f, 0.92, 0.05);
+    const metalMat = cityMat(0x2b241e, 0.6, 0.6);
     const seg = 40;
     for (let i = 0; i < seg; i++) {
       const a = (i / seg) * Math.PI * 2;
-      // Kapılar caddelerin geldiği yerde: 8 sektör sınırında boşluk bırak.
-      const da = (Math.PI * 2) / SECTORS;
       const m = ((a % da) + da) % da;
       if (Math.min(m, da - m) * wallR < AVENUE_HALF + 6) continue;
-      const w = new THREE.Mesh(
-        new THREE.BoxGeometry(2.6, 13, (Math.PI * 2 * wallR) / seg + 1),
-        wallMat,
+
+      const wallLen = (Math.PI * 2 * wallR) / seg + 1;
+
+      // Ana palisade duvarı — ahşap kütükler
+      const wallH = rng.range(10, 13);
+      const wall = new THREE.Mesh(
+        new THREE.BoxGeometry(2.2, wallH, wallLen),
+        palisadeMat,
       );
-      w.position.set(spec.cx + Math.cos(a) * wallR, baseY + 6.5, spec.cz + Math.sin(a) * wallR);
-      w.rotation.y = -a;
-      parts.add(w);
-      if (i % 5 === 0) {
-        const merlon = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3, 3.6), wallMat);
-        merlon.position.set(
+      wall.position.set(spec.cx + Math.cos(a) * wallR, baseY + wallH / 2, spec.cz + Math.sin(a) * wallR);
+      wall.rotation.y = -a;
+      parts.add(wall);
+
+      // Ahşap kütük dişleri (üstte sivri uçlar)
+      const logCount = Math.max(2, Math.floor(wallLen / 1.2));
+      for (let j = 0; j < logCount; j++) {
+        const offset = (j / (logCount - 1) - 0.5) * wallLen;
+        const log = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.12, 0.18, 2.2, 5),
+          palisadeMat,
+        );
+        log.position.set(
+          spec.cx + Math.cos(a) * wallR + Math.cos(a + Math.PI / 2) * offset * Math.cos(a),
+          baseY + wallH + 1.1,
+          spec.cz + Math.sin(a) * wallR + Math.sin(a + Math.PI / 2) * offset * Math.cos(a),
+        );
+        log.rotation.y = -a;
+        parts.add(log);
+      }
+
+      // Metal destek direkleri — her 3 parçada bir
+      if (i % 3 === 0) {
+        const support = new THREE.Mesh(
+          new THREE.BoxGeometry(0.4, wallH + 2, 0.4),
+          metalMat,
+        );
+        support.position.set(
           spec.cx + Math.cos(a) * wallR,
-          baseY + 14,
+          baseY + (wallH + 2) / 2,
           spec.cz + Math.sin(a) * wallR,
         );
-        merlon.rotation.y = -a;
-        parts.add(merlon);
-        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 6, 5), lanternMat);
-        lamp.position.set(spec.cx + Math.cos(a) * wallR, baseY + 16, spec.cz + Math.sin(a) * wallR);
-        parts.add(lamp);
+        support.rotation.y = -a;
+        parts.add(support);
+
+        //rama askeri lamba (searchlight)
+        const spotlight = new THREE.Mesh(
+          new THREE.ConeGeometry(0.5, 0.8, 6),
+          cityMat(0x8a6b32, 0.35, 0.9),
+        );
+        spotlight.position.set(
+          spec.cx + Math.cos(a) * wallR,
+          baseY + wallH + 2.5,
+          spec.cz + Math.sin(a) * wallR,
+        );
+        parts.add(spotlight);
+
+        // Işık.createQuery
+        const lightGlow = new THREE.Mesh(
+          new THREE.SphereGeometry(0.3, 6, 5),
+          lanternMat,
+        );
+        lightGlow.position.set(
+          spec.cx + Math.cos(a) * wallR,
+          baseY + wallH + 2.2,
+          spec.cz + Math.sin(a) * wallR,
+        );
+        parts.add(lightGlow);
+      }
+
+      // Dikenli tel — duvarın üstünde
+      if (i % 2 === 0) {
+        const wireLen = wallLen * 0.6;
+        const wire = new THREE.Mesh(
+          new THREE.BoxGeometry(0.08, 0.3, wireLen),
+          metalMat,
+        );
+        wire.position.set(
+          spec.cx + Math.cos(a) * wallR,
+          baseY + wallH + 0.4,
+          spec.cz + Math.sin(a) * wallR,
+        );
+        wire.rotation.y = -a;
+        parts.add(wire);
       }
     }
+
+    // Gözetleme kuleleri — kapıların yanına ve duvar köşelerine
+    const towerPositions = [0, 2, 4, 6].map((s) => s * da + da / 2);
+    for (const ta of towerPositions) {
+      const tx = spec.cx + Math.cos(ta) * wallR;
+      const tz = spec.cz + Math.sin(ta) * wallR;
+      const ty = baseY;
+
+      // Kule temeli
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(4, 2, 4),
+        cityMat(0x3a3228, 0.85, 0.15),
+      );
+      base.position.set(tx, ty + 1, tz);
+      parts.add(base);
+
+      // Kule gövdesi — ahşap
+      const towerH = rng.range(8, 11);
+      const towerBody = new THREE.Mesh(
+        new THREE.BoxGeometry(3, towerH, 3),
+        palisadeMat,
+      );
+      towerBody.position.set(tx, ty + 2 + towerH / 2, tz);
+      parts.add(towerBody);
+
+      // Gözlem platformu
+      const platform = new THREE.Mesh(
+        new THREE.BoxGeometry(4, 0.4, 4),
+        cityMat(0x2e2620, 0.85, 0.15),
+      );
+      platform.position.set(tx, ty + 2 + towerH + 0.2, tz);
+      parts.add(platform);
+
+      // Korkuluk
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const post = new THREE.Mesh(
+            new THREE.BoxGeometry(0.15, 1.2, 0.15),
+            palisadeMat,
+          );
+          post.position.set(
+            tx + sx * 1.7,
+            ty + 2 + towerH + 0.8,
+            tz + sz * 1.7,
+          );
+          parts.add(post);
+        }
+      }
+
+      // Gözetleme gözleri — ahşap panjur
+      for (const side of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+        const eye = new THREE.Mesh(
+          new THREE.BoxGeometry(0.8, 0.5, 0.15),
+          cityMat(0x1a1612, 0.7, 0.3),
+        );
+        eye.position.set(
+          tx + Math.cos(side) * 1.6,
+          ty + 2 + towerH - 1.5,
+          tz + Math.sin(side) * 1.6,
+        );
+        eye.rotation.y = side;
+        parts.add(eye);
+      }
+
+      // Tüfek yuvası
+      const rifleSlot = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 0.3, 0.15),
+        metalMat,
+      );
+      rifleSlot.position.set(tx, ty + 2 + towerH - 0.8, tz + 1.6);
+      parts.add(rifleSlot);
+    }
+
+    // Askeri kapısı — her caddede
+    for (let j = 0; j < SECTORS; j++) {
+      const gateA = j * da;
+      const gx = spec.cx + Math.cos(gateA) * wallR;
+      const gz = spec.cz + Math.sin(gateA) * wallR;
+
+      // Kapı opening — duvar boşluğu
+      const gateW = AVENUE_HALF * 1.6;
+      const gateH = 8;
+
+      // Kapı direkleri — kalın ahşap
+      for (const side of [-1, 1]) {
+        const pillar = new THREE.Mesh(
+          new THREE.BoxGeometry(1.5, gateH + 3, 1.5),
+          palisadeMat,
+        );
+        pillar.position.set(
+          gx + Math.cos(gateA + Math.PI / 2) * side * (gateW / 2 + 1),
+          baseY + (gateH + 3) / 2,
+          gz + Math.sin(gateA + Math.PI / 2) * side * (gateW / 2 + 1),
+        );
+        pillar.rotation.y = -gateA;
+        parts.add(pillar);
+
+        // Üst çapraz destek
+        const brace = new THREE.Mesh(
+          new THREE.BoxGeometry(0.3, 0.3, 3.5),
+          metalMat,
+        );
+        brace.position.set(
+          gx + Math.cos(gateA + Math.PI / 2) * side * (gateW / 2 + 1),
+          baseY + gateH + 1.5,
+          gz + Math.sin(gateA + Math.PI / 2) * side * (gateW / 2 + 1),
+        );
+        brace.rotation.y = -gateA;
+        parts.add(brace);
+      }
+
+      // Kapı üstü kiriş
+      const lintel = new THREE.Mesh(
+        new THREE.BoxGeometry(gateW + 3, 1.2, 2),
+        palisadeMat,
+      );
+      lintel.position.set(gx, baseY + gateH + 0.6, gz);
+      lintel.rotation.y = -gateA;
+      parts.add(lintel);
+
+      // Kapı lambası (searchlight)
+      const gateLamp = new THREE.Mesh(
+        new THREE.ConeGeometry(0.6, 1.0, 6),
+        cityMat(0x8a6b32, 0.35, 0.9),
+      );
+      gateLamp.position.set(gx, baseY + gateH + 2.5, gz);
+      parts.add(gateLamp);
+
+      const gateGlow = new THREE.Mesh(
+        new THREE.SphereGeometry(0.35, 6, 5),
+        lanternMat,
+      );
+      gateGlow.position.set(gx, baseY + gateH + 2.0, gz);
+      parts.add(gateGlow);
+
+      // Barikatlar — kapının her iki yanında
+      for (const side of [-1, 1]) {
+        const barricade = new THREE.Mesh(
+          new THREE.BoxGeometry(2, 1.5, 0.4),
+          metalMat,
+        );
+        barricade.position.set(
+          gx + Math.cos(gateA + Math.PI / 2) * side * (gateW / 2 + 3),
+          baseY + 0.75,
+          gz + Math.sin(gateA + Math.PI / 2) * side * (gateW / 2 + 3),
+        );
+        barricade.rotation.y = -gateA;
+        parts.add(barricade);
+
+        // Çivili tel rulo
+        const wireRoll = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.4, 0.4, 1.5, 8),
+          metalMat,
+        );
+        wireRoll.rotation.z = Math.PI / 2;
+        wireRoll.position.set(
+          gx + Math.cos(gateA + Math.PI / 2) * side * (gateW / 2 + 4.5),
+          baseY + 0.4,
+          gz + Math.sin(gateA + Math.PI / 2) * side * (gateW / 2 + 4.5),
+        );
+        parts.add(wireRoll);
+      }
+    }
+
     void rng;
   }
 

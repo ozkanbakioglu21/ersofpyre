@@ -55,7 +55,7 @@ export function MainMenu({
             Sefer
           </PyreButton>
           <PyreButton full onClick={onSandbox}>
-            Serbest Yıkım
+            Şehre Saldır
           </PyreButton>
           <PyreButton full onClick={onControls}>
             Kontroller
@@ -150,7 +150,7 @@ export function ChapterSelect({
             onClick={() => onPick("sandbox")}
             className="w-full rounded-xl border border-accent/40 bg-card p-5 text-left transition-colors hover:border-accent"
           >
-            <h3 className="font-display text-lg font-bold text-accent">Serbest Yıkım</h3>
+            <h3 className="font-display text-lg font-bold text-accent">Şehre Saldır</h3>
             <p className="text-xs text-muted-foreground">
               Rastgele şehir, tüm yetenekler açık, hikâye yok
             </p>
@@ -329,7 +329,7 @@ export function ResultScreen({
         <h2
           className={`mt-3 font-display text-4xl font-black uppercase ${won ? "text-primary" : "text-destructive"}`}
         >
-          {won ? "Bölge küle döndü" : "Pyra düştü"}
+          {won ? "Bölge küle döndü" : "Pyre düştü"}
         </h2>
 
         <div className="mt-6 space-y-1.5">
