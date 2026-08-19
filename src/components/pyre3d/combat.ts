@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { FIREBALL } from "./projectiles";
+import { terrainHeight } from "./world";
 import type { Airship, Target, WeakPoint } from "./types";
 import type { Game } from "./game";
 
@@ -205,20 +206,73 @@ export function updateBreath(g: Game, dt: number, firing: boolean, head: THREE.V
  * Patlama (Köz Mermisi ve şok)
  * ------------------------------------------------------------------ */
 
-export type BlastOpts = { radius: number; damage: number; ignite: number; weakPointMul?: number };
+export type BlastOpts = {
+  radius: number;
+  damage: number;
+  ignite: number;
+  weakPointMul?: number;
+  /** Köz Mermisi yönü — varsa oval yıkım uygulanır. */
+  dir?: THREE.Vector3;
+  /** Köz Mermisi mi? — true ise yere çukur, binaya yarım çökme. */
+  fireball?: boolean;
+};
 
 export function explode(g: Game, at: THREE.Vector3, o: BlastOpts): void {
   g.fx.explosion(at, o.radius / 26);
-  g.audio.explosion(o.radius / 26);
+  // Köz Mermisi: derin bomba sesi; diğerleri normal patlama
+  if (o.fireball) g.audio.bombHit();
+  else g.audio.explosion(o.radius / 26);
 
-  g.grid.query(at.x, at.z, o.radius, neighbours);
+  /* ---- Köz Mermisi efektleri ---- */
+  if (o.fireball) {
+    // Çukur: yere çarpınca karanlık karartma diski + hörgüç halkası
+    const groundY = terrainHeight(at.x, at.z);
+    if (at.y <= groundY + 3) {
+      g.fx.crater(at, o.radius * 0.35);
+    }
+  }
+
+  /* ---- Yıkım yarıçapı (oval genişletme) ---- */
+  const dir = o.dir;
+  const hasDir = dir && dir.lengthSq() > 0.01;
+  // Ejderha yönünde uzatma katsayısı: yön varsa %60 daha uzun
+  const stretchX = hasDir ? 1.6 : 1;
+  const stretchZ = 1;
+
+  /* ---- Bina hasarı ---- */
+  g.grid.query(at.x, at.z, o.radius * stretchX, neighbours);
   for (const t of neighbours) {
     if (t.dead) continue;
-    const d = t.pos.distanceTo(at);
-    if (d > o.radius + t.radius) continue;
-    // Mesafeye göre azalan hasar: merkezde tam, kenarda üçte bir.
-    const falloff = 1 - Math.min(1, d / (o.radius + t.radius)) * 0.66;
-    damageTarget(g, t, o.damage * falloff, o.ignite * falloff);
+    // Oval mesafe hesabı: yön boyunca uzatılmış yarıçap
+    let dx = t.pos.x - at.x;
+    let dz = t.pos.z - at.z;
+    if (hasDir) {
+      // Ejderha yönünde ecxprojeksiyon — yön boyunca mesafe düşürülür
+      const proj = dx * dir!.x + dz * dir!.z;
+      const perpX = dx - proj * dir!.x;
+      const perpZ = dz - proj * dir!.z;
+      // Yön boyunca mesafe kısaltılır (daha uzun menzil), psyche mesafe aynen kalır
+      dx = proj * 0.62 + perpX;
+      dz = perpZ;
+    }
+    const d = Math.hypot(dx, dz);
+    const effectiveR = o.radius * (hasDir ? stretchX : 1);
+    if (d > effectiveR + t.radius) continue;
+    const falloff = 1 - Math.min(1, d / (effectiveR + t.radius)) * 0.66;
+    const dmg = o.damage * falloff;
+    const ign = o.ignite * falloff;
+
+    if (o.fireball) {
+      // Köz Mermisi: binaya çarpınca ağır hasar + yüksek yanma
+      // Yarım çökme etkisi: binanın yarısına kadar hasar, anında tutuşma
+      damageTarget(g, t, dmg * 1.3, Math.min(1, ign * 1.8));
+      // Ekstra yakma — bina hemen yanmaya başlar
+      if (!t.dead) {
+        t.burn = Math.min(1, t.burn + 0.6 * falloff);
+      }
+    } else {
+      damageTarget(g, t, dmg, ign);
+    }
   }
 
   const wpMul = o.weakPointMul ?? 1;

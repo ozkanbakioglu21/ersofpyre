@@ -1068,7 +1068,11 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           }
         }
         if (hit || b.life <= 0) {
-          if (hit) explode(g, b.mesh.position, FIREBALL_BLAST);
+          if (hit) {
+            // Köz Mermisi yönü — oval yıkım için
+            const fbDir = tmp.copy(b.vel).normalize();
+            explode(g, b.mesh.position, { ...FIREBALL_BLAST, dir: fbDir, fireball: true });
+          }
           b.active = false;
           b.mesh.visible = false;
         }

@@ -17,6 +17,8 @@ export type AudioEngine = {
   ambient(on: boolean): void;
   /** Hava saldırısı siren — şehirde alarm. */
   siren(on: boolean): void;
+  /** Bomba/alev topu çarpması — derin toprak patlaması. */
+  bombHit(): void;
   explosion(size: number): void;
   fireball(): void;
   hit(): void;
@@ -48,6 +50,7 @@ const NOOP: AudioEngine = {
   flame() {},
   ambient() {},
   siren() {},
+  bombHit() {},
   explosion() {},
   fireball() {},
   hit() {},
@@ -504,8 +507,44 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     fireball() {
       withCtx((c) => {
-        noiseBurst(c, { dur: 0.24, peak: 0.22, type: "bandpass", from: 900, to: 220, q: 1.4 });
-        tone(c, { type: "sawtooth", from: 320, to: 90, dur: 0.22, peak: 0.14 });
+        // Fırlatma sesi — kısa ve sert
+        noiseBurst(c, { dur: 0.18, peak: 0.18, type: "bandpass", from: 1100, to: 320, q: 1.6 });
+        tone(c, { type: "sawtooth", from: 380, to: 120, dur: 0.16, peak: 0.12 });
+      });
+    },
+    bombHit() {
+      withCtx((c) => {
+        // Katman 1: Derin toprak patlaması — çok düşük frekans
+        noiseBurst(c, {
+          dur: 0.7,
+          peak: 0.44,
+          type: "lowpass",
+          from: 600,
+          to: 55,
+          q: 0.6,
+        });
+        // Katman 2: Sub-bass thump — göğsü titreten dip
+        tone(c, { type: "sine", from: 85, to: 18, dur: 0.65, peak: 0.42 });
+        // Katman 3: Toprak çatlama — tiz kırılma
+        noiseBurst(c, {
+          dur: 0.22,
+          peak: 0.14,
+          type: "highpass",
+          from: 3200,
+          to: 1400,
+          q: 2,
+          delay: 0.04,
+        });
+        // Katman 4: Enkaz düşmesi — yavaş taneli gürültü
+        noiseBurst(c, {
+          dur: 0.55,
+          peak: 0.08,
+          type: "bandpass",
+          from: 480,
+          to: 200,
+          q: 1.2,
+          delay: 0.12,
+        });
       });
     },
     hit() {

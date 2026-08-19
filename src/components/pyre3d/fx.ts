@@ -17,6 +17,8 @@ export type FxSystem = {
   flameJet(p: THREE.Vector3, n: number, dir: THREE.Vector3): void;
   explosion(p: THREE.Vector3, size: number): void;
   shock(p: THREE.Vector3): void;
+  /** Çukur — bomba/alev topu yere çarpınca. */
+  crater(p: THREE.Vector3, radius: number): void;
   update(dt: number, now: number): void;
   setDensity(k: number): void;
   dispose(): void;
@@ -129,6 +131,36 @@ export function createFx(scene: THREE.Scene): FxSystem {
   scene.add(shockMesh);
   let shockT = -1;
 
+  /* ---- çukur havuzu ---- */
+  const CRATERS = 12;
+  const craterGroup = new THREE.Group();
+  craterGroup.name = "craters";
+  scene.add(craterGroup);
+  type Crater = { base: THREE.Mesh; rim: THREE.Mesh; t: number };
+  const craters: Crater[] = [];
+  const craterBaseMat = new THREE.MeshStandardMaterial({
+    color: 0x1a0e06,
+    roughness: 1,
+    metalness: 0,
+  });
+  const craterRimMat = new THREE.MeshStandardMaterial({
+    color: 0x3a2818,
+    roughness: 0.9,
+    metalness: 0,
+  });
+  for (let i = 0; i < CRATERS; i++) {
+    const base = new THREE.Mesh(new THREE.CircleGeometry(1, 16), craterBaseMat);
+    base.rotation.x = -Math.PI / 2;
+    base.visible = false;
+    craterGroup.add(base);
+    const rim = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 16), craterRimMat);
+    rim.rotation.x = -Math.PI / 2;
+    rim.visible = false;
+    craterGroup.add(rim);
+    craters.push({ base, rim, t: -1 });
+  }
+  let craterIdx = 0;
+
   let density = 1;
 
   return {
@@ -192,6 +224,21 @@ export function createFx(scene: THREE.Scene): FxSystem {
     shock(p) {
       shockMesh.position.copy(p);
       shockT = 0;
+    },
+    crater(p, radius) {
+      const c = craters[craterIdx]!;
+      craterIdx = (craterIdx + 1) % CRATERS;
+      // Taban: koyu karartma diski
+      c.base.position.set(p.x, p.y + 0.15, p.z);
+      c.base.scale.setScalar(radius);
+      c.base.visible = true;
+      // Hörgüç: yükseltilmiş halka
+      c.rim.position.set(p.x, p.y + 0.35, p.z);
+      c.rim.scale.setScalar(radius * 1.15);
+      c.rim.visible = true;
+      c.t = 0;
+      // Ek kor sıçraması
+      this.ember(p, Math.round(radius * 3), radius * 0.6);
     },
     update(dt, now) {
       for (let i = 0; i < EMBERS; i++) {
@@ -268,6 +315,8 @@ export function createFx(scene: THREE.Scene): FxSystem {
       emberMat.dispose();
       flameMat.dispose();
       shockMat.dispose();
+      craterBaseMat.dispose();
+      craterRimMat.dispose();
       for (const b of blasts) b.mat.dispose();
     },
   };
