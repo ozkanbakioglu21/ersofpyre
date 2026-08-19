@@ -1321,11 +1321,11 @@ export function createStructure(
               // Materyali karart (yanmış görünüm)
               const mat = m.material as THREE.MeshStandardMaterial;
               if (mat.color) {
-                mat.color.multiplyScalar(0.25);
+                mat.color.multiplyScalar(0.30);
               }
               if (mat.emissive) {
-                mat.emissive.setHex(0x331100);
-                mat.emissiveIntensity = 0.6;
+                mat.emissive.setHex(0xffb020);
+                mat.emissiveIntensity = 1.4;
               }
             }
           });
