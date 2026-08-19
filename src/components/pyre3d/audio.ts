@@ -23,6 +23,7 @@ export type AudioEngine = {
   lockOn(): void;
   rage(): void;
   roar(): void;
+  scream(): void;
   ui(): void;
   win(): void;
   lose(): void;
@@ -57,6 +58,7 @@ const NOOP: AudioEngine = {
   lockOn() {},
   rage() {},
   roar() {},
+  scream() {},
   ui() {},
   win() {},
   lose() {},
@@ -124,6 +126,20 @@ const SFX_MANIFEST: Record<string, string[]> = {
     "fire_whoosh.wav", "flame_burst_01.ogg", "flame_burst_02.ogg",
   ],
   flameLoop: ["flame_loop.ogg"],
+  screamMale: [
+    "scream_male_01.flac", "scream_male_02.flac", "scream_male_03.flac",
+    "scream_male_04.flac", "scream_male_05.flac", "scream_male_06.flac",
+    "scream_male_07.flac", "scream_male_08.flac", "scream_male_09.flac",
+    "scream_male_10.flac", "scream_male_11.flac", "scream_male_12.flac",
+    "scream_male_13.flac", "scream_male_14.flac", "scream_male_15.flac",
+  ],
+  screamFemale: [
+    "scream_female_01.ogg", "scream_female_02.ogg",
+  ],
+  screamHigh: [
+    "scream_high_01.mp3", "scream_high_02.mp3",
+  ],
+  crowdScream: ["crowd_shout.ogg"],
 };
 
 function pickRandom<T>(arr: T[]): T {
@@ -1015,6 +1031,21 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       withCtx((c) => {
         tone(c, { type: "sawtooth", from: 150, to: 55, dur: 1.3, peak: 0.32 });
         noiseBurst(c, { dur: 1.4, peak: 0.24, type: "bandpass", from: 420, to: 160, q: 1.6 });
+      });
+    },
+    scream() {
+      withCtx((c) => {
+        // Rastgele çığlık türü seç: erkek (%50), kadın (%25), tiz (%15), kalabalık (%10)
+        const r = Math.random();
+        if (r < 0.50) {
+          playSample(c, "screamMale", { pitch: 0.8 + Math.random() * 0.4, vol: 0.35 });
+        } else if (r < 0.75) {
+          playSample(c, "screamFemale", { pitch: 0.85 + Math.random() * 0.3, vol: 0.3 });
+        } else if (r < 0.90) {
+          playSample(c, "screamHigh", { pitch: 0.9 + Math.random() * 0.2, vol: 0.28 });
+        } else {
+          playSample(c, "crowdScream", { pitch: 0.9 + Math.random() * 0.2, vol: 0.2 });
+        }
       });
     },
     ui() {

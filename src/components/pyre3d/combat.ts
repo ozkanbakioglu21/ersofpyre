@@ -197,6 +197,7 @@ export function updateBreath(g: Game, dt: number, firing: boolean, head: THREE.V
       if (hit(npc.group.position, 2.2)) {
         npcH.emitDeathFx(npc.group.position, g.fx);
         npcH.kill(npc);
+        g.audio.scream();
       }
     }
   }
@@ -314,6 +315,7 @@ export function explode(g: Game, at: THREE.Vector3, o: BlastOpts): void {
       if (d < o.radius) {
         npcH.emitDeathFx(npc.group.position, g.fx);
         npcH.kill(npc);
+        g.audio.scream();
       }
     }
   }
