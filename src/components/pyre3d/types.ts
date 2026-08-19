@@ -90,6 +90,8 @@ export type Burnable = {
   dead: boolean;
   /** Ateş ışığının nesne merkezine göre yükseklik farkı. */
   lightY: number;
+  /** Yıkılmış bina yarıya ayrıldı mı? */
+  splitDone: boolean;
 };
 
 /**
@@ -117,6 +119,8 @@ export type Target = Burnable & {
   apply: (t: Target) => void;
   /** `apply` çağrısını gereksiz tekrarlamamak için son yazılan yanma değeri. */
   wrote: number;
+  /** Bina yarıya ayrıldı mı? */
+  splitDone: boolean;
 };
 
 export type WeakPointId =

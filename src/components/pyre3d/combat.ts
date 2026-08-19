@@ -54,7 +54,8 @@ export function killTarget(g: Game, t: Target): void {
   if (t.dead) return;
   t.dead = true;
   t.apply(t);
-  if (t.rig) t.rig.visible = false;
+  // Kule donanımlarını gizle (ışıldak, tesla); binalar apply'da ayrışıyor
+  if (t.rig && t.tower) t.rig.visible = false;
   g.state.destroyed++;
   addCombo(g);
   g.state.score += t.score * g.state.combo;

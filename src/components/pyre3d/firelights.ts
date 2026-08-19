@@ -51,7 +51,8 @@ export function createFireLights(scene: THREE.Scene): FireLightPool {
         timer = RETARGET;
         cells.clear();
         for (const s of sources) {
-          if (s.dead || s.burn <= 0.04) continue;
+          if (s.burn <= 0.04) continue;
+          if (s.dead && !s.splitDone) continue;
           const cx = Math.floor(s.pos.x / CELL);
           const cz = Math.floor(s.pos.z / CELL);
           const key = ((cx + 4096) << 13) | (cz + 4096);

@@ -1095,7 +1095,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       if (burnT <= 0) {
         burnT = 0.25;
         g.burning.length = 0;
-        for (const t of targets) if (!t.dead && t.burn > 0.04) g.burning.push(t);
+        for (const t of targets) if (t.burn > 0.04 && (!t.dead || t.splitDone)) g.burning.push(t);
       }
       updateBurning(g, dt);
       updateFireSpread(g, dt);

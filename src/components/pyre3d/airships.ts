@@ -316,6 +316,7 @@ export function createAirship(
     hullColor: hullMat.color.clone(),
     weakPoints,
     lightY: 2,
+    splitDone: false,
   };
 }
 

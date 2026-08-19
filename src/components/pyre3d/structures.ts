@@ -1308,9 +1308,39 @@ export function createStructure(
     tower: spec.tower,
     rig: null,
     wrote: -1,
+    splitDone: false,
     apply(t) {
       if (t.dead) {
-        group.visible = false;
+        if (!t.splitDone) {
+          t.splitDone = true;
+          // Binaların yarısını ayır — sol ve sağ
+          const halfX = spec.radius * 0.6;
+          group.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              const m = child as THREE.Mesh;
+              // Materyali karart (yanmış görünüm)
+              const mat = m.material as THREE.MeshStandardMaterial;
+              if (mat.color) {
+                mat.color.multiplyScalar(0.25);
+              }
+              if (mat.emissive) {
+                mat.emissive.setHex(0x331100);
+                mat.emissiveIntensity = 0.6;
+              }
+            }
+          });
+          // Yarıları ayır
+          for (const child of group.children) {
+            if (child.position.x < 0) {
+              child.position.x -= halfX;
+              child.rotation.z = -0.08 - Math.random() * 0.12;
+            } else {
+              child.position.x += halfX;
+              child.rotation.z = 0.08 + Math.random() * 0.12;
+            }
+            child.position.y -= 0.5 + Math.random() * 1.5;
+          }
+        }
         return;
       }
       writeState(list, Math.min(1, t.burn));

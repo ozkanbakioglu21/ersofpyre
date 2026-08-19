@@ -1247,6 +1247,7 @@ export async function createCity(
         tower: null,
         rig: null,
         wrote: -1,
+        splitDone: false,
         // Aralıklar aşağıda bakeTagged'dan sonra bağlanıyor.
         apply: () => {},
       };
@@ -1265,7 +1266,7 @@ export async function createCity(
 
     for (const t of blockBuildings) {
       const list: TagRange[] = ranges.get(t.id) ?? [];
-      t.apply = (self) => writeState(list, self.dead ? 2 : Math.min(1, self.burn));
+      t.apply = (self) => writeState(list, self.dead ? 1 : Math.min(1, self.burn));
     }
 
     const center = new THREE.Vector3();
@@ -1356,6 +1357,7 @@ export async function createCity(
       tower: s.tower,
       rig: null,
       wrote: -1,
+      splitDone: false,
       apply: () => {},
     };
     lmTargets.push(t);
@@ -1371,7 +1373,7 @@ export async function createCity(
     for (const m of meshes) group.add(m);
     for (const t of lmTargets) {
       const list: TagRange[] = ranges.get(t.id) ?? [];
-      t.apply = (self) => writeState(list, self.dead ? 2 : Math.min(1, self.burn));
+      t.apply = (self) => writeState(list, self.dead ? 1 : Math.min(1, self.burn));
     }
   }
 

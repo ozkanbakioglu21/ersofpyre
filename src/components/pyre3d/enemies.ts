@@ -100,6 +100,7 @@ export function createWasp(x: number, y: number, z: number, rng: Rng): Enemy {
     burn: 0,
     dead: false,
     lightY: 0,
+    splitDone: false,
     props,
     hullMat,
     state: "chase",
