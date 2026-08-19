@@ -911,15 +911,13 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         const wOuter = 1 + Math.random() * 0.16;
         const wMid = 1 + Math.random() * 0.1;
         const wCore = 1 + Math.random() * 0.08;
-        // Alev titreşimi — koniler hafifçe sağa-sola sallanır
-        const sway = Math.sin(now * 0.04) * 0.08 + Math.sin(now * 0.07) * 0.04;
         flameOuter.mesh.scale.set(wOuter, len, wOuter);
-        flameOuter.mesh.rotation.z = sway;
+        flameOuter.mesh.rotation.z = 0;
         const midLen = len * (0.8 + Math.random() * 0.2);
         flameMid.mesh.scale.set(wMid, midLen, wMid);
-        flameMid.mesh.rotation.z = sway * 1.3 + Math.sin(now * 0.09) * 0.03;
+        flameMid.mesh.rotation.z = 0;
         flameCore.mesh.scale.set(wCore, len * 0.72, wCore);
-        flameCore.mesh.rotation.z = -sway * 0.6;
+        flameCore.mesh.rotation.z = 0;
         fx.flameJet(headPos, 7, g.fwd);
         fx.ember(headPos, 3, 5);
       } else {
