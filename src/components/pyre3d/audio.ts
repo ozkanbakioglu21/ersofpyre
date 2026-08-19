@@ -87,6 +87,10 @@ const SFX_MANIFEST: Record<string, string[]> = {
     "explosion_04.ogg", "explosion_05.ogg", "explosion_06.ogg",
     "explosion_07.ogg", "dynamite.wav",
   ],
+  bigExplosion: [
+    "big_explosion.wav", "dynamite.wav",
+    "explosion_04.ogg", "explosion_05.ogg", "explosion_06.ogg", "explosion_07.ogg",
+  ],
   glassBreak: [
     "glass_break_01.ogg", "glass_break_02.ogg", "glass_break_03.ogg",
     "glass_break_04.wav",
@@ -97,6 +101,20 @@ const SFX_MANIFEST: Record<string, string[]> = {
   debris: ["debris_01.ogg", "debris_02.ogg", "debris_03.ogg"],
   woodBreak: ["wood_break_01.ogg", "wood_break_02.ogg"],
   crack: ["crack_01.ogg", "crack_02.ogg"],
+  gunshot: [
+    "gunshot_01.ogg", "gunshot_02.ogg", "gunshot_03.ogg",
+    "crack_01.ogg", "crack_02.ogg",
+  ],
+  laser: [
+    "laser_01.wav", "laser_02.wav", "laser_03.wav",
+    "laser_rifle.ogg",
+  ],
+  cannon: ["cannon_01.ogg", "cannon_02.ogg", "cannon_03.ogg"],
+  rocket: ["rocket_01.wav"],
+  fireWhoosh: [
+    "fire_whoosh.wav", "flame_burst_01.ogg", "flame_burst_02.ogg",
+  ],
+  flameLoop: ["flame_loop.ogg"],
 };
 
 function pickRandom<T>(arr: T[]): T {
@@ -754,9 +772,13 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         if (now - lastExplosion < 0.045) return;
         lastExplosion = now;
         const s = Math.min(2, Math.max(0.5, size));
-        // Gerçek patlama sesi
-        playSample(c, "explosion", { pitch: 0.8 + Math.random() * 0.4, vol: 0.7 * s });
-        // Prosedürel katman: derin bass + tiz crack
+        // Büyük patlamalar için güçlü ses
+        if (s >= 1.2) {
+          playSample(c, "bigExplosion", { pitch: 0.75 + Math.random() * 0.3, vol: 0.8 * s });
+        } else {
+          playSample(c, "explosion", { pitch: 0.8 + Math.random() * 0.4, vol: 0.7 * s });
+        }
+        // Prosedürel katman
         noiseBurst(c, {
           dur: 0.42 * s,
           peak: 0.34 * s,
@@ -780,16 +802,17 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     fireball() {
       withCtx((c) => {
-        // Gerçek fırlatma sesi
-        playSample(c, "crack", { pitch: 1 + Math.random() * 0.3, vol: 0.4 });
+        // Alev fırlatma — whoosh + rocket
+        playSample(c, "fireWhoosh", { pitch: 0.9 + Math.random() * 0.2, vol: 0.5 });
+        playSample(c, "rocket", { pitch: 0.85 + Math.random() * 0.3, vol: 0.35, delay: 0.02 });
         noiseBurst(c, { dur: 0.18, peak: 0.18, type: "bandpass", from: 1100, to: 320, q: 1.6 });
         tone(c, { type: "sawtooth", from: 380, to: 120, dur: 0.16, peak: 0.12 });
       });
     },
     bombHit() {
       withCtx((c) => {
-        // Gerçek bomba sesi (dynamite)
-        playSample(c, "explosion", { pitch: 0.7 + Math.random() * 0.3, vol: 0.85 });
+        // Büyük bomba sesi
+        playSample(c, "bigExplosion", { pitch: 0.7 + Math.random() * 0.3, vol: 0.9 });
         // Prosedürel derin bass
         noiseBurst(c, {
           dur: 0.7,
@@ -836,7 +859,12 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     enemyShot() {
       withCtx((c) => {
-        playSample(c, "crack", { pitch: 1.2 + Math.random() * 0.4, vol: 0.3 });
+        // Silah sesi — lazer veya tabanca
+        if (Math.random() < 0.5) {
+          playSample(c, "laser", { pitch: 0.9 + Math.random() * 0.3, vol: 0.25 });
+        } else {
+          playSample(c, "gunshot", { pitch: 0.8 + Math.random() * 0.4, vol: 0.3 });
+        }
         tone(c, { type: "triangle", from: 880, to: 420, dur: 0.1, peak: 0.06 });
       });
     },
