@@ -587,7 +587,7 @@ export function makeSandbox(seed: number): ChapterDef {
         { x: -60, y: 140, z: 450, role: "scout" },
       ],
       wind: { dir: Math.random() * Math.PI * 2, strength: 0.5 },
-      start: { x: 0, y: 120, z: -520 },
+      start: { x: 0, y: 130, z: -920 },
     },
     objectives: [{ id: "yikim", type: "destroyPercent", pct: 0.7, label: "Şehri küle çevir" }],
     fail: [{ type: "death" }],

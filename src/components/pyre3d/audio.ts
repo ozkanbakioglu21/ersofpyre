@@ -15,6 +15,8 @@ export type AudioEngine = {
   /** Konik alev döngüsü — basılı tutuldukça açık kalır. */
   flame(on: boolean): void;
   ambient(on: boolean): void;
+  /** Hava saldırısı siren — şehirde alarm. */
+  siren(on: boolean): void;
   explosion(size: number): void;
   fireball(): void;
   hit(): void;
@@ -45,6 +47,7 @@ const NOOP: AudioEngine = {
   setVolume() {},
   flame() {},
   ambient() {},
+  siren() {},
   explosion() {},
   fireball() {},
   hit() {},
@@ -97,8 +100,10 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
 
   let flameNodes: { src: AudioBufferSourceNode; gain: GainNode; lfo: OscillatorNode } | null = null;
   let ambientNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  let sirenNodes: { osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null = null;
   let flameWanted = false;
   let ambientWanted = false;
+  let sirenWanted = false;
 
   const ensure = (): Ctx | null => {
     if (ctx) return ctx;
@@ -267,6 +272,82 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     };
   };
 
+  /* ---- hava saldırısı siren ---- */
+  const SIREN周期 = 3.5; /* frekans tarama süresi (saniye) */
+
+  const startSiren = (c: Ctx) => {
+    if (sirenNodes) return;
+    const t = c.ac.currentTime;
+    const gain = c.ac.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.18, t + 1.2);
+
+    // Birincil siren: 400–800 Hz arası sawtooth tarama
+    const osc1 = c.ac.createOscillator();
+    osc1.type = "sawtooth";
+    osc1.frequency.setValueAtTime(400, t);
+    osc1.frequency.linearRampToValueAtTime(800, t + SIREN周期 / 2);
+    osc1.frequency.linearRampToValueAtTime(400, t + SIREN周期);
+
+    // İkincil siren: fazda kayık (duraklama etkisi)
+    const osc2 = c.ac.createOscillator();
+    osc2.type = "sawtooth";
+    osc2.frequency.setValueAtTime(420, t);
+    osc2.frequency.linearRampToValueAtTime(820, t + SIREN周期 / 2);
+    osc2.frequency.linearRampToValueAtTime(420, t + SIREN周期);
+
+    // Düşük geçiren filtre — tiz sızırtıyı yumuşat
+    const filter = c.ac.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 1400;
+    filter.Q.value = 1.2;
+
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(gain).connect(c.master);
+
+    // Sürekli döngü: her periyot sonunda yeniden başlat
+    const scheduleLoop = () => {
+      if (!sirenNodes) return;
+      const now = c.ac.currentTime;
+      osc1.frequency.setValueAtTime(400, now);
+      osc1.frequency.linearRampToValueAtTime(800, now + SIREN周期 / 2);
+      osc1.frequency.linearRampToValueAtTime(400, now + SIREN周期);
+      osc2.frequency.setValueAtTime(420, now);
+      osc2.frequency.linearRampToValueAtTime(820, now + SIREN周期 / 2);
+      osc2.frequency.linearRampToValueAtTime(420, now + SIREN周期);
+      timerId = setTimeout(scheduleLoop, SIREN周期 * 1000);
+    };
+    let timerId = setTimeout(scheduleLoop, SIREN周期 * 1000);
+
+    osc1.start(t);
+    osc2.start(t);
+    // Periyodik tarama: ScheduledSource olmayan oscillator'lar durmaz; manuel
+    // stop ile değil, sadece sirenNodes null yaparak durduruyoruz.
+    sirenNodes = { osc1, osc2, gain };
+    // Referansı temizlemek için timer'ı saklıyoruz
+    (sirenNodes as unknown as { _timer: ReturnType<typeof setTimeout> })._timer = timerId;
+  };
+
+  const stopSiren = (c: Ctx) => {
+    if (!sirenNodes) return;
+    const { osc1, osc2, gain } = sirenNodes;
+    const timerId = (sirenNodes as unknown as { _timer: ReturnType<typeof setTimeout> })._timer;
+    clearTimeout(timerId);
+    sirenNodes = null;
+    const t = c.ac.currentTime;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+    osc1.stop(t + 1.4);
+    osc2.stop(t + 1.4);
+    osc1.onended = () => {
+      osc1.disconnect();
+      osc2.disconnect();
+      gain.disconnect();
+    };
+  };
+
   const withCtx = (fn: (c: Ctx) => void) => {
     if (muted) return;
     const c = ctx;
@@ -281,14 +362,20 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (c.ac.state === "suspended") void c.ac.resume();
       if (flameWanted) startFlame(c);
       if (ambientWanted) startAmbient(c);
+      if (sirenWanted) startSiren(c);
     },
     setMuted(m) {
       muted = m;
       const c = ctx;
       if (!c) return;
       c.master.gain.setTargetAtTime(m ? 0 : volume, c.ac.currentTime, 0.02);
-      if (m) stopFlame(c);
-      else if (flameWanted) startFlame(c);
+      if (m) {
+        stopFlame(c);
+        stopSiren(c);
+      } else {
+        if (flameWanted) startFlame(c);
+        if (sirenWanted) startSiren(c);
+      }
     },
     setVolume(v) {
       volume = Math.min(1, Math.max(0, v));
@@ -309,6 +396,13 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (!c || muted || c.ac.state !== "running") return;
       if (on) startAmbient(c);
       else stopAmbient(c);
+    },
+    siren(on) {
+      sirenWanted = on;
+      const c = ctx;
+      if (!c || muted || c.ac.state !== "running") return;
+      if (on) startSiren(c);
+      else stopSiren(c);
     },
     explosion(size) {
       withCtx((c) => {
@@ -423,14 +517,17 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (!c) return;
       stopFlame(c);
       stopAmbient(c);
+      stopSiren(c);
       flameWanted = false;
       ambientWanted = false;
+      sirenWanted = false;
     },
     dispose() {
       const c = ctx;
       if (!c) return;
       stopFlame(c);
       stopAmbient(c);
+      stopSiren(c);
       ctx = null;
       void c.ac.close().catch(() => {});
     },
