@@ -442,91 +442,88 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     if (musicNodes) return;
     const t = c.ac.currentTime;
 
-    // Katman 1: Karanlık drone pad — iki detune sawtooth, derin lowpass
+    // Katman 1: Ana drone — iki detune sawtooth, orta frekans
     const pad1 = c.ac.createOscillator();
     pad1.type = "sawtooth";
-    pad1.frequency.value = 55;
+    pad1.frequency.value = 110;
     const pad2 = c.ac.createOscillator();
     pad2.type = "sawtooth";
-    pad2.frequency.value = 55.7; // hafif detune → chorusing
+    pad2.frequency.value = 110.8;
     const padGain = c.ac.createGain();
     padGain.gain.setValueAtTime(0.0001, t);
-    padGain.gain.exponentialRampToValueAtTime(0.75, t + 1.2);
+    padGain.gain.linearRampToValueAtTime(0.35, t + 1);
     const padFilter = c.ac.createBiquadFilter();
     padFilter.type = "lowpass";
-    padFilter.frequency.value = 280;
-    padFilter.Q.value = 1.4;
+    padFilter.frequency.value = 600;
+    padFilter.Q.value = 0.7;
     pad1.connect(padFilter);
     pad2.connect(padFilter);
     padFilter.connect(padGain);
     padGain.connect(c.master);
 
-    // Katman 2: Sub-bass nabız — kalp atışı ritmi
+    // Katman 2: Dip nabız — kalp atışı
     const subPulse = c.ac.createOscillator();
     subPulse.type = "sine";
-    subPulse.frequency.value = 42;
+    subPulse.frequency.value = 65;
     const subPulseGain = c.ac.createGain();
     subPulseGain.gain.setValueAtTime(0.0001, t);
-    subPulseGain.gain.exponentialRampToValueAtTime(0.85, t + 0.8);
-    // LFO ile nabız: sine 0.35 Hz → sub-bass gain'i açıp kapatır
+    subPulseGain.gain.linearRampToValueAtTime(0.4, t + 0.8);
     const pulseLfo = c.ac.createOscillator();
     pulseLfo.type = "sine";
-    pulseLfo.frequency.value = 0.35;
+    pulseLfo.frequency.value = 0.4;
     const pulseLfoGain = c.ac.createGain();
-    pulseLfoGain.gain.value = 0.45;
+    pulseLfoGain.gain.value = 0.35;
     pulseLfo.connect(pulseLfoGain).connect(subPulseGain.gain);
     subPulse.connect(subPulseGain);
     subPulseGain.connect(c.master);
 
-    // Katman 3: Gerilim teli — yavaş taramalı triangle, urgilan
+    // Katman 3: Gerilim — taramalı sawtooth
     const tension = c.ac.createOscillator();
-    tension.type = "triangle";
-    tension.frequency.value = 110;
+    tension.type = "sawtooth";
+    tension.frequency.value = 220;
     const tensionGain = c.ac.createGain();
     tensionGain.gain.setValueAtTime(0.0001, t);
-    tensionGain.gain.exponentialRampToValueAtTime(0.45, t + 1.5);
-    // Yavaş frekans tarama: 90-165 Hz arası 12 saniyede
-    tension.frequency.setValueAtTime(90, t);
-    tension.frequency.linearRampToValueAtTime(165, t + 12);
+    tensionGain.gain.linearRampToValueAtTime(0.15, t + 1.5);
+    tension.frequency.setValueAtTime(165, t);
+    tension.frequency.linearRampToValueAtTime(330, t + 8);
     const tensionFilter = c.ac.createBiquadFilter();
-    tensionFilter.type = "bandpass";
-    tensionFilter.frequency.value = 220;
-    tensionFilter.Q.value = 2.5;
+    tensionFilter.type = "lowpass";
+    tensionFilter.frequency.value = 800;
+    tensionFilter.Q.value = 0.5;
     tension.connect(tensionFilter);
     tensionFilter.connect(tensionGain);
     tensionGain.connect(c.master);
 
-    // Katman 4: Metalik doku — filtrelenmiş gürültü, çok yavaş LFO
+    // Katman 4: Metalik doku — gürültü
     const metallic = c.ac.createBufferSource();
     metallic.buffer = c.noise;
     metallic.loop = true;
     const metalFilter = c.ac.createBiquadFilter();
     metalFilter.type = "bandpass";
-    metalFilter.frequency.value = 1800;
-    metalFilter.Q.value = 6;
+    metalFilter.frequency.value = 2400;
+    metalFilter.Q.value = 3;
     const metallicGain = c.ac.createGain();
     metallicGain.gain.setValueAtTime(0.0001, t);
-    metallicGain.gain.exponentialRampToValueAtTime(0.22, t + 1.5);
-    // LFO: bandpass frekansını gezdirir → metalik tınlama
+    metallicGain.gain.linearRampToValueAtTime(0.08, t + 1);
     const lfo = c.ac.createOscillator();
     lfo.type = "sine";
-    lfo.frequency.value = 0.12;
+    lfo.frequency.value = 0.15;
     const lfoGain = c.ac.createGain();
-    lfoGain.gain.value = 900;
+    lfoGain.gain.value = 1200;
     lfo.connect(lfoGain).connect(metalFilter.frequency);
     metallic.connect(metalFilter);
     metalFilter.connect(metallicGain);
     metallicGain.connect(c.master);
 
-    // Gerilim periyodik tarama — her 12 saniyede bir
+    // Gerilim periyodik tarama
     const scheduleTension = () => {
       if (!musicNodes) return;
       const now = c.ac.currentTime;
-      tension.frequency.setValueAtTime(90, now);
-      tension.frequency.linearRampToValueAtTime(165, now + 12);
-      tensionTimer = setTimeout(scheduleTension, 12000);
+      tension.frequency.setValueAtTime(165, now);
+      tension.frequency.linearRampToValueAtTime(330, now + 8);
+      tensionTimer = setTimeout(scheduleTension, 8000);
     };
-    let tensionTimer = setTimeout(scheduleTension, 12000);
+    let tensionTimer = setTimeout(scheduleTension, 8000);
 
     pad1.start(t);
     pad2.start(t);
@@ -544,10 +541,10 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       lfo, lfoGain,
     };
     (musicNodes as unknown as { _timer: ReturnType<typeof setTimeout> })._timer = tensionTimer;
-    // Also store pulseLfo reference for cleanup
     (musicNodes as unknown as { _pulseLfo: OscillatorNode })._pulseLfo = pulseLfo;
     (musicNodes as unknown as { _tensionFilter: BiquadFilterNode })._tensionFilter = tensionFilter;
     (musicNodes as unknown as { _padFilter: BiquadFilterNode })._padFilter = padFilter;
+    (musicNodes as unknown as { _metalFilter: BiquadFilterNode })._metalFilter = metalFilter;
   };
 
   const stopMusic = (c: Ctx) => {
@@ -595,6 +592,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       (m as unknown as { _tensionFilter: BiquadFilterNode })._tensionFilter.disconnect();
       m.tensionGain.disconnect();
       m.metallic.disconnect();
+      (m as unknown as { _metalFilter: BiquadFilterNode })._metalFilter?.disconnect();
       m.metallicGain.disconnect();
       m.lfo.disconnect();
       m.lfoGain.disconnect();
