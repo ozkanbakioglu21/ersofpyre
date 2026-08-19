@@ -24,9 +24,9 @@ export type FxSystem = {
   dispose(): void;
 };
 
-const EMBERS = 700;
-const FLAME = 340;
-const SMOKE = 120;
+const EMBERS = 1000;
+const FLAME = 520;
+const SMOKE = 180;
 const BLASTS = 10;
 
 export function createFx(scene: THREE.Scene): FxSystem {
@@ -37,7 +37,7 @@ export function createFx(scene: THREE.Scene): FxSystem {
   const emGeo = new THREE.BufferGeometry();
   emGeo.setAttribute("position", new THREE.BufferAttribute(emPos, 3));
   const emberMat = new THREE.PointsMaterial({
-    color: 0xff9430,
+    color: 0xffb840,
     map: softParticleTexture(),
     size: 2.6,
     transparent: true,
@@ -80,10 +80,10 @@ export function createFx(scene: THREE.Scene): FxSystem {
   flamePts.frustumCulled = false;
   scene.add(flamePts);
   let fpIdx = 0;
-  const fpA = new THREE.Color(0xfff6d0);
-  const fpB = new THREE.Color(0xffc83c);
-  const fpC = new THREE.Color(0xff6a1a);
-  const fpD = new THREE.Color(0x5a1200);
+  const fpA = new THREE.Color(0xffe840);
+  const fpB = new THREE.Color(0xffd850);
+  const fpC = new THREE.Color(0xffa820);
+  const fpD = new THREE.Color(0x7a3800);
   const fpTmp = new THREE.Color();
   for (let i = 0; i < FLAME; i++) {
     fpLife[i] = 0;

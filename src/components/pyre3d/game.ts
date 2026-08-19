@@ -411,8 +411,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     return { mesh, mat };
   };
   // Boylar BREATH.range (70) ile aynı mertebede: gördüğün alev yaktığın alan.
-  const flameOuter = mkFlame(0xff7a1a, 10, 64, 14);
-  const flameMid = mkFlame(0xffc83c, 6.4, 58, 12);
+  const flameOuter = mkFlame(0xffa800, 10, 64, 14);
+  const flameMid = mkFlame(0xffd850, 6.4, 58, 12);
   const flameCore = mkFlame(0xfff6d0, 3.2, 50, 10);
   const flameRig = new THREE.Group();
   flameRig.add(flameOuter.mesh, flameMid.mesh, flameCore.mesh);
@@ -920,7 +920,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         flameMid.mesh.rotation.z = 0;
         flameCore.mesh.scale.set(wCore, len * 0.72, wCore);
         flameCore.mesh.rotation.z = 0;
-        fx.flameJet(headPos, 7, g.fwd);
+        fx.flameJet(headPos, 10, g.fwd);
         fx.ember(headPos, 3, 5);
       } else {
         dragon.glow.intensity += (0 - dragon.glow.intensity) * Math.min(1, dt * 6);

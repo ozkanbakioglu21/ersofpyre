@@ -337,21 +337,21 @@ export function updateBurning(g: Game, dt: number): void {
     if (t.dead) {
       // Ölü binalar: sadece yangın görselleri (hasar yok)
       if (t.burn > 0.04) {
-        if (Math.random() < dt * 14) {
+        if (Math.random() < dt * 20) {
           tmp.set(
             t.pos.x + (Math.random() - 0.5) * t.radius * 2,
             t.pos.y + 1 + Math.random() * Math.min(10, t.height * 0.6),
             t.pos.z + (Math.random() - 0.5) * t.radius * 2,
           );
-          g.fx.ember(tmp, 3, 5);
+          g.fx.ember(tmp, 4, 6);
         }
-        if (Math.random() < dt * 6) {
+        if (Math.random() < dt * 10) {
           tmp.set(
             t.pos.x + (Math.random() - 0.5) * t.radius,
             t.pos.y + 0.5,
             t.pos.z + (Math.random() - 0.5) * t.radius,
           );
-          g.fx.flameJet(tmp, 4, new THREE.Vector3(0, 1, 0));
+          g.fx.flameJet(tmp, 6, new THREE.Vector3(0, 1, 0));
         }
       }
       continue;
@@ -361,13 +361,13 @@ export function updateBurning(g: Game, dt: number): void {
       t.wrote = t.burn;
       t.apply(t);
     }
-    if (Math.random() < t.burn * dt * 18) {
+    if (Math.random() < t.burn * dt * 24) {
       tmp.set(
         t.pos.x + (Math.random() - 0.5) * t.radius * 2,
         t.pos.y + 2 + Math.random() * Math.min(14, t.height),
         t.pos.z + (Math.random() - 0.5) * t.radius * 2,
       );
-      g.fx.ember(tmp, 2, 4);
+      g.fx.ember(tmp, 3, 5);
     }
     if (t.hp <= 0) killTarget(g, t);
   }
