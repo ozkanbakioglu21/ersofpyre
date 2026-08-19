@@ -667,8 +667,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     explosion(size) {
       withCtx((c) => {
-        // Yangın zinciri saniyede onlarca yıkım üretebiliyor; kulak bunu
-        // tek bir gürültü duvarı olarak duyuyor. Aralık sınırı koyuyoruz.
         const now = c.ac.currentTime;
         if (now - lastExplosion < 0.045) return;
         lastExplosion = now;
@@ -682,10 +680,20 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           q: 0.8,
         });
         tone(c, { type: "sine", from: 130 * s, to: 26, dur: 0.5 * s, peak: 0.36 });
+        // Tiz crack — patlama anı
+        noiseBurst(c, {
+          dur: 0.1,
+          peak: 0.3 * s,
+          type: "highpass",
+          from: 4200,
+          to: 2000,
+          q: 2.5,
+        });
+        tone(c, { type: "sawtooth", from: 2800, to: 900, dur: 0.12, peak: 0.18 * s });
         // Metal gıcırtısı: enkazın kendi üstüne çökmesi.
         noiseBurst(c, {
           dur: 0.3,
-          peak: 0.07,
+          peak: 0.12,
           type: "bandpass",
           from: 2600,
           to: 900,
@@ -714,17 +722,39 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         });
         // Katman 2: Sub-bass thump — göğsü titreten dip
         tone(c, { type: "sine", from: 85, to: 18, dur: 0.65, peak: 0.42 });
-        // Katman 3: Toprak çatlama — tiz kırılma
+        // Katman 3: Tiz patlama cracki — ani sert kırılma
         noiseBurst(c, {
-          dur: 0.22,
-          peak: 0.14,
+          dur: 0.12,
+          peak: 0.38,
           type: "highpass",
-          from: 3200,
-          to: 1400,
-          q: 2,
-          delay: 0.04,
+          from: 4800,
+          to: 2200,
+          q: 3,
+          delay: 0.01,
         });
-        // Katman 4: Enkaz düşmesi — yavaş taneli gürültü
+        // Katman 4: Metalik çığlık — patlama dalgasının metal yüzeyden sekmesi
+        tone(c, { type: "sawtooth", from: 3200, to: 800, dur: 0.18, peak: 0.22, delay: 0.02 });
+        tone(c, { type: "square", from: 2400, to: 600, dur: 0.14, peak: 0.16, delay: 0.03 });
+        // Katman 5: Cam kırığı / tiz taneler — çok tiz gürültü süpürmesi
+        noiseBurst(c, {
+          dur: 0.08,
+          peak: 0.28,
+          type: "highpass",
+          from: 7000,
+          to: 4500,
+          q: 2,
+          delay: 0.03,
+        });
+        noiseBurst(c, {
+          dur: 0.14,
+          peak: 0.16,
+          type: "bandpass",
+          from: 5500,
+          to: 3200,
+          q: 4,
+          delay: 0.06,
+        });
+        // Katman 6: Enkaz düşmesi — yavaş taneli gürültü
         noiseBurst(c, {
           dur: 0.55,
           peak: 0.08,
@@ -740,6 +770,8 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       withCtx((c) => {
         noiseBurst(c, { dur: 0.16, peak: 0.26, type: "lowpass", from: 1200, to: 160 });
         tone(c, { type: "square", from: 190, to: 60, dur: 0.14, peak: 0.14 });
+        noiseBurst(c, { dur: 0.08, peak: 0.18, type: "highpass", from: 3600, to: 1800, q: 2.5 });
+        tone(c, { type: "sawtooth", from: 1800, to: 500, dur: 0.1, peak: 0.1 });
       });
     },
     enemyShot() {
