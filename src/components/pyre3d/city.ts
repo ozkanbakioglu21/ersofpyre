@@ -928,6 +928,42 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       }
     }
 
+    // Kapı ile duvar arasındaki dolgu parçaları
+    const skipRad = (AVENUE_HALF + 6) / wallR;
+    for (let j = 0; j < SECTORS; j++) {
+      const gateA = j * da;
+      for (const side of [-1, 1]) {
+        const edgeA = gateA + side * skipRad;
+        const fillLen = skipRad * wallR + 2;
+        const fx = spec.cx + Math.cos(edgeA) * wallR;
+        const fz = spec.cz + Math.sin(edgeA) * wallR;
+        const fillH = rng.range(10, 13);
+        const fill = new THREE.Mesh(
+          new THREE.BoxGeometry(2.2, fillH, fillLen),
+          palisadeMat,
+        );
+        fill.position.set(fx, baseY + fillH / 2, fz);
+        fill.rotation.y = -(edgeA);
+        parts.add(fill);
+        // Kütük dişleri
+        const logC = Math.max(2, Math.floor(fillLen / 1.2));
+        for (let k = 0; k < logC; k++) {
+          const lo = (k / (logC - 1) - 0.5) * fillLen;
+          const log = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.12, 0.18, 2.2, 5),
+            palisadeMat,
+          );
+          log.position.set(
+            fx + Math.cos(edgeA + Math.PI / 2) * lo,
+            baseY + fillH + 1.1,
+            fz + Math.sin(edgeA + Math.PI / 2) * lo,
+          );
+          log.rotation.y = -edgeA;
+          parts.add(log);
+        }
+      }
+    }
+
     void rng;
   }
 
