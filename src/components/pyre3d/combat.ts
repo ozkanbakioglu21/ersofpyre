@@ -12,17 +12,15 @@ import type { Game } from "./game";
  */
 
 export const SPREAD = {
-  /** Komşu arama yarıçapı. Eski 70 birim yoğun şehirde 5-8 kat fazlaydı:
-   *  cephe arası boşluk 6-14, cadde 14-18 birim. */
-  radius: 22,
-  windBoost: 0.6,
-  baseChancePerSec: 0.55,
+  /** Komşu arama yarıçapı. */
+  radius: 30,
+  windBoost: 0.7,
+  baseChancePerSec: 0.9,
   /** Araya cadde giriyorsa sıçrama olasılığı bu kadar düşer. */
-  streetBreak: 0.35,
-  /** Saniyede tutuşabilecek yeni hedef sayısı. Bu sınır olmadan zincirleme
-   *  reaksiyon tek karede parçacık havuzlarını boşaltıp kare süresini patlatıyor. */
-  igniteBudgetPerSec: 6,
-  tick: 0.4,
+  streetBreak: 0.4,
+  /** Saniyede tutuşabilecek yeni hedef sayısı. */
+  igniteBudgetPerSec: 14,
+  tick: 0.25,
 } as const;
 
 export const BREATH = {
@@ -339,21 +337,21 @@ export function updateBurning(g: Game, dt: number): void {
     if (t.dead) {
       // Ölü binalar: sadece yangın görselleri (hasar yok)
       if (t.burn > 0.04) {
-        if (Math.random() < dt * 8) {
+        if (Math.random() < dt * 14) {
           tmp.set(
             t.pos.x + (Math.random() - 0.5) * t.radius * 2,
             t.pos.y + 1 + Math.random() * Math.min(10, t.height * 0.6),
             t.pos.z + (Math.random() - 0.5) * t.radius * 2,
           );
-          g.fx.ember(tmp, 2, 4);
+          g.fx.ember(tmp, 3, 5);
         }
-        if (Math.random() < dt * 4) {
+        if (Math.random() < dt * 6) {
           tmp.set(
             t.pos.x + (Math.random() - 0.5) * t.radius,
             t.pos.y + 0.5,
             t.pos.z + (Math.random() - 0.5) * t.radius,
           );
-          g.fx.flameJet(tmp, 3, new THREE.Vector3(0, 1, 0));
+          g.fx.flameJet(tmp, 4, new THREE.Vector3(0, 1, 0));
         }
       }
       continue;
@@ -363,13 +361,13 @@ export function updateBurning(g: Game, dt: number): void {
       t.wrote = t.burn;
       t.apply(t);
     }
-    if (Math.random() < t.burn * 0.7 * dt * 12) {
+    if (Math.random() < t.burn * dt * 18) {
       tmp.set(
         t.pos.x + (Math.random() - 0.5) * t.radius * 2,
         t.pos.y + 2 + Math.random() * Math.min(14, t.height),
         t.pos.z + (Math.random() - 0.5) * t.radius * 2,
       );
-      g.fx.ember(tmp, 1, 3);
+      g.fx.ember(tmp, 2, 4);
     }
     if (t.hp <= 0) killTarget(g, t);
   }

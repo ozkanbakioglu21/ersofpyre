@@ -31,7 +31,7 @@ export function createFireLights(scene: THREE.Scene): FireLightPool {
   const goals: THREE.Vector3[] = [];
   const power: number[] = [];
   for (let i = 0; i < FIRE_LIGHTS; i++) {
-    const l = new THREE.PointLight(0xff6a1a, 0, 46, 2);
+    const l = new THREE.PointLight(0xff6a1a, 0, 64, 2);
     l.position.set(0, -600, 0);
     scene.add(l);
     lights.push(l);
@@ -103,9 +103,9 @@ export function createFireLights(scene: THREE.Scene): FireLightPool {
           Math.sin(now * 0.011 + l.position.x) * 10 +
           Math.sin(now * 0.037 + l.position.z) * 6 +
           Math.sin(now * 0.089 + l.position.x * 0.5) * 3;
-        const target = Math.min(150, 20 + p * 9) + flicker;
+        const target = Math.min(200, 30 + p * 12) + flicker;
         l.intensity += (target - l.intensity) * Math.min(1, dt * 8);
-        l.distance = 46 + Math.min(74, p * 7);
+        l.distance = 64 + Math.min(96, p * 9);
       }
     },
   };
