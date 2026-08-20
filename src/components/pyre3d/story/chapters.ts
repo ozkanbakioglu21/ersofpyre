@@ -503,7 +503,7 @@ const c06: ChapterDef = {
   par: { time: 180, score: 9000 },
   rewardEmbers: 2400,
   bondXp: 240,
-  unlocks: [],
+  unlocks: ["c07"],
   beats: [
     {
       id: "acilis",
@@ -546,6 +546,158 @@ const c06: ChapterDef = {
       lines: [
         { who: "Kayra", text: "Kül söner. Köz kalır.", dur: 4 },
         { who: "Pyra", text: "(Kanatlar yorgun ama sağlam.)", dur: 3 },
+      ],
+    },
+  ],
+};
+
+/* ------------------------------------------------------------------ *
+ * 07 — Çöl Kervanı
+ * ------------------------------------------------------------------ */
+const c07: ChapterDef = {
+  id: "c07",
+  index: 7,
+  title: "Çöl Kervanı",
+  subtitle: "Ashkeep'in can damarı",
+  briefing: {
+    lore:
+      "Kül Vadisi'nden kaçtıktan sonra güneye, çöle iniyorsunuz. Kumlukların " +
+      "ortasından Ashkeep'in ana ikmal kervanı geçiyor — tonlarca lexil, " +
+      "barut ve yiyecek. Bu kervanı imha edersen sovereign'in ordusu " +
+      "beslenemez. Ama kervanı koruyan muhafız kulesi ve anti-draj silahları var.",
+    objectives: [
+      "Kervanı yok et",
+      "Muhafız kulelerini yık",
+      "Ana kampı küle çevir",
+    ],
+    tips: [
+      "Kervan uzun — boydan boya geç",
+      "Kuleler seni hedef alıyor, düşür",
+      "Rüzgar kumunu savuruyor — odaklan",
+    ],
+  },
+  world: {
+    radius: 900,
+    terrain: [
+      // Kum tepeleri — yolun iki yanında yükselen dev tepecikler
+      { t: "ridge", axis: "x", center: -280, halfWidth: 120, feather: 140, height: 80 },
+      { t: "ridge", axis: "x", center: 280, halfWidth: 110, feather: 130, height: 70 },
+      { t: "ridge", axis: "z", center: 400, halfWidth: 200, feather: 160, height: 90 },
+    ],
+    scatter: {
+      tower: 6,
+      house: 12,
+      workshop: 4,
+      ammo_depot: 3,
+      barracks: 2,
+    },
+    props: [
+      // Kervan güzergahı — boydan boya kuzeyden güneye
+      { t: "structure", kind: "warehouse", x: 0, z: -300, scale: 1.2, id: "kervan1" },
+      { t: "structure", kind: "warehouse", x: 20, z: -180, scale: 1.1, id: "kervan2" },
+      { t: "structure", kind: "warehouse", x: -10, z: -60, scale: 1.3, id: "kervan3" },
+      { t: "structure", kind: "warehouse", x: 15, z: 60, scale: 1.0, id: "kervan4" },
+      { t: "structure", kind: "warehouse", x: -5, z: 180, scale: 1.2, id: "kervan5" },
+      // Muhafız kuleleri — kervan boyunca
+      { t: "structure", kind: "watchtower", x: -60, z: -240, scale: 1.0 },
+      { t: "structure", kind: "watchtower", x: 70, z: -120, scale: 1.0 },
+      { t: "structure", kind: "watchtower", x: -50, z: 0, scale: 1.0 },
+      { t: "structure", kind: "watchtower", x: 65, z: 120, scale: 1.0 },
+      { t: "structure", kind: "watchtower", x: -55, z: 240, scale: 1.0 },
+      // Ana kamp — kervanın sonunda
+      { t: "structure", kind: "barracks", x: 0, z: 340, scale: 1.4, id: "kamp" },
+      { t: "structure", kind: "armory", x: 40, z: 370, scale: 1.1 },
+      { t: "structure", kind: "command_post", x: -35, z: 390, scale: 1.0 },
+    ],
+    airships: [
+      { x: 200, y: 140, z: -200, role: "scout" },
+      { x: -180, y: 130, z: 100, role: "scout" },
+      { x: 100, y: 155, z: 350, role: "scout" },
+    ],
+    waves: {
+      ilk: { enemy: "wasp", count: 3, radius: 260, altitude: [100, 160] },
+      kamp: { enemy: "wasp", count: 5, radius: 300, altitude: [90, 170] },
+      son: { enemy: "wasp", count: 6, radius: 340, altitude: [80, 180] },
+    },
+    zones: [
+      { id: "kervan_baslangic", x: 0, z: -350, r: 80, label: "Kervan başlangıcı" },
+      { id: "kamp_bolgesi", x: 0, z: 340, r: 120, label: "Ana kamp" },
+    ],
+    wind: { dir: 0.3, strength: 0.6 },
+    start: { x: 0, y: 130, z: -500 },
+    fogScale: 1.3,
+  },
+  objectives: [
+    { id: "kervan", type: "destroyPercent", pct: 0.6, label: "Kervanı yok et" },
+    { id: "kuleler", type: "destroyKind", kind: "watchtower", count: 4, label: "Muhafız kulelerini yık" },
+    { id: "kamp", type: "destroyKind", kind: "barracks", count: 1, label: "Ana kampı küle çevir" },
+  ],
+  fail: [{ type: "death" }],
+  abilities: { flame: true, fireball: false, roll: false, shock: false, rage: false },
+  par: { time: 360, score: 18000 },
+  rewardEmbers: 1500,
+  bondXp: 170,
+  unlocks: [],
+  beats: [
+    {
+      id: "acilis",
+      trigger: { at: "start" },
+      lines: [
+        { who: "Kayra", text: "Çöl. Kervan güzergahı kuzeyden güneye uzanıyor.", dur: 3.8 },
+        { who: "Pyra", text: "(Kumlar arasında uzun bir kuyruk görülüyor — develer, vagonlar.)", dur: 3.6 },
+      ],
+      actions: [
+        { do: "hint", text: "Kervan boyunca uç, hepsini yak", keys: [], dur: 6 },
+      ],
+    },
+    {
+      id: "ilkVagon",
+      trigger: { at: "event", event: "targetDestroyed" },
+      lines: [{ who: "Kayra", text: "İlk vagon gitti. Lexil doluydu — alev topu gibi patladı.", dur: 3.4 }],
+      actions: [
+        { do: "unlockAbility", ability: "fireball" },
+        { do: "hint", text: "Köz Mermisi — uzaktaki hedefleri vur", keys: ["M"], dur: 8 },
+      ],
+    },
+    {
+      id: "kuleUyari",
+      trigger: { at: "objectiveProgress", id: "kervan", pct: 0.3 },
+      lines: [{ who: "Ashkeep", text: "Kuleler ejderhayı görüyor — ateş aç!", dur: 3 }],
+      actions: [
+        { do: "spawnWave", wave: "ilk" },
+        { do: "hint", text: "Kuleleri düşür", keys: [], dur: 5 },
+      ],
+    },
+    {
+      id: "ruzgarDegisti",
+      trigger: { at: "objectiveProgress", id: "kervan", pct: 0.5 },
+      lines: [{ who: "Kayra", text: "Rüzgar değişti. Kumu savuruyor — dikkatli ol.", dur: 3.2 }],
+      actions: [{ do: "setWind", dir: 1.1, strength: 0.8 }],
+    },
+    {
+      id: "kampSaldiri",
+      trigger: { at: "objectiveProgress", id: "kervan", pct: 0.7 },
+      lines: [
+        { who: "Ashkeep", text: "Tüm birlikler kampa! Ejderhayı durdurun!", dur: 3.6 },
+      ],
+      actions: [
+        { do: "spawnWave", wave: "kamp" },
+        { do: "unlockAbility", ability: "roll" },
+        { do: "hint", text: "Takla at — hedeflerden kurtul", keys: ["R"], dur: 8 },
+      ],
+    },
+    {
+      id: "sonDalga",
+      trigger: { at: "objectiveDone", id: "kuleler" },
+      lines: [{ who: "Kayra", text: "Kuleler sustu. Şimdi kampı bitir.", dur: 3 }],
+      actions: [{ do: "spawnWave", wave: "son" }],
+    },
+    {
+      id: "kampDustu",
+      trigger: { at: "objectiveDone", id: "kamp" },
+      lines: [
+        { who: "Kayra", text: "Kamp gitti. Kervanın geri kalanı savunmasız.", dur: 3.4 },
+        { who: "Pyra", text: "(Kumlukların ötesinde bir şey parlıyor — echelon mu?)", dur: 3.8 },
       ],
     },
   ],
@@ -600,7 +752,7 @@ export function makeSandbox(seed: number): ChapterDef {
   };
 }
 
-export const CHAPTERS: ChapterDef[] = [c01, c02, c03, c04, c05, c06];
+export const CHAPTERS: ChapterDef[] = [c01, c02, c03, c04, c05, c06, c07];
 
 export function chapterById(id: ChapterId, seed = Date.now() % 1e9): ChapterDef {
   if (id === "sandbox") return makeSandbox(seed);
