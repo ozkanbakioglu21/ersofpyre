@@ -302,21 +302,21 @@ const c03: ChapterDef = {
 const c04: ChapterDef = {
   id: "c04",
   index: 4,
-  title: "Çöl Kervanı",
+  title: "Vadiye Yak",
   subtitle: "Ashkeep'in can damarı",
   briefing: {
     lore:
       "Kül Vadisi'nden kaçtıktan sonra güneye, çöle iniyorsunuz. Kumlukların " +
-      "ortasından Ashkeep'in ana ikmal kervanı geçiyor — tonlarca lexil, " +
-      "barut ve yiyecek. Bu kervanı imha edersen sovereign'in ordusu " +
-      "beslenemez. Ama kervanı koruyan muhafız kuleleri ve kamp var.",
+      "ortasından Ashkeep'in ana ikmal yolu geçiyor — tonlarca lexil, " +
+      "barut ve yiyecek. Bu ikmal yolunu imha edersen sovereign'in ordusu " +
+      "beslenemez. Ama yolu koruyan muhafız kuleleri ve kamp var.",
     objectives: [
-      "Kervanın %60'ını yok et",
+      "Hedeflerin %60'ını yok et",
       "4 muhafız kulesini yık",
       "Kampı küle çevir",
     ],
     tips: [
-      "Kervan uzun — boydan boya geç",
+      "Hedefler uzun bir hat üzerinde — boydan boya geç",
       "Kuleler seni hedef alıyor, düşür",
       "Rüzgar kumunu savuruyor — odaklan",
     ],
@@ -337,7 +337,6 @@ const c04: ChapterDef = {
     sunColor: 0xffd090,
     exposure: 1.35,
     props: [
-      { t: "caravan", x: 0, z: -300, count: 28, spacing: 22, angle: 0.03 },
       { t: "structure", kind: "warehouse", x: 0, z: -300, scale: 1.2, id: "kervan1" },
       { t: "structure", kind: "warehouse", x: 20, z: -180, scale: 1.1, id: "kervan2" },
       { t: "structure", kind: "warehouse", x: -10, z: -60, scale: 1.3, id: "kervan3" },
