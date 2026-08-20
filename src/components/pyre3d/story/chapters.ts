@@ -3,9 +3,8 @@ import type { ChapterDef, ChapterId } from "./types";
 /**
  * Kampanya: "Kül Perdesinin Ardında".
  *
- * GDD'nin 06. bölümündeki beat sheet birebir bölümlere açıldı. Her bölüm
- * bir mekaniği baskı altında öğretiyor; tutorial paneli yok, ipuçları
- * oynanışın içinden geliyor.
+ * Yedi bölüm, her biri yeni bir mekaniği öğretir. Zorluk ve düşman sayısı
+ * ilerledikçe artar — son bölüm her şeyi bir araya getirir.
  */
 
 const ALL_OFF = { flame: false, fireball: false, roll: false, shock: false, rage: false };
@@ -32,7 +31,6 @@ const c01: ChapterDef = {
   },
   world: {
     radius: 700,
-    // Kanyon: koridorun dışında arazi duvar gibi yükseliyor.
     terrain: [{ t: "ridge", axis: "z", center: 0, halfWidth: 95, feather: 110, height: 170 }],
     scatter: {},
     props: [
@@ -172,113 +170,31 @@ const c02: ChapterDef = {
       ],
       actions: [{ do: "setWind", dir: 1.1, strength: 0.75 }],
     },
+    {
+      id: "ruzgarKamp",
+      trigger: { at: "objectiveDone", id: "kamp" },
+      lines: [{ who: "Kayra", text: "Rüzgâr ateşi kampa taşıdı. Küle döndü.", dur: 3.4 }],
+    },
   ],
 };
 
 /* ------------------------------------------------------------------ *
- * 03 — Kül Perdesi
+ * 03 — Kül Vadisi
  * ------------------------------------------------------------------ */
 const c03: ChapterDef = {
   id: "c03",
   index: 3,
-  title: "Kül Perdesi",
-  subtitle: "Ashkeep keşif filosu",
-  briefing: {
-    lore:
-      "Kül perdesi yarılıyor. Üstte altı gemilik bir Ashkeep keşif kolu var ve " +
-      "Wasp avcıları çoktan harpunlarını hazırladı. Harpun yerse Pyra ağırlaşır. " +
-      "Kurtuluş takla — ve tam zamanında atılan takla ödüllendirilir.",
-    objectives: ["Wasp filosunu dağıt", "3 kez kusursuz kaçın"],
-    tips: [
-      "R ile takla at",
-      "Merminin tam üstünde takla = kusursuz kaçınma",
-      "Harpun bağı takla ile kopar",
-    ],
-  },
-  world: {
-    radius: 700,
-    scatter: { house: 28, tower: 6, workshop: 8 },
-    airships: [
-      { x: 180, y: 120, z: 60, role: "scout" },
-      { x: -220, y: 140, z: -80, role: "scout" },
-    ],
-    waves: {
-      ilk: { enemy: "wasp", count: 3, radius: 240, altitude: [90, 150] },
-      ikinci: { enemy: "wasp", count: 5, radius: 300, altitude: [80, 170] },
-    },
-    wind: { dir: 2.2, strength: 0.4 },
-    start: { x: 0, y: 110, z: -60 },
-  },
-  objectives: [
-    { id: "wasp", type: "killEnemies", enemy: "wasp", count: 8, label: "Wasp avcılarını düşür" },
-    { id: "kacinma", type: "perfectDodges", count: 3, label: "Kusursuz kaçınma" },
-    { id: "yikim", type: "destroyPercent", pct: 0.2, label: "Yerleşimi yak" },
-  ],
-  fail: [{ type: "death" }],
-  abilities: { ...ALL_OFF, flame: true, roll: true, shock: true },
-  par: { time: 240, score: 5200 },
-  rewardEmbers: 700,
-  bondXp: 110,
-  unlocks: ["c04"],
-  beats: [
-    {
-      id: "acilis",
-      trigger: { at: "start" },
-      lines: [
-        { who: "Ashkeep", text: "Keşif kolu — yerde bir ejderha var. Harpunlar hazır.", dur: 3.6 },
-        { who: "Kayra", text: "Bizi gördüler. Pyra, kükre.", dur: 2.8 },
-      ],
-      actions: [
-        { do: "roar" },
-        { do: "unlockAbility", ability: "roll" },
-        { do: "spawnWave", wave: "ilk" },
-        { do: "hint", text: "Takla at", keys: ["R"], dur: 8 },
-      ],
-    },
-    {
-      id: "harpunUyari",
-      trigger: { at: "time", t: 14 },
-      actions: [{ do: "hint", text: "Harpun yersen takla ile kurtul", keys: ["R"], dur: 6 }],
-    },
-    {
-      id: "ilkKusursuz",
-      trigger: { at: "event", event: "perfectDodge" },
-      lines: [{ who: "Kayra", text: "Tam zamanında! Bu kanatlara güç verdi.", dur: 3 }],
-      actions: [{ do: "slowmo", scale: 0.35, dur: 0.35 }],
-    },
-    {
-      id: "ikinciDalga",
-      trigger: { at: "objectiveProgress", id: "wasp", pct: 0.45 },
-      lines: [{ who: "Ashkeep", text: "İkinci filo — sıkıştırın!", dur: 3 }],
-      actions: [
-        { do: "spawnWave", wave: "ikinci" },
-        { do: "shake", amp: 0.6 },
-      ],
-    },
-    {
-      id: "bitis",
-      trigger: { at: "objectiveDone", id: "wasp" },
-      lines: [{ who: "Kayra", text: "Keşif kolu dağıldı. Ama bunu haber verdiler.", dur: 3.4 }],
-    },
-  ],
-};
-
-/* ------------------------------------------------------------------ *
- * 04 — Kül Vadisi
- * ------------------------------------------------------------------ */
-const c04: ChapterDef = {
-  id: "c04",
-  index: 4,
   title: "Kül Vadisi",
   subtitle: "Kül Şehri'nin köz madenleri",
   briefing: {
     lore:
-      "Ashkeep'in taşra şehri: halka halka kurulmuş, ortasında Kazan Meydanı, " +
-      "kenarında köz madeni asansörleri. Damarları kazıyan bu asansörler. " +
-      "Şehrin %60'ı küle dönerse lonca burayı bırakır — %100 fazladan köz getirir.",
-    objectives: ["Şehrin %60'ını yık", "3 köz madeni asansörünü imha et"],
+      "Kül Şehri — Ashkeep'in taşra merkezi. Halka halka kurulmuş, ortasında " +
+      "Kazan Meydanı, kenarında köz madeni asansörleri. Damarları kazıyan " +
+      "bu asansörler. Köz Mermisi ile yangını caddenin öbür tarafına sıçrat — " +
+      "cadde yangın duvarıdır.",
+    objectives: ["Şehrin %30'unu yık", "3 köz madeni asansörünü imha et"],
     tips: [
-      "M ile Köz Mermisi at — yangını caddenin öbür tarafına sıçratır",
+      "M ile Köz Mermisi at",
       "Caddeler yangın duvarıdır",
       "Rüzgâr cepheyi taşır",
     ],
@@ -315,11 +231,11 @@ const c04: ChapterDef = {
     },
   ],
   fail: [{ type: "death" }],
-  abilities: { flame: true, fireball: true, roll: true, shock: true, rage: true },
+  abilities: { ...ALL_OFF, flame: true, fireball: true },
   par: { time: 420, score: 26000 },
   rewardEmbers: 1200,
   bondXp: 150,
-  unlocks: ["c05"],
+  unlocks: ["c04"],
   beats: [
     {
       id: "acilis",
@@ -355,10 +271,7 @@ const c04: ChapterDef = {
       id: "tahliye",
       trigger: { at: "objectiveProgress", id: "yikim", pct: 0.55 },
       lines: [{ who: "Ashkeep", text: "Tahliye! Bütün mürettebat direklere!", dur: 3.2 }],
-      actions: [
-        { do: "spawnWave", wave: "tahliye" },
-        { do: "unlockAbility", ability: "rage" },
-      ],
+      actions: [{ do: "spawnWave", wave: "tahliye" }],
     },
     {
       id: "asansorler",
@@ -366,29 +279,173 @@ const c04: ChapterDef = {
       lines: [{ who: "Kayra", text: "Asansörler gitti. Bu damar bir daha açılmaz.", dur: 3.4 }],
     },
     {
-      id: "vorren",
+      id: "yikimEcho",
       trigger: { at: "objectiveDone", id: "yikim" },
       lines: [
-        { who: "Vorren", text: "Bir şehir. Yalnızca bir şehir. Bize on tane daha var.", dur: 4.2 },
+        { who: "Kayra", text: "Kül Şehri yanıyor. Loncanın erleri titriyor.", dur: 3.8 },
+        { who: "Pyra", text: "(Dumanın içinde esen bir kükreme.)", dur: 3.2 },
       ],
     },
   ],
 };
 
 /* ------------------------------------------------------------------ *
- * 05 — Bulwark
+ * 04 — Çöl Kervanı
+ * ------------------------------------------------------------------ */
+const c04: ChapterDef = {
+  id: "c04",
+  index: 4,
+  title: "Çöl Kervanı",
+  subtitle: "Ashkeep'in can damarı",
+  briefing: {
+    lore:
+      "Kül Vadisi'nden kaçtıktan sonra güneye, çöle iniyorsunuz. Kumlukların " +
+      "ortasından Ashkeep'in ana ikmal kervanı geçiyor — tonlarca lexil, " +
+      "barut ve yiyecek. Bu kervanı imha edersen sovereign'in ordusu " +
+      "beslenemez. Ama kervanı koruyan muhafız kuleleri ve kamp var.",
+    objectives: [
+      "Kervanın %60'ını yok et",
+      "4 muhafız kulesini yık",
+      "Kampı küle çevir",
+    ],
+    tips: [
+      "Kervan uzun — boydan boya geç",
+      "Kuleler seni hedef alıyor, düşür",
+      "Rüzgar kumunu savuruyor — odaklan",
+    ],
+  },
+  world: {
+    radius: 900,
+    terrain: [
+      { t: "ridge", axis: "x", center: -280, halfWidth: 120, feather: 140, height: 80 },
+      { t: "ridge", axis: "x", center: 280, halfWidth: 110, feather: 130, height: 70 },
+      { t: "ridge", axis: "z", center: 400, halfWidth: 200, feather: 160, height: 90 },
+    ],
+    scatter: {
+      tower: 6,
+      house: 12,
+      workshop: 4,
+      ammo_depot: 3,
+      barracks: 2,
+    },
+    props: [
+      { t: "structure", kind: "warehouse", x: 0, z: -300, scale: 1.2, id: "kervan1" },
+      { t: "structure", kind: "warehouse", x: 20, z: -180, scale: 1.1, id: "kervan2" },
+      { t: "structure", kind: "warehouse", x: -10, z: -60, scale: 1.3, id: "kervan3" },
+      { t: "structure", kind: "warehouse", x: 15, z: 60, scale: 1.0, id: "kervan4" },
+      { t: "structure", kind: "warehouse", x: -5, z: 180, scale: 1.2, id: "kervan5" },
+      { t: "structure", kind: "watchtower", x: -60, z: -240, scale: 1.0 },
+      { t: "structure", kind: "watchtower", x: 70, z: -120, scale: 1.0 },
+      { t: "structure", kind: "watchtower", x: -50, z: 0, scale: 1.0 },
+      { t: "structure", kind: "watchtower", x: 65, z: 120, scale: 1.0 },
+      { t: "structure", kind: "watchtower", x: -55, z: 240, scale: 1.0 },
+      { t: "structure", kind: "barracks", x: 0, z: 340, scale: 1.4, id: "kamp" },
+      { t: "structure", kind: "armory", x: 40, z: 370, scale: 1.1 },
+      { t: "structure", kind: "command_post", x: -35, z: 390, scale: 1.0 },
+    ],
+    airships: [
+      { x: 200, y: 140, z: -200, role: "scout" },
+      { x: -180, y: 130, z: 100, role: "scout" },
+      { x: 100, y: 155, z: 350, role: "scout" },
+    ],
+    waves: {
+      ilk: { enemy: "wasp", count: 3, radius: 260, altitude: [100, 160] },
+      kule: { enemy: "wasp", count: 4, radius: 300, altitude: [90, 170] },
+      son: { enemy: "wasp", count: 6, radius: 340, altitude: [80, 180] },
+    },
+    wind: { dir: 0.3, strength: 0.6 },
+    start: { x: 0, y: 130, z: -500 },
+    fogScale: 1.3,
+  },
+  objectives: [
+    { id: "kervan", type: "destroyPercent", pct: 0.6, label: "Kervanı yok et" },
+    { id: "kuleler", type: "destroyKind", kind: "watchtower", count: 4, label: "Muhafız kulelerini yık" },
+    { id: "kamp", type: "destroyKind", kind: "barracks", count: 1, label: "Kampı küle çevir" },
+  ],
+  fail: [{ type: "death" }],
+  abilities: { ...ALL_OFF, flame: true, fireball: true },
+  par: { time: 360, score: 18000 },
+  rewardEmbers: 1500,
+  bondXp: 170,
+  unlocks: ["c05"],
+  beats: [
+    {
+      id: "acilis",
+      trigger: { at: "start" },
+      lines: [
+        { who: "Kayra", text: "Çöl. Kervan güzergahı kuzeyden güneye uzanıyor.", dur: 3.8 },
+        { who: "Pyra", text: "(Kumlar arasında uzun bir kuyruk görülüyor — develer, vagonlar.)", dur: 3.6 },
+      ],
+      actions: [
+        { do: "hint", text: "Kervan boyunca uç, hepsini yak", keys: [], dur: 6 },
+      ],
+    },
+    {
+      id: "ilkVagon",
+      trigger: { at: "event", event: "targetDestroyed" },
+      lines: [{ who: "Kayra", text: "İlk vagon gitti. Lexil doluydu — alev topu gibi patladı.", dur: 3.4 }],
+      actions: [
+        { do: "unlockAbility", ability: "roll" },
+        { do: "hint", text: "Takla — hedeflerden ve mermilerden kurtul", keys: ["R"], dur: 8 },
+      ],
+    },
+    {
+      id: "kuleUyari",
+      trigger: { at: "objectiveProgress", id: "kervan", pct: 0.3 },
+      lines: [{ who: "Ashkeep", text: "Kuleler ejderhayı görüyor — ateş aç!", dur: 3 }],
+      actions: [
+        { do: "spawnWave", wave: "ilk" },
+        { do: "hint", text: "Kuleleri düşür", keys: [], dur: 5 },
+      ],
+    },
+    {
+      id: "ruzgarDegisti",
+      trigger: { at: "objectiveProgress", id: "kervan", pct: 0.5 },
+      lines: [{ who: "Kayra", text: "Rüzgar değişti. Kumu savuruyor — dikkatli ol.", dur: 3.2 }],
+      actions: [{ do: "setWind", dir: 1.1, strength: 0.8 }],
+    },
+    {
+      id: "kampSaldiri",
+      trigger: { at: "objectiveProgress", id: "kervan", pct: 0.7 },
+      lines: [
+        { who: "Ashkeep", text: "Tüm birlikler kampa! Ejderhayı durdurun!", dur: 3.6 },
+      ],
+      actions: [
+        { do: "spawnWave", wave: "kule" },
+        { do: "hint", text: "Takla ile saldırılardan korun", keys: ["R"], dur: 6 },
+      ],
+    },
+    {
+      id: "sonDalga",
+      trigger: { at: "objectiveDone", id: "kuleler" },
+      lines: [{ who: "Kayra", text: "Kuleler sustu. Şimdi kampı bitir.", dur: 3 }],
+      actions: [{ do: "spawnWave", wave: "son" }],
+    },
+    {
+      id: "kampDustu",
+      trigger: { at: "objectiveDone", id: "kamp" },
+      lines: [
+        { who: "Kayra", text: "Kamp gitti. Kervanın geri kalanı savunmasız.", dur: 3.4 },
+        { who: "Pyra", text: "(Kumlukların ötesinde bir şey parlıyor — echelon mu?)", dur: 3.8 },
+      ],
+    },
+  ],
+};
+
+/* ------------------------------------------------------------------ *
+ * 05 — Bulutvari
  * ------------------------------------------------------------------ */
 const c05: ChapterDef = {
   id: "c05",
   index: 5,
-  title: "Bulwark",
-  subtitle: "Toplu firkateyn",
+  title: "Bulutvari",
+  subtitle: "Lonca filosu",
   briefing: {
     lore:
       "Lonca cevabını gönderdi: 'Bulwark' sınıfı bir toplu firkateyn. Gövdesi " +
       "konik aleve kapalı — kırılacak yeri modülleri. Balon hücreleri, motor " +
       "podları, yan batarya ve köprü. Hangi sırayla imha ettiğin gemiyi değiştirir.",
-    objectives: ["Bulwark'ın modüllerini imha et", "Firkateyni düşür"],
+    objectives: ["Bulwark'ın modüllerini imha et", "Firkateyni düşür", "Yerleşimi yak"],
     tips: [
       "Köz Mermisi modüllere 2.5 kat hasar verir",
       "Bataryayı alırsan top ateşi kesilir",
@@ -403,7 +460,10 @@ const c05: ChapterDef = {
       { x: 220, y: 130, z: 320, role: "scout" },
       { x: -240, y: 140, z: 300, role: "scout" },
     ],
-    waves: { eskort: { enemy: "wasp", count: 4, radius: 260, altitude: [110, 180] } },
+    waves: {
+      eskort: { enemy: "wasp", count: 4, radius: 260, altitude: [110, 180] },
+      ikinci: { enemy: "wasp", count: 5, radius: 300, altitude: [100, 190] },
+    },
     wind: { dir: 1.8, strength: 0.35 },
     start: { x: 0, y: 140, z: -80 },
   },
@@ -419,7 +479,7 @@ const c05: ChapterDef = {
     { id: "yikim", type: "destroyPercent", pct: 0.4, label: "Yerleşimi yak" },
   ],
   fail: [{ type: "death" }],
-  abilities: { flame: true, fireball: true, roll: true, shock: true, rage: true },
+  abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true },
   par: { time: 300, score: 14000 },
   rewardEmbers: 1800,
   bondXp: 180,
@@ -438,6 +498,15 @@ const c05: ChapterDef = {
       ],
     },
     {
+      id: "sokKilidi",
+      trigger: { at: "time", t: 18 },
+      lines: [{ who: "Kayra", text: "Şok dalgası hazır — dikkat et!", dur: 3 }],
+      actions: [
+        { do: "unlockAbility", ability: "shock" },
+        { do: "hint", text: "Şok dalgası — yakındaki düşmanları savur", keys: ["Q"], dur: 8 },
+      ],
+    },
+    {
       id: "ilkModul",
       trigger: { at: "event", event: "weakPointDown" },
       lines: [{ who: "Pyra", text: "(Bir modül koptu. Gemi sarsılıyor.)", dur: 2.8 }],
@@ -447,10 +516,10 @@ const c05: ChapterDef = {
       id: "yariCan",
       trigger: { at: "objectiveProgress", id: "modul", pct: 0.5 },
       lines: [{ who: "Ashkeep", text: "Balon basıncı düşüyor! İrtifa kaybediyoruz!", dur: 3.4 }],
-      actions: [{ do: "spawnWave", wave: "eskort" }],
+      actions: [{ do: "spawnWave", wave: "ikinci" }],
     },
     {
-      id: "dusus",
+      id: "sonSaldiri",
       trigger: { at: "objectiveDone", id: "modul" },
       lines: [{ who: "Kayra", text: "Bitir şunu, Pyra.", dur: 2.6 }],
       actions: [{ do: "shake", amp: 1.2 }],
@@ -459,13 +528,13 @@ const c05: ChapterDef = {
 };
 
 /* ------------------------------------------------------------------ *
- * 06 — Sovereign Cinder
+ * 06 — Ateş Çemberi
  * ------------------------------------------------------------------ */
 const c06: ChapterDef = {
   id: "c06",
   index: 6,
-  title: "Sovereign Cinder",
-  subtitle: "Kül perdesinin ardında",
+  title: "Ateş Çemberi",
+  subtitle: "Sovereign'in kalesi",
   briefing: {
     lore:
       "Vorren'in sesi tüm filoya yayılıyor. Kül perdesi ikiye ayrılıyor ve " +
@@ -499,7 +568,7 @@ const c06: ChapterDef = {
     { id: "yikim", type: "destroyPercent", pct: 0.5, label: "Yerleşimi yak" },
   ],
   fail: [{ type: "death" }],
-  abilities: { flame: true, fireball: true, roll: true, shock: true, rage: true },
+  abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true, shock: true, rage: true },
   par: { time: 180, score: 9000 },
   rewardEmbers: 2400,
   bondXp: 240,
@@ -509,10 +578,14 @@ const c06: ChapterDef = {
       id: "acilis",
       trigger: { at: "start" },
       lines: [
-        { who: "Vorren", text: "Son yuva da söndü.", dur: 4 },
+        { who: "Vorren", text: "Son yuva da sönüyor.", dur: 4 },
         { who: "Kayra", text: "…O da ne?", dur: 2.4 },
       ],
-      actions: [{ do: "spawnWave", wave: "baski" }],
+      actions: [
+        { do: "unlockAbility", ability: "rage" },
+        { do: "hint", text: "Öfke — can barını doldurarak serbest bırak", keys: [], dur: 7 },
+        { do: "spawnWave", wave: "baski" },
+      ],
     },
     {
       id: "perde",
@@ -552,152 +625,132 @@ const c06: ChapterDef = {
 };
 
 /* ------------------------------------------------------------------ *
- * 07 — Çöl Kervanı
+ * 07 — Son Hesaplaşma
  * ------------------------------------------------------------------ */
 const c07: ChapterDef = {
   id: "c07",
   index: 7,
-  title: "Çöl Kervanı",
-  subtitle: "Ashkeep'in can damarı",
+  title: "Son Hesaplaşma",
+  subtitle: "Kül perdesinin ardında",
   briefing: {
     lore:
-      "Kül Vadisi'nden kaçtıktan sonra güneye, çöle iniyorsunuz. Kumlukların " +
-      "ortasından Ashkeep'in ana ikmal kervanı geçiyor — tonlarca lexil, " +
-      "barut ve yiyecek. Bu kervanı imha edersen sovereign'in ordusu " +
-      "beslenemez. Ama kervanı koruyan muhafız kulesi ve anti-draj silahları var.",
+      "Kül perdesinin arkasındaki son kale. Sovereign'in tüm güçleri burada " +
+      "toplanmış. Firkateynler, Wasplar, kuleler — her şey. Bu son savaş. " +
+      "Her yeteneğini kullan, her hedefi yok et. Başka şans yok.",
     objectives: [
-      "Kervanı yok et",
-      "Muhafız kulelerini yık",
-      "Ana kampı küle çevir",
+      "Şehrin %70'ini yok et",
+      "2 firkateyni düşür",
+      "3 fabrikayı imha et",
+      "120 saniye hayatta kal",
     ],
     tips: [
-      "Kervan uzun — boydan boya geç",
-      "Kuleler seni hedef alıyor, düşür",
-      "Rüzgar kumunu savuruyor — odaklan",
+      "Tüm yetenekler açık",
+      "Firkateynlerin zayıf noktalarını hedefle",
+      "Fabrikalar stratejik hedef — öncelikli yok et",
     ],
   },
   world: {
     radius: 900,
-    terrain: [
-      // Kum tepeleri — yolun iki yanında yükselen dev tepecikler
-      { t: "ridge", axis: "x", center: -280, halfWidth: 120, feather: 140, height: 80 },
-      { t: "ridge", axis: "x", center: 280, halfWidth: 110, feather: 130, height: 70 },
-      { t: "ridge", axis: "z", center: 400, halfWidth: 200, feather: 160, height: 90 },
-    ],
-    scatter: {
-      tower: 6,
-      house: 12,
-      workshop: 4,
-      ammo_depot: 3,
-      barracks: 2,
+    city: {
+      seed: 20260822,
+      cx: 0,
+      cz: 0,
+      radius: 460,
+      density: "large",
+      wall: true,
+      masts: 6,
+      elevators: 5,
     },
-    props: [
-      // Kervan güzergahı — boydan boya kuzeyden güneye
-      { t: "structure", kind: "warehouse", x: 0, z: -300, scale: 1.2, id: "kervan1" },
-      { t: "structure", kind: "warehouse", x: 20, z: -180, scale: 1.1, id: "kervan2" },
-      { t: "structure", kind: "warehouse", x: -10, z: -60, scale: 1.3, id: "kervan3" },
-      { t: "structure", kind: "warehouse", x: 15, z: 60, scale: 1.0, id: "kervan4" },
-      { t: "structure", kind: "warehouse", x: -5, z: 180, scale: 1.2, id: "kervan5" },
-      // Muhafız kuleleri — kervan boyunca
-      { t: "structure", kind: "watchtower", x: -60, z: -240, scale: 1.0 },
-      { t: "structure", kind: "watchtower", x: 70, z: -120, scale: 1.0 },
-      { t: "structure", kind: "watchtower", x: -50, z: 0, scale: 1.0 },
-      { t: "structure", kind: "watchtower", x: 65, z: 120, scale: 1.0 },
-      { t: "structure", kind: "watchtower", x: -55, z: 240, scale: 1.0 },
-      // Ana kamp — kervanın sonunda
-      { t: "structure", kind: "barracks", x: 0, z: 340, scale: 1.4, id: "kamp" },
-      { t: "structure", kind: "armory", x: 40, z: 370, scale: 1.1 },
-      { t: "structure", kind: "command_post", x: -35, z: 390, scale: 1.0 },
-    ],
     airships: [
-      { x: 200, y: 140, z: -200, role: "scout" },
-      { x: -180, y: 130, z: 100, role: "scout" },
-      { x: 100, y: 155, z: 350, role: "scout" },
+      { x: 0, y: 150, z: 300, role: "frigate", id: "souverein1", weakPoints: true },
+      { x: 180, y: 140, z: -200, role: "frigate", id: "souverein2", weakPoints: true },
+      { x: 320, y: 130, z: 100, role: "scout" },
+      { x: -300, y: 120, z: -250, role: "scout" },
+      { x: 60, y: 150, z: -400, role: "scout" },
+      { x: -200, y: 140, z: 350, role: "scout" },
     ],
     waves: {
-      ilk: { enemy: "wasp", count: 3, radius: 260, altitude: [100, 160] },
-      kamp: { enemy: "wasp", count: 5, radius: 300, altitude: [90, 170] },
-      son: { enemy: "wasp", count: 6, radius: 340, altitude: [80, 180] },
+      ilk: { enemy: "wasp", count: 5, radius: 300, altitude: [100, 170] },
+      ikinci: { enemy: "wasp", count: 6, radius: 340, altitude: [90, 180] },
+      son: { enemy: "wasp", count: 8, radius: 380, altitude: [80, 200] },
     },
-    zones: [
-      { id: "kervan_baslangic", x: 0, z: -350, r: 80, label: "Kervan başlangıcı" },
-      { id: "kamp_bolgesi", x: 0, z: 340, r: 120, label: "Ana kamp" },
-    ],
-    wind: { dir: 0.3, strength: 0.6 },
-    start: { x: 0, y: 130, z: -500 },
-    fogScale: 1.3,
+    wind: { dir: 2.0, strength: 0.65 },
+    start: { x: 0, y: 150, z: -620 },
+    fogScale: 1.35,
   },
   objectives: [
-    { id: "kervan", type: "destroyPercent", pct: 0.6, label: "Kervanı yok et" },
-    { id: "kuleler", type: "destroyKind", kind: "watchtower", count: 4, label: "Muhafız kulelerini yık" },
-    { id: "kamp", type: "destroyKind", kind: "barracks", count: 1, label: "Ana kampı küle çevir" },
+    { id: "yikim", type: "destroyPercent", pct: 0.7, label: "Şehri küle çevir" },
+    { id: "gemi", type: "killAirships", role: "frigate", count: 2, label: "Firkateynleri düşür" },
+    { id: "fabrika", type: "destroyKind", kind: "factory", count: 3, label: "Fabrikaları imha et" },
+    { id: "hayatta", type: "survive", seconds: 120, label: "Hayatta kal" },
   ],
   fail: [{ type: "death" }],
-  abilities: { flame: true, fireball: false, roll: false, shock: false, rage: false },
-  par: { time: 360, score: 18000 },
-  rewardEmbers: 1500,
-  bondXp: 170,
+  abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true, shock: true, rage: true },
+  par: { time: 600, score: 40000 },
+  rewardEmbers: 4000,
+  bondXp: 300,
   unlocks: [],
   beats: [
     {
       id: "acilis",
       trigger: { at: "start" },
       lines: [
-        { who: "Kayra", text: "Çöl. Kervan güzergahı kuzeyden güneye uzanıyor.", dur: 3.8 },
-        { who: "Pyra", text: "(Kumlar arasında uzun bir kuyruk görülüyor — develer, vagonlar.)", dur: 3.6 },
+        { who: "Vorren", text: "Son perde. Burası Ashkeep'in kalbi — ve sen onu yakacaksın.", dur: 4.2 },
+        { who: "Kayra", text: "Pyra, hazır mısın? Son kez.", dur: 3 },
+        { who: "Pyra", text: "(Kanatlar genişliyor. Köz göğünden akıyor.)", dur: 3.2 },
       ],
-      actions: [
-        { do: "hint", text: "Kervan boyunca uç, hepsini yak", keys: [], dur: 6 },
-      ],
-    },
-    {
-      id: "ilkVagon",
-      trigger: { at: "event", event: "targetDestroyed" },
-      lines: [{ who: "Kayra", text: "İlk vagon gitti. Lexil doluydu — alev topu gibi patladı.", dur: 3.4 }],
-      actions: [
-        { do: "unlockAbility", ability: "fireball" },
-        { do: "hint", text: "Köz Mermisi — uzaktaki hedefleri vur", keys: ["M"], dur: 8 },
-      ],
-    },
-    {
-      id: "kuleUyari",
-      trigger: { at: "objectiveProgress", id: "kervan", pct: 0.3 },
-      lines: [{ who: "Ashkeep", text: "Kuleler ejderhayı görüyor — ateş aç!", dur: 3 }],
       actions: [
         { do: "spawnWave", wave: "ilk" },
-        { do: "hint", text: "Kuleleri düşür", keys: [], dur: 5 },
+        { do: "hint", text: "Tüm yetenekler açık — her şeyi yok et", keys: [], dur: 6 },
       ],
+    },
+    {
+      id: "fabrikaHedef",
+      trigger: { at: "time", t: 15 },
+      lines: [{ who: "Kayra", text: "Fabrikalar stratejik hedef — onları ilk indir.", dur: 3.4 }],
+      actions: [{ do: "hint", text: "Fabrikaları hedefle", keys: ["M"], dur: 6 }],
+    },
+    {
+      id: "ilkDalgaBitti",
+      trigger: { at: "objectiveProgress", id: "yikim", pct: 0.15 },
+      lines: [{ who: "Ashkeep", text: "İkinci dalga geliyor! Hazır olun!", dur: 3 }],
+      actions: [{ do: "spawnWave", wave: "ikinci" }],
+    },
+    {
+      id: "firkateynUyari",
+      trigger: { at: "objectiveProgress", id: "fabrika", pct: 0.5 },
+      lines: [
+        { who: "Ashkeep", text: "Firkateynler angaje oluyor! Bataryalar açık!", dur: 3.6 },
+      ],
+      actions: [{ do: "shake", amp: 0.8 }],
     },
     {
       id: "ruzgarDegisti",
-      trigger: { at: "objectiveProgress", id: "kervan", pct: 0.5 },
-      lines: [{ who: "Kayra", text: "Rüzgar değişti. Kumu savuruyor — dikkatli ol.", dur: 3.2 }],
-      actions: [{ do: "setWind", dir: 1.1, strength: 0.8 }],
-    },
-    {
-      id: "kampSaldiri",
-      trigger: { at: "objectiveProgress", id: "kervan", pct: 0.7 },
-      lines: [
-        { who: "Ashkeep", text: "Tüm birlikler kampa! Ejderhayı durdurun!", dur: 3.6 },
-      ],
-      actions: [
-        { do: "spawnWave", wave: "kamp" },
-        { do: "unlockAbility", ability: "roll" },
-        { do: "hint", text: "Takla at — hedeflerden kurtul", keys: ["R"], dur: 8 },
-      ],
+      trigger: { at: "objectiveProgress", id: "yikim", pct: 0.5 },
+      lines: [{ who: "Kayra", text: "Rüzgâr döndü. Ateş şehrin merkezine yürüyor.", dur: 3.4 }],
+      actions: [{ do: "setWind", dir: 0.5, strength: 0.85 }],
     },
     {
       id: "sonDalga",
-      trigger: { at: "objectiveDone", id: "kuleler" },
-      lines: [{ who: "Kayra", text: "Kuleler sustu. Şimdi kampı bitir.", dur: 3 }],
-      actions: [{ do: "spawnWave", wave: "son" }],
+      trigger: { at: "objectiveProgress", id: "yikim", pct: 0.6 },
+      lines: [{ who: "Vorren", text: "Her şeyi yapın! O ejderhayı durdurun!", dur: 3.4 }],
+      actions: [
+        { do: "spawnWave", wave: "son" },
+        { do: "shake", amp: 1.0 },
+      ],
     },
     {
-      id: "kampDustu",
-      trigger: { at: "objectiveDone", id: "kamp" },
+      id: "yaralandi",
+      trigger: { at: "stat", key: "hp", op: "<", value: 35 },
+      lines: [{ who: "Kayra", text: "Dayan Pyra! Neredeyse bitti!", dur: 3 }],
+      actions: [{ do: "slowmo", scale: 0.4, dur: 0.5 }],
+    },
+    {
+      id: "zafer",
+      trigger: { at: "objectiveDone", id: "yikim" },
       lines: [
-        { who: "Kayra", text: "Kamp gitti. Kervanın geri kalanı savunmasız.", dur: 3.4 },
-        { who: "Pyra", text: "(Kumlukların ötesinde bir şey parlıyor — echelon mu?)", dur: 3.8 },
+        { who: "Kayra", text: "Şehri küle çevirdik. Ashkeep'in kalbi durdu.", dur: 4 },
+        { who: "Pyra", text: "(Dumanın içinde, bir kükreme daha yükseliyor.)", dur: 3.4 },
       ],
     },
   ],
