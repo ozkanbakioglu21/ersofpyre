@@ -1610,6 +1610,110 @@ export function buildDeco(kind: DecoKind, rng: Rng, scale = 1): THREE.Group {
   g.rotation.y = rng.range(0, Math.PI * 2);
   return g;
 }
+
+/** Deve — düşük poligon gövde, kambur, uzun boyun, 4 bacak. */
+export function buildCamel(rng: Rng, withRider = false, withCargo = false): THREE.Group {
+  const g = new THREE.Group();
+  const skin = cityMat(0x8a6a42);
+  const darkSkin = cityMat(0x6a4a2a);
+  const cloth = cityMat(0x5a3a20);
+
+  const bodyW = rng.range(1.8, 2.4);
+  const bodyH = rng.range(0.9, 1.2);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), skin);
+  body.scale.set(bodyW, bodyH, bodyW * 0.6);
+  body.position.y = 2.6;
+  g.add(body);
+
+  const hump = new THREE.Mesh(new THREE.SphereGeometry(0.55, 6, 5), skin);
+  hump.scale.set(1.2, 0.9, 0.8);
+  hump.position.set(0, 3.4, 0);
+  g.add(hump);
+
+  const neckH = rng.range(1.8, 2.4);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, neckH, 6), skin);
+  neck.position.set(bodyW * 0.5, 2.8 + neckH * 0.35, 0);
+  neck.rotation.z = -0.35;
+  g.add(neck);
+
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.35, 0.3), darkSkin);
+  head.position.set(bodyW * 0.5 + 0.4, 2.8 + neckH * 0.75, 0);
+  g.add(head);
+
+  for (const sx of [-0.15, 0.15]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 4), darkSkin);
+    ear.position.set(head.position.x + sx, head.position.y + 0.2, 0);
+    g.add(ear);
+  }
+
+  const legH = rng.range(1.8, 2.2);
+  for (const [sx, sz] of [[-0.5, -0.3], [-0.5, 0.3], [0.5, -0.3], [0.5, 0.3]] as const) {
+    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, legH * 0.55, 5), darkSkin);
+    upper.position.set(bodyW * sx, legH * 0.4, bodyW * 0.6 * sz);
+    upper.rotation.x = sz * 0.08;
+    g.add(upper);
+    const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, legH * 0.45, 5), darkSkin);
+    lower.position.set(bodyW * sx, legH * 0.08, bodyW * 0.6 * sz + sz * 0.15);
+    g.add(lower);
+  }
+
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.02, 0.6, 4), darkSkin);
+  tail.position.set(-bodyW * 0.55, 2.8, 0);
+  tail.rotation.z = 0.8;
+  g.add(tail);
+
+  if (withCargo) {
+    const cargo = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.9), cloth);
+    cargo.position.set(0, 3.3, 0.4);
+    g.add(cargo);
+    const bag = new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 4), cloth);
+    bag.scale.set(1, 0.7, 0.8);
+    bag.position.set(0.3, 3.7, -0.3);
+    g.add(bag);
+  }
+
+  if (withRider) {
+    const riderBody = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.8, 6), cityMat(0x3a2a18));
+    riderBody.position.set(0, 3.9, 0.15);
+    g.add(riderBody);
+    const riderHead = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 5), cityMat(0xb09070));
+    riderHead.position.set(0, 4.45, 0.15);
+    g.add(riderHead);
+    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.3, 6), cityMat(0x4a3a28));
+    hat.position.set(0, 4.65, 0.15);
+    g.add(hat);
+  }
+
+  g.rotation.y = rng.range(-0.15, 0.15);
+  return g;
+}
+
+/** Kervan hattı — develer, vagonlar, biniciler. */
+export function buildCaravanLine(
+  count: number,
+  spacing: number,
+  rng: Rng,
+): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const t = i - (count - 1) / 2;
+    const offsetX = rng.range(-2, 2);
+    const isRider = i % 5 === 0;
+    const isCargo = !isRider && rng.chance(0.55);
+    const camel = buildCamel(rng, isRider, isCargo);
+    camel.position.set(offsetX, 0, t * spacing);
+    camel.position.x += Math.sin(i * 0.7) * 1.5;
+    g.add(camel);
+
+    if (!isRider && !isCargo && rng.chance(0.3)) {
+      const cart = buildVehicle("cart", rng);
+      cart.position.set(offsetX, 0, t * spacing - 3.2);
+      g.add(cart);
+    }
+  }
+  return g;
+}
+
 export function buildTree(rng: Rng): THREE.Group {
   const g = new THREE.Group();
   const type = rng.int(0, 3);
