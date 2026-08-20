@@ -78,14 +78,15 @@ export const FLIGHT = {
 
   /* ---- dik iniş ---- */
   steepDiveDuration: 1.4,
-  steepDiveSpeedBoost: 58,
+  steepDiveSpeedBoost: 72,
   steepDiveStaminaCost: 18,
   steepDiveCooldown: 3,
-  /** Burnu aşağı itme hızı — oyuncunun iptal etmesine izin verecek kadar yavaş ama
-   *  hissedilir kadar hızlı. */
-  steepDivePitchRate: 6.5,
+  /** Dik iniş hedef pitch açısı: 80° ≈ 1.396 radyan. */
+  steepDivePitch: 1.396,
+  /** Burnu aşağı itme hızı — 80°'ye hızlı geçiş. */
+  steepDivePitchRate: 10,
   /** Dalış sırasında ekstra dikey ivme (aşağı). */
-  steepDiveAltAccel: -140,
+  steepDiveAltAccel: -280,
 
   /* ---- barrel roll (takla) ---- */
   rollDuration: 0.55,
@@ -247,7 +248,7 @@ export function updateFlight(g: Game, dt: number): void {
     // Dik iniş: burnu zorla max aşağı eğ — pitch(Return)/trimRate'e dokunulmaz,
     // oyuncu V'ye basınca burnun aniden kilitlenmesi hissedilir.
     const before = a.pitch;
-    a.pitch += (-FLIGHT.maxPitch - a.pitch) * Math.min(1, dt * FLIGHT.steepDivePitchRate);
+    a.pitch += (-FLIGHT.steepDivePitch - a.pitch) * Math.min(1, dt * FLIGHT.steepDivePitchRate);
     a.pitchVel = (a.pitch - before) / Math.max(dt, 1e-4);
   } else {
     const before = a.pitch;
@@ -412,7 +413,7 @@ export function updateFlight(g: Game, dt: number): void {
   d.body.rotation.z += (bank - d.body.rotation.z) * lerpK;
 
   // Beden pitch eğimi — alçalırken tüm gövde aşağı doğru eğilir, yükselirken yukarı
-  const bodyPitch = -a.pitch * 0.45;
+  const bodyPitch = -a.pitch * (a.steepDiveT > 0 ? 1.0 : 0.45);
   d.body.rotation.x += (bodyPitch - d.body.rotation.x) * Math.min(1, dt * 5);
 
   // Kanat çırpma — kanat ucu gecikmesiyle
