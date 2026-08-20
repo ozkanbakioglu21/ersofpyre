@@ -24,6 +24,8 @@ export type AudioEngine = {
   rage(): void;
   roar(): void;
   scream(): void;
+  /** Dalma rüzgarı: 0..1 yoğunluk. */
+  diveWind(intensity: number): void;
   ui(): void;
   win(): void;
   lose(): void;
@@ -59,6 +61,7 @@ const NOOP: AudioEngine = {
   rage() {},
   roar() {},
   scream() {},
+  diveWind() {},
   ui() {},
   win() {},
   lose() {},
@@ -245,6 +248,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   let ambientWanted = false;
   let sirenWanted = false;
   let musicWanted = false;
+  let diveWindNodes: { src: AudioBufferSourceNode; gain: GainNode; lfo: OscillatorNode } | null = null;
   let musicNodes: {
     pad1: OscillatorNode;
     pad2: OscillatorNode;
@@ -1053,6 +1057,45 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         }
       });
     },
+    diveWind(intensity: number) {
+      const c = ctx;
+      if (!c) return;
+      // İlk çağrıda sürekli dalma rüzgarı düğümü kur
+      if (!diveWindNodes) {
+        const t = c.ac.currentTime;
+        const src = c.ac.createBufferSource();
+        src.buffer = c.noise;
+        src.loop = true;
+        // Bandpass: rüzgar uğultusu — orta frekans
+        const bp = c.ac.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 800;
+        bp.Q.value = 0.6;
+        // Yüksek kesim — çok tiz olmasın
+        const hp = c.ac.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = 200;
+        hp.Q.value = 0.3;
+        const gain = c.ac.createGain();
+        gain.gain.value = 0.0001;
+        // LFO ile frekans dalgalanması
+        const lfo = c.ac.createOscillator();
+        lfo.type = "sine";
+        lfo.frequency.value = 0.3;
+        const lfoGain = c.ac.createGain();
+        lfoGain.gain.value = 300;
+        lfo.connect(lfoGain).connect(bp.frequency);
+        src.connect(hp).connect(bp).connect(gain).connect(c.master);
+        src.start(t);
+        lfo.start(t);
+        diveWindNodes = { src, gain, lfo };
+      }
+      // Gain'i yoğunluğa göre ayarla
+      const now = c.ac.currentTime;
+      diveWindNodes.gain.gain.cancelScheduledValues(now);
+      const target = intensity * 0.18;
+      diveWindNodes.gain.gain.setTargetAtTime(target, now, 0.08);
+    },
     ui() {
       withCtx((c) => {
         tone(c, { type: "square", from: 420, to: 300, dur: 0.05, peak: 0.05 });
@@ -1085,6 +1128,13 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       stopAmbient(c);
       stopSiren(c);
       stopMusic(c);
+      if (diveWindNodes) {
+        diveWindNodes.gain.gain.cancelScheduledValues(c.ac.currentTime);
+        diveWindNodes.gain.gain.setValueAtTime(0.0001, c.ac.currentTime);
+        diveWindNodes.src.stop(c.ac.currentTime + 0.1);
+        diveWindNodes.lfo.stop(c.ac.currentTime + 0.1);
+        diveWindNodes = null;
+      }
       flameWanted = false;
       ambientWanted = false;
       sirenWanted = false;
@@ -1097,6 +1147,11 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       stopAmbient(c);
       stopSiren(c);
       stopMusic(c);
+      if (diveWindNodes) {
+        diveWindNodes.src.stop();
+        diveWindNodes.lfo.stop();
+        diveWindNodes = null;
+      }
       ctx = null;
       void c.ac.close().catch(() => {});
     },

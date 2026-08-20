@@ -266,7 +266,8 @@ export function updateFlight(g: Game, dt: number): void {
   g.dive = a.diveAccum;
 
   /* ---- hız hesapla ---- */
-  const targetSpeed = braking ? 0 : c.boost ? FLIGHT.boostSpeed : FLIGHT.baseSpeed;
+  const diveBoost = a.diveAccum * FLIGHT.diveGain;
+  const targetSpeed = braking ? 0 : c.boost ? FLIGHT.boostSpeed : FLIGHT.baseSpeed + diveBoost;
   s.speed +=
     (targetSpeed - s.speed) * Math.min(1, dt * (braking ? FLIGHT.brakeLerp : FLIGHT.speedLerp));
 
@@ -368,49 +369,101 @@ export function updateFlight(g: Game, dt: number): void {
   const lerpK = g.roll ? 1 : Math.min(1, dt * 5);
   d.body.rotation.z += (bank - d.body.rotation.z) * lerpK;
 
-  // Kanat çırpma
+  // Beden pitch eğimi — alçalırken tüm gövde aşağı doğru eğilir, yükselirken yukarı
+  const bodyPitch = -a.pitch * 0.45;
+  d.body.rotation.x += (bodyPitch - d.body.rotation.x) * Math.min(1, dt * 5);
+
+  // Kanat çırpma — kanat ucu gecikmesiyle
   s.flap += dt * (braking ? FLIGHT.brakeFlapRate : 2.2 + s.speed * 0.03);
   const flapAmt = Math.sin(s.flap) * (braking ? 0.9 : c.throttle ? 0.75 : 0.5);
+  const flapSpeed = braking ? FLIGHT.brakeFlapRate : 2.2 + s.speed * 0.03;
+  const tipLag = 0.35; // kanat ucu eklem gecikmesi (radyan)
   d.wingR.rotation.z = -flapAmt - 0.1;
   d.wingL.rotation.z = flapAmt + 0.1;
-  d.wingR.rotation.x = Math.sin(s.flap - 0.6) * 0.16;
-  d.wingL.rotation.x = Math.sin(s.flap - 0.6) * 0.16;
+  d.wingR.rotation.x = Math.sin(s.flap - tipLag) * 0.16;
+  d.wingL.rotation.x = Math.sin(s.flap - tipLag) * 0.16;
 
-  // Kuyruk ve boyun animasyonu
+  // Bacak salınımı — uçuşta geriye sarkar, fren/devasa hızlı ise bükülür
+  const legSwing = s.speed * 0.008 + (braking ? 0.18 : 0);
+  const legDangle = Math.sin(s.flap * 0.4) * 0.04;
+  for (const leg of d.legs) {
+    leg.thigh.rotation.x = 0.55 + legSwing + legDangle;
+    leg.shin.rotation.x = -0.2 - legSwing * 0.3;
+  }
+
+  // Kuyruk — genlik azalması + EXTRA whipcord inventi
   d.tail.forEach((t, i) => {
-    t.rotation.y = Math.sin(s.flap * 0.7 - i * 0.45) * 0.13 - a.roll * 0.08;
-    t.rotation.x = Math.sin(s.flap * 0.5 - i * 0.3) * 0.05;
+    const norm = i / (d.tail.length - 1);
+    const amp = 0.15 * (1 - norm * 0.4);
+    const phase = s.flap * 0.7 - i * 0.52;
+    t.rotation.y = Math.sin(phase) * amp - a.roll * 0.1 * (1 - norm);
+    t.rotation.x = Math.sin(phase * 0.6) * 0.05 * (1 - norm * 0.3);
+    // Ek: kuyruk ucu sallantısı
+    if (norm > 0.7) {
+      t.rotation.z = Math.sin(s.flap * 1.3 + i * 0.3) * 0.06 * (norm - 0.7) * 3.3;
+    }
   });
+
+  // Boyun — S-eğrisi + bağımsız baş bakışı
+  const neckLen = d.neck.length;
   d.neck.forEach((n, i) => {
-    const fireTilt = g.fireT * 0.35 * (1 - i * 0.15);
-    n.rotation.x = -a.pitch * 0.12 + fireTilt + Math.sin(s.flap * 0.6 - i) * 0.03;
-    n.rotation.y = -a.yaw * 0.08 - a.roll * 0.05;
+    const norm = i / (neckLen - 1);
+    const fireTilt = g.fireT * 0.35 * (1 - norm * 0.7);
+    // Pitch etkisi: kök segment daha fazla eğilir, uç segment daha az
+    const pitchEffect = -a.pitch * 0.15 * (1 - norm * 0.5);
+    // Yaw etkisi: S-eğrisi için alternans
+    const yawS = Math.sin(norm * Math.PI) * -a.yaw * 0.12;
+    // Flap titreşimi: her segment farklı fazda
+    const wave = Math.sin(s.flap * 0.6 - i * 0.65) * 0.04 * (1 - norm * 0.3);
+
+    n.rotation.x = pitchEffect + fireTilt + wave;
+    n.rotation.y = yawS - a.roll * 0.06 * (1 - norm * 0.3);
   });
+
+  // Baş — boyundan bağımsız, yumuşak look-ahead
+  const speedFactor = Math.min(1, s.speed * 0.02);
+  const pitchLead = -a.pitch * 0.25 * speedFactor;
+  const yawLead = -a.yaw * 0.18 * speedFactor;
+  d.headLook.rotation.x += (pitchLead - d.headLook.rotation.x) * Math.min(1, dt * 7);
+  d.headLook.rotation.y += (yawLead - d.headLook.rotation.y) * Math.min(1, dt * 7);
 }
 
 /** Ejderhanın yönüyle dönen, arkadan-üstten takip kamerası. */
+const BASE_FOV = 66;
 export function updateCamera(g: Game, dt: number, playing: boolean): void {
   const s = g.state;
   const a = g.flightAxes;
+  const dive = a.diveAccum;
   const ry = g.dragon.root.rotation.y;
 
-  // Kamera geri mesafesi: pitch yukarı çıktıkça biraz uzar.
+  // Kamera geri mesafesi: dalarken yakınlaşır, pitch yukarı çıktıkça uzar.
   const pitchBackOffset = Math.max(0, a.pitch) * 6;
-  const back = (playing ? 34 + s.speed * 0.16 : 40) + (s.rageT > 0 ? 8 : 0) + pitchBackOffset;
+  const diveClose = dive * 6;
+  const back = (playing ? 34 + s.speed * 0.16 : 40) + (s.rageT > 0 ? 8 : 0) + pitchBackOffset - diveClose;
 
-  // Kamera yüksekliği: pitch yukarı çıkınca biraz yukarı.
+  // Kamera yüksekliği: pitch yukarı çıkınca biraz yukarı, dalarken biraz alçalır.
   const pitchHeightOffset = a.pitch * 8;
+  const diveHeightDrop = dive * 5;
 
-  camOff.set(0, 14 + pitchHeightOffset, -back).applyAxisAngle(UP, ry);
+  camOff.set(0, 14 + pitchHeightOffset - diveHeightDrop, -back).applyAxisAngle(UP, ry);
   camGoal.copy(camOff).add(g.dragon.root.position);
   camPos.copy(g.camera.position).lerp(camGoal, Math.min(1, dt * 9));
 
+  // Hasar sarsıntısı
   if (s.shakeT > 0) {
     s.shakeT = Math.max(0, s.shakeT - dt);
     const amp = s.shakeAmp * (s.shakeT / 0.35);
     camPos.x += (Math.random() - 0.5) * amp;
     camPos.y += (Math.random() - 0.5) * amp;
   }
+
+  // Dalma mikro-sarsıntısı — derin dalma titreşimi
+  if (dive > 0.2) {
+    const dAmp = (dive - 0.2) * 1.8;
+    camPos.x += (Math.random() - 0.5) * dAmp;
+    camPos.y += (Math.random() - 0.5) * dAmp * 0.5;
+  }
+
   camPos.y = Math.max(terrainHeight(camPos.x, camPos.z) + 8, camPos.y);
   g.camera.position.copy(camPos);
 
@@ -424,6 +477,11 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
   lookGoal.add(tmpVec);
 
   g.camera.lookAt(lookGoal);
+
+  // FOV: dalarken genişler (hız hissi), NORMAL'e dönüş yumuşak
+  const targetFov = BASE_FOV + dive * 10 + Math.max(0, a.pitch) * -3;
+  g.camera.fov += (targetFov - g.camera.fov) * Math.min(1, dt * 4);
+  g.camera.updateProjectionMatrix();
 }
 
 export function shake(g: Game, amp: number): void {

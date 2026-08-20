@@ -903,6 +903,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
 
       /* ---- uçuş ---- */
       updateFlight(g, dt);
+      audio.diveWind(g.dive);
+      fx.windStreak(dragon.root.position, g.flightAxes.heading, g.dive);
       if (g.infinite) updateInfinitePath(g, g.infinite, dt);
       dragon.maw.getWorldPosition(headPos);
 

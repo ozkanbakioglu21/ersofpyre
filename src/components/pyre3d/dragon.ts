@@ -7,9 +7,13 @@ export type DragonRig = {
   wingR: THREE.Group;
   tail: THREE.Group[];
   neck: THREE.Group[];
+  /** Boyun ile baş arasında bağımsız bakış eklemi */
+  headLook: THREE.Group;
   jaw: THREE.Mesh;
   glow: THREE.PointLight;
   maw: THREE.Mesh;
+  /** Bacak reference'ları — sol ve sağ, üst bacak + alt bacak */
+  legs: { thigh: THREE.Mesh; shin: THREE.Mesh }[];
 };
 
 const shared = <T extends THREE.Material>(m: T): T => {
@@ -228,27 +232,28 @@ export function createDragon(): DragonRig {
   }
 
   /* ================================================================== *
-   *  BOYUN — 5 segment, organik eğri
+   *  BOYUN — 9 segment, esnek S-eğrisi
    * ================================================================== */
   const neck: THREE.Group[] = [];
   let attach: THREE.Object3D = body;
-  const neckSegs = 5;
+  const neckSegs = 9;
   for (let i = 0; i < neckSegs; i++) {
     const seg = new THREE.Group();
-    const yOff = i === 0 ? 0.45 : 0.14 + Math.sin(i * 0.4) * 0.04;
-    const zOff = i === 0 ? 1.9 : 0.75;
+    const t = i / (neckSegs - 1);
+    const yOff = i === 0 ? 0.45 : 0.12 + Math.sin(t * Math.PI * 0.8) * 0.08;
+    const zOff = i === 0 ? 1.9 : 0.42;
     seg.position.set(0, yOff, zOff);
 
-    const r = 0.72 - i * 0.09;
-    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), hide);
+    const r = THREE.MathUtils.lerp(0.72, 0.28, t);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 8), hide);
     m.scale.set(1, 0.92, 1.3);
     casters.add(m);
     seg.add(m);
 
-    // Boyun altı — karın rengi
-    if (i < 3) {
+    // Boyun altı — karın rengi (ilk 4 segment)
+    if (i < 4) {
       const throat = new THREE.Mesh(
-        new THREE.SphereGeometry(r * 0.7, 10, 8),
+        new THREE.SphereGeometry(r * 0.7, 8, 6),
         belly,
       );
       throat.scale.set(0.8, 0.6, 1.1);
@@ -256,10 +261,10 @@ export function createDragon(): DragonRig {
       seg.add(throat);
     }
 
-    // Boyun dikenleri
-    if (i > 0 && i < 4) {
+    // Boyun dikenleri (orta segmentler)
+    if (i > 0 && i < neckSegs - 1 && i % 2 === 1) {
       const ns = new THREE.Mesh(
-        new THREE.ConeGeometry(0.12, 0.45, 4),
+        new THREE.ConeGeometry(0.1, 0.35, 4),
         scaleMat(0x1a1410, 0.8),
       );
       ns.position.set(0, r * 0.7, 0);
@@ -272,11 +277,15 @@ export function createDragon(): DragonRig {
   }
 
   /* ================================================================== *
-   *  BAŞ — detaylı
+   *  BAŞ — detaylı (headLook eklemi ile)
    * ================================================================== */
+  const headLook = new THREE.Group();
+  headLook.position.set(0, 0.08, 0.42);
+  attach.add(headLook);
+
   const head = new THREE.Group();
-  head.position.set(0, 0.08, 0.85);
-  attach.add(head);
+  head.position.set(0, 0, 0.43);
+  headLook.add(head);
 
   // Kafatası — ana kütle
   const skull = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 12), hide);
@@ -478,7 +487,7 @@ export function createDragon(): DragonRig {
     elbow.position.set(2.9 * side, 0, 0);
     g.add(elbow);
 
-    // El parmakları — 4 ana kemik
+    // El parmakları — 4 ana yumuşak kamış (ince, yuvarlak)
     const fingers = new THREE.Group();
     fingers.position.set(2.9 * side, 0, 0);
     g.add(fingers);
@@ -488,7 +497,7 @@ export function createDragon(): DragonRig {
     for (let i = 0; i < 4; i++) {
       const len = fingerLens[i]!;
       const f = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.06 - i * 0.008, len, 4, 6),
+        new THREE.CylinderGeometry(0.035 - i * 0.004, 0.025 - i * 0.003, len, 5),
         scaleMat(0x1e1510, 0.8),
       );
       f.rotation.z = Math.PI / 2;
@@ -499,19 +508,6 @@ export function createDragon(): DragonRig {
         -(len / 2) * Math.sin(fingerAngles[i]!),
       );
       fingers.add(f);
-
-      // Parmak ucu pençe
-      const tip = new THREE.Mesh(
-        new THREE.ConeGeometry(0.04, 0.2, 4),
-        hornMat,
-      );
-      tip.position.set(
-        len * side * Math.cos(fingerAngles[i]!),
-        0,
-        -len * Math.sin(fingerAngles[i]!),
-      );
-      tip.rotation.z = side * Math.PI / 2;
-      fingers.add(tip);
     }
 
     // Baş parmak (kçik, geriye)
@@ -557,6 +553,7 @@ export function createDragon(): DragonRig {
   /* ================================================================== *
    *  BACAKLAR — kalın, kaslı, pençeli
    * ================================================================== */
+  const legs: { thigh: THREE.Mesh; shin: THREE.Mesh }[] = [];
   for (const s of [-1, 1]) {
     // Üst bacak (uyluk)
     const thigh = new THREE.Mesh(
@@ -583,6 +580,8 @@ export function createDragon(): DragonRig {
     shin.position.set(0.7 * s, -1.7, 1.1);
     shin.rotation.x = -0.2;
     body.add(shin);
+
+    legs.push({ thigh, shin });
 
     // Ayak pençeleri — 3 ana pençe + arka pençe
     const footPos = new THREE.Vector3(0.7 * s, -2.1, 1.4);
@@ -613,36 +612,38 @@ export function createDragon(): DragonRig {
   }
 
   /* ================================================================== *
-   *  KUYRUK — 10 segment, kama ucu
+   *  KUYRUK — 14 segment, akıcı kırbaç hareketi
    * ================================================================== */
   const tail: THREE.Group[] = [];
   let tAttach: THREE.Object3D = body;
-  for (let i = 0; i < 10; i++) {
+  const tailSegs = 14;
+  for (let i = 0; i < tailSegs; i++) {
     const seg = new THREE.Group();
+    const t = i / (tailSegs - 1);
     seg.position.set(
       0,
       i === 0 ? 0.08 : (i < 3 ? 0.02 : 0),
-      i === 0 ? -2.5 : -0.68,
+      i === 0 ? -2.5 : -0.5,
     );
-    const r = Math.max(0.06, 0.55 - i * 0.05);
+    const r = THREE.MathUtils.lerp(0.55, 0.06, t);
     const m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), hide);
     m.scale.set(1, 0.9, 1.4);
-    if (i < 5) casters.add(m);
+    if (i < 6) casters.add(m);
     seg.add(m);
 
     // Kuyruk üst dikenleri
-    if (i % 2 === 0 && i < 8) {
+    if (i % 2 === 0 && i < tailSegs - 3) {
       const fin = new THREE.Mesh(
-        new THREE.ConeGeometry(0.12, 0.5, 4),
+        new THREE.ConeGeometry(0.1 * (1 - t * 0.7), 0.4 * (1 - t * 0.5), 4),
         scaleMat(0x1a1410, 0.8),
       );
-      fin.position.set(0, r + 0.15, 0);
+      fin.position.set(0, r + 0.12, 0);
       seg.add(fin);
     }
 
     // Magma damarları kuyrukta
-    if (i < 6 && i % 2 === 0) {
-      const v = new THREE.Mesh(new THREE.SphereGeometry(0.06, 5, 5), magma);
+    if (i < 8 && i % 2 === 0) {
+      const v = new THREE.Mesh(new THREE.SphereGeometry(0.05 * (1 - t * 0.5), 5, 5), magma);
       v.position.set(0, r * 0.8, 0);
       seg.add(v);
     }
@@ -682,5 +683,5 @@ export function createDragon(): DragonRig {
     m.receiveShadow = false;
   });
 
-  return { root, body, wingL, wingR, tail, neck, jaw, glow, maw };
+  return { root, body, wingL, wingR, tail, neck, headLook, jaw, glow, maw, legs };
 }

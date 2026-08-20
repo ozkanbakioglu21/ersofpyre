@@ -19,6 +19,8 @@ export type FxSystem = {
   shock(p: THREE.Vector3): void;
   /** Çukur — bomba/alev topu yere çarpınca. */
   crater(p: THREE.Vector3, radius: number): void;
+  /** Dalma rüzgarı çizgileri: kamera etrafında apparel çizgiler */
+  windStreak(camPos: THREE.Vector3, heading: number, intensity: number): void;
   update(dt: number, now: number): void;
   setDensity(k: number): void;
   dispose(): void;
@@ -189,6 +191,31 @@ export function createFx(scene: THREE.Scene): FxSystem {
   }
   let craterIdx = 0;
 
+  /* ---- dalma rüzgarı çizgileri ---- */
+  const WIND_STREAKS = 60;
+  const wsPos = new Float32Array(WIND_STREAKS * 3);
+  const wsLife = new Float32Array(WIND_STREAKS);
+  const wsMax = new Float32Array(WIND_STREAKS);
+  const wsGeo = new THREE.BufferGeometry();
+  wsGeo.setAttribute("position", new THREE.BufferAttribute(wsPos, 3));
+  const wsMat = new THREE.PointsMaterial({
+    color: 0xffffff,
+    map: softParticleTexture(),
+    size: 3.5,
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const wsPts = new THREE.Points(wsGeo, wsMat);
+  wsPts.frustumCulled = false;
+  scene.add(wsPts);
+  let wsIdx = 0;
+  for (let i = 0; i < WIND_STREAKS; i++) {
+    wsLife[i] = 0;
+    wsPos[i * 3 + 1] = -9999;
+  }
+
   let density = 1;
 
   return {
@@ -281,6 +308,27 @@ export function createFx(scene: THREE.Scene): FxSystem {
       // Ek kor sıçraması
       this.ember(p, Math.round(radius * 3), radius * 0.6);
     },
+    windStreak(camPos, heading, intensity) {
+      if (intensity < 0.15) return;
+      // Her karede yoğunluğa bağlı streak ekle
+      const spawn = Math.round(intensity * 4);
+      const cosH = Math.cos(heading);
+      const sinH = Math.sin(heading);
+      for (let i = 0; i < spawn; i++) {
+        const i3 = wsIdx * 3;
+        // Kamera etrafında rastgele ofset (yana + yukari/asagi)
+        const lateral = rand(-20, 20);
+        const vert = rand(-8, 8);
+        const fwd = rand(15, 50);
+        wsPos[i3] = camPos.x + sinH * fwd + cosH * lateral;
+        wsPos[i3 + 1] = camPos.y + vert;
+        wsPos[i3 + 2] = camPos.z + cosH * fwd - sinH * lateral;
+        const life = rand(0.15, 0.35);
+        wsLife[wsIdx] = life;
+        wsMax[wsIdx] = life;
+        wsIdx = (wsIdx + 1) % WIND_STREAKS;
+      }
+    },
     update(dt, now) {
       for (let i = 0; i < EMBERS; i++) {
         if (emLife[i]! <= 0) continue;
@@ -341,6 +389,16 @@ export function createFx(scene: THREE.Scene): FxSystem {
       const hasSmoke = smLife.some((l) => l > 0);
       smokeMat.opacity = hasSmoke ? 0.32 : 0;
 
+      /* ---- rüzgar çizgileri ---- */
+      for (let i = 0; i < WIND_STREAKS; i++) {
+        if (wsLife[i]! <= 0) continue;
+        wsLife[i] = wsLife[i]! - dt;
+        if (wsLife[i]! <= 0) wsPos[i * 3 + 1] = -9999;
+      }
+      const hasStreaks = wsLife.some((l) => l > 0);
+      wsMat.opacity = hasStreaks ? 0.35 : 0;
+      (wsGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
+
       for (const b of blasts) {
         if (b.t < 0) continue;
         b.t += dt;
@@ -374,11 +432,13 @@ export function createFx(scene: THREE.Scene): FxSystem {
       emGeo.dispose();
       fpGeo.dispose();
       smGeo.dispose();
+      wsGeo.dispose();
       blastGeo.dispose();
       shockMesh.geometry.dispose();
       emberMat.dispose();
       flameMat.dispose();
       smokeMat.dispose();
+      wsMat.dispose();
       shockMat.dispose();
       craterBaseMat.dispose();
       craterRimMat.dispose();
