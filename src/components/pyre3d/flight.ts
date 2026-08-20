@@ -77,22 +77,22 @@ export const FLIGHT = {
   diveDecay: 0.75,
 
   /* ---- dik iniş ---- */
-  steepDiveDuration: 1.4,
-  steepDiveSpeedBoost: 72,
+  steepDiveDuration: 2.0,
+  steepDiveSpeedBoost: 48,
   steepDiveStaminaCost: 18,
   steepDiveCooldown: 3,
   /** Dik iniş hedef pitch açısı: 80° ≈ 1.396 radyan. */
   steepDivePitch: 1.396,
-  /** Burnu aşağı itme hızı — 80°'ye hızlı geçiş. */
-  steepDivePitchRate: 10,
+  /** Burnu aşağı itme hızı — yavaş, sinematik geçiş. */
+  steepDivePitchRate: 5,
   /** Dalış sırasında ekstra dikey ivme (aşağı). */
-  steepDiveAltAccel: -280,
-  /** Korkscrew frekansı (rad/s) — saniyede ~0.56 tam tur. */
-  steepDiveSpiralRate: 3.5,
-  /** Korkscrew yaw genliği — sarmal yol genişliği. */
-  steepDiveSpiralYaw: 0.45,
-  /** Dalışta otomatik bank açısı (rad). */
-  steepDiveAutoBank: 0.7,
+  steepDiveAltAccel: -150,
+  /** Korkscrew frekansı (rad/s) — yavaş, geniş sarmal. */
+  steepDiveSpiralRate: 2.0,
+  /** Korkscrew yaw genliği — geniş, elegant yol. */
+  steepDiveSpiralYaw: 0.55,
+  /** Dalışta otomatik bank açısı (rad) — zarif yatlama. */
+  steepDiveAutoBank: 0.5,
 
   /* ---- barrel roll (takla) ---- */
   rollDuration: 0.55,
@@ -125,6 +125,8 @@ export type FlightAxes = {
   steepDiveT: number;
   /** Korkscrew faz biriktiricisi. */
   steepDivePhase: number;
+  /** Kanat katlama durumu (0=açık, 0.4=katlı) — yumuşak geçiş. */
+  wingFold: number;
   /** Ejderhanın yatay yön açısı (radyan). Yaw input'u bu açıya birikir. */
   heading: number;
 };
@@ -141,6 +143,7 @@ export function createFlightAxes(): FlightAxes {
     diveAccum: 0,
     steepDiveT: 0,
     steepDivePhase: 0,
+    wingFold: 0,
     heading: 0,
   };
 }
@@ -241,7 +244,7 @@ export function updateFlight(g: Game, dt: number): void {
     a.heading += Math.sin(a.steepDivePhase) * FLIGHT.steepDiveSpiralYaw * dt;
     // Otomatik bank: gövde yatar → görsel dramatiklik
     const autoBank = FLIGHT.steepDiveAutoBank * Math.cos(a.steepDivePhase * 0.7);
-    a.roll += (autoBank - a.roll) * Math.min(1, dt * 6);
+    a.roll += (autoBank - a.roll) * Math.min(1, dt * 3);
   }
 
   /* ---- stamina ---- */
@@ -436,14 +439,15 @@ export function updateFlight(g: Game, dt: number): void {
   const bodyPitch = -a.pitch * (a.steepDiveT > 0 ? 1.0 : 0.45);
   d.body.rotation.x += (bodyPitch - d.body.rotation.x) * Math.min(1, dt * 5);
 
-  // Kanat çırpma — kanat ucu gecikmesiyle; dik inişte kanatlar katlanır
+  // Kanat çırpma — kanat ucu gecikmesiyle; dik inişte kanatlar yavaşça katlanır
   s.flap += dt * (braking ? FLIGHT.brakeFlapRate : 2.2 + s.speed * 0.03);
-  const wingFold = a.steepDiveT > 0 ? 0.4 : 0;
+  const wingFoldTarget = a.steepDiveT > 0 ? 0.4 : 0;
+  a.wingFold += (wingFoldTarget - a.wingFold) * Math.min(1, dt * 3);
   const flapAmt = Math.sin(s.flap) * (braking ? 0.9 : c.throttle ? 0.75 : 0.5);
   const flapSpeed = braking ? FLIGHT.brakeFlapRate : 2.2 + s.speed * 0.03;
   const tipLag = 0.35; // kanat ucu eklem gecikmesi (radyan)
-  d.wingR.rotation.z = -flapAmt - 0.1 - wingFold;
-  d.wingL.rotation.z = flapAmt + 0.1 + wingFold;
+  d.wingR.rotation.z = -flapAmt - 0.1 - a.wingFold;
+  d.wingL.rotation.z = flapAmt + 0.1 + a.wingFold;
   d.wingR.rotation.x = Math.sin(s.flap - tipLag) * 0.16;
   d.wingL.rotation.x = Math.sin(s.flap - tipLag) * 0.16;
 
@@ -532,11 +536,11 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
 
   // Dik iniş sarsıntısı — korkscrew sallanması + sarsıntı
   if (a.steepDiveT > 0) {
-    const sdAmp = 1.2 * Math.min(1, (FLIGHT.steepDiveDuration - a.steepDiveT) / 0.3);
+    const sdAmp = 0.8 * Math.min(1, (FLIGHT.steepDiveDuration - a.steepDiveT) / 0.5);
     // Korkscrew kamerası: spiralle senkronize yatay salınım
-    const spiralSway = Math.sin(a.steepDivePhase) * 2.5;
+    const spiralSway = Math.sin(a.steepDivePhase) * 2.0;
     camPos.x += spiralSway;
-    camPos.y += (Math.random() - 0.5) * sdAmp * 0.6;
+    camPos.y += (Math.random() - 0.5) * sdAmp * 0.5;
   }
 
   camPos.y = Math.max(terrainHeight(camPos.x, camPos.z) + 8, camPos.y);
