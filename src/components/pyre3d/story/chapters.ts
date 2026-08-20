@@ -31,7 +31,7 @@ const c01: ChapterDef = {
     ],
   },
   world: {
-    radius: 700,
+    radius: 1400,
     terrain: [{ t: "ridge", axis: "z", center: 0, halfWidth: 95, feather: 110, height: 170 }],
     scatter: {},
     props: [
