@@ -76,6 +76,17 @@ export const FLIGHT = {
   diveGain: 46,
   diveDecay: 0.75,
 
+  /* ---- dik iniş ---- */
+  steepDiveDuration: 1.4,
+  steepDiveSpeedBoost: 58,
+  steepDiveStaminaCost: 18,
+  steepDiveCooldown: 3,
+  /** Burnu aşağı itme hızı — oyuncunun iptal etmesine izin verecek kadar yavaş ama
+   *  hissedilir kadar hızlı. */
+  steepDivePitchRate: 6.5,
+  /** Dalış sırasında ekstra dikey ivme (aşağı). */
+  steepDiveAltAccel: -140,
+
   /* ---- barrel roll (takla) ---- */
   rollDuration: 0.55,
   rollInvuln: 0.4,
@@ -103,6 +114,8 @@ export type FlightAxes = {
   altMomentum: number;
   /** Dalma ile biriken ekstra hız skoru (0..1). */
   diveAccum: number;
+  /** Dik iniş kalan süre (s). 0 = aktif değil. */
+  steepDiveT: number;
   /** Ejderhanın yatay yön açısı (radyan). Yaw input'u bu açıya birikir. */
   heading: number;
 };
@@ -117,6 +130,7 @@ export function createFlightAxes(): FlightAxes {
     yawVel: 0,
     altMomentum: 0,
     diveAccum: 0,
+    steepDiveT: 0,
     heading: 0,
   };
 }
@@ -157,6 +171,18 @@ export function tryRoll(g: Game, dir: -1 | 1): boolean {
   return true;
 }
 
+/** Dik iniş: burnu zorla aşağı iter, kısa süreli büyük hız ve irtifa kaybı. */
+export function trySteepDive(g: Game): boolean {
+  const s = g.state;
+  const a = g.flightAxes;
+  if (a.steepDiveT > 0 || s.steepDiveCd > 0 || s.stamina < FLIGHT.steepDiveStaminaCost) return false;
+  a.steepDiveT = FLIGHT.steepDiveDuration;
+  s.steepDiveCd = FLIGHT.steepDiveCooldown;
+  s.stamina -= FLIGHT.steepDiveStaminaCost;
+  g.audio.roll(); // mevcut sesi kullan — yaratılmadı henüz
+  return true;
+}
+
 /** Hedefe yumuşak yaklaşma (momentum damping). */
 function lerpDamp(
   current: number,
@@ -184,11 +210,17 @@ export function updateFlight(g: Game, dt: number): void {
   s.emberRush = Math.max(0, s.emberRush - dt);
   s.snared = Math.max(0, s.snared - dt);
   s.marked = Math.max(0, s.marked - dt);
+  s.steepDiveCd = Math.max(0, s.steepDiveCd - dt);
 
   /* ---- barrel roll (dodge) ---- */
   if (c.dodge !== 0) {
     tryRoll(g, c.dodge > 0 ? 1 : -1);
     c.dodge = 0;
+  }
+
+  /* ---- dik iniş timerı ---- */
+  if (a.steepDiveT > 0) {
+    a.steepDiveT = Math.max(0, a.steepDiveT - dt);
   }
 
   /* ---- stamina ---- */
@@ -211,6 +243,12 @@ export function updateFlight(g: Game, dt: number): void {
     // Askıda kalırken burun düzleşiyor.
     a.pitch += (0 - a.pitch) * Math.min(1, dt * FLIGHT.pitchReturn);
     a.pitchVel = 0;
+  } else if (a.steepDiveT > 0) {
+    // Dik iniş: burnu zorla max aşağı eğ — pitch(Return)/trimRate'e dokunulmaz,
+    // oyuncu V'ye basınca burnun aniden kilitlenmesi hissedilir.
+    const before = a.pitch;
+    a.pitch += (-FLIGHT.maxPitch - a.pitch) * Math.min(1, dt * FLIGHT.steepDivePitchRate);
+    a.pitchVel = (a.pitch - before) / Math.max(dt, 1e-4);
   } else {
     const before = a.pitch;
     if (Math.abs(c.pitch) > 0.05) {
@@ -267,7 +305,8 @@ export function updateFlight(g: Game, dt: number): void {
 
   /* ---- hız hesapla ---- */
   const diveBoost = a.diveAccum * FLIGHT.diveGain;
-  const targetSpeed = braking ? 0 : c.boost ? FLIGHT.boostSpeed : FLIGHT.baseSpeed + diveBoost;
+  const steepBoost = a.steepDiveT > 0 ? FLIGHT.steepDiveSpeedBoost * Math.min(1, a.steepDiveT / 0.25) : 0;
+  const targetSpeed = braking ? 0 : c.boost ? FLIGHT.boostSpeed : FLIGHT.baseSpeed + diveBoost + steepBoost;
   s.speed +=
     (targetSpeed - s.speed) * Math.min(1, dt * (braking ? FLIGHT.brakeLerp : FLIGHT.speedLerp));
 
@@ -321,9 +360,12 @@ export function updateFlight(g: Game, dt: number): void {
       ? c.pitch * FLIGHT.altSpeed * 0.55
       : a.pitch * FLIGHT.altSpeed + c.throttle * FLIGHT.altSpeed * 0.15;
 
+  // Dik iniş: ekstra dikey ivme ekle (yere doğru çekim).
+  const steepAltBoost = a.steepDiveT > 0 ? FLIGHT.steepDiveAltAccel * Math.min(1, a.steepDiveT / 0.3) : 0;
+
   // Hover'da irtifa momentumu daha yumuşak.
   const altLerp = hover ? 2.5 : 6.5;
-  a.altMomentum += (altInput - a.altMomentum) * Math.min(1, dt * altLerp);
+  a.altMomentum += (altInput + steepAltBoost - a.altMomentum) * Math.min(1, dt * altLerp);
 
   const groundY = terrainHeight(d.root.position.x, d.root.position.z);
   const minY = groundY + FLIGHT.minClearance;
@@ -464,6 +506,13 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
     camPos.y += (Math.random() - 0.5) * dAmp * 0.5;
   }
 
+  // Dik iniş sarsıntısı — kamera daha hızlı sallanır
+  if (a.steepDiveT > 0) {
+    const sdAmp = 1.2 * Math.min(1, (FLIGHT.steepDiveDuration - a.steepDiveT) / 0.3);
+    camPos.x += (Math.random() - 0.5) * sdAmp;
+    camPos.y += (Math.random() - 0.5) * sdAmp * 0.6;
+  }
+
   camPos.y = Math.max(terrainHeight(camPos.x, camPos.z) + 8, camPos.y);
   g.camera.position.copy(camPos);
 
@@ -479,7 +528,8 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
   g.camera.lookAt(lookGoal);
 
   // FOV: dalarken genişler (hız hissi), NORMAL'e dönüş yumuşak
-  const targetFov = BASE_FOV + dive * 10 + Math.max(0, a.pitch) * -3;
+  const steepFov = a.steepDiveT > 0 ? 8 * Math.min(1, a.steepDiveT / 0.2) : 0;
+  const targetFov = BASE_FOV + dive * 10 + Math.max(0, a.pitch) * -3 + steepFov;
   g.camera.fov += (targetFov - g.camera.fov) * Math.min(1, dt * 4);
   g.camera.updateProjectionMatrix();
 }

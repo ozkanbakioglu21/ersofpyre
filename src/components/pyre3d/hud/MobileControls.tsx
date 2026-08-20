@@ -61,6 +61,7 @@ export type TouchAbilities = {
   roll: boolean;
   shock: boolean;
   rage: boolean;
+  steepDive: boolean;
 };
 
 export function MobileControls({
@@ -259,6 +260,19 @@ export function MobileControls({
         buzz(26);
       },
       show: (f) => f.rage >= 100,
+    });
+  }
+  if (abilities.steepDive) {
+    buttons.push({
+      key: "dikInis",
+      label: "Dik İniş",
+      size: 58,
+      tone: "border-sky-400/70 bg-sky-400/15 text-sky-300",
+      press: () => {
+        ctrl.current.steepDive = true;
+        buzz(16);
+      },
+      cd: (f) => f.steepDiveCd,
     });
   }
 

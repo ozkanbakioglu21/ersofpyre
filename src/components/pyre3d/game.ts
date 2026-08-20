@@ -34,6 +34,7 @@ import {
   FLIGHT,
   shake,
   tryRoll,
+  trySteepDive,
   updateCamera,
   updateFlight,
   createFlightAxes,
@@ -488,6 +489,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     shockCd: 0,
     fireballCd: 0,
     rollCd: 0,
+    steepDiveCd: 0,
     speed: FLIGHT.baseSpeed,
     combo: 1,
     comboT: 0,
@@ -1036,6 +1038,15 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           audio.rage();
         }
       }
+
+      /* ---- dik iniş ---- */
+      if (c.steepDive) {
+        c.steepDive = false;
+        if (trySteepDive(g)) {
+          audio.roar();
+          shake(g, 0.5);
+        }
+      }
       if (state.rageT > 0) {
         state.rageT = Math.max(0, state.rageT - dt);
         fill.color.setHex(0xff7050);
@@ -1499,6 +1510,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     f.fireballCd = state.fireballCd / FIREBALL.cooldown;
     f.shockCd = state.shockCd / 5;
     f.rollCd = state.rollCd / FLIGHT.rollCooldown;
+    f.steepDiveCd = state.steepDiveCd / FLIGHT.steepDiveCooldown;
     f.elapsed = Math.round(state.time);
     f.bestTime = bestTime;
     bridge.paint();

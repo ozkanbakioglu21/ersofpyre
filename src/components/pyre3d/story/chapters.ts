@@ -7,7 +7,7 @@ import type { ChapterDef, ChapterId } from "./types";
  * ilerledikçe artar — son bölüm her şeyi bir araya getirir.
  */
 
-const ALL_OFF = { flame: false, fireball: false, roll: false, shock: false, rage: false };
+const ALL_OFF = { flame: false, fireball: false, roll: false, shock: false, rage: false, steepDive: false };
 
 /* ------------------------------------------------------------------ *
  * 01 — Uyanış
@@ -516,7 +516,7 @@ const c05: ChapterDef = {
     { id: "yikim", type: "destroyPercent", pct: 0.4, label: "Yerleşimi yak" },
   ],
   fail: [{ type: "death" }],
-  abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true },
+  abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true, steepDive: true },
   par: { time: 300, score: 14000 },
   rewardEmbers: 1800,
   bondXp: 180,
@@ -605,7 +605,7 @@ const c06: ChapterDef = {
     { id: "yikim", type: "destroyPercent", pct: 0.5, label: "Yerleşimi yak" },
   ],
   fail: [{ type: "death" }],
-  abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true, shock: true, rage: true },
+  abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true, shock: true, rage: true, steepDive: true },
   par: { time: 180, score: 9000 },
   rewardEmbers: 2400,
   bondXp: 240,
@@ -722,7 +722,7 @@ const c07: ChapterDef = {
     { id: "hayatta", type: "survive", seconds: 120, label: "Hayatta kal" },
   ],
   fail: [{ type: "death" }],
-  abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true, shock: true, rage: true },
+  abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true, shock: true, rage: true, steepDive: true },
   par: { time: 600, score: 40000 },
   rewardEmbers: 4000,
   bondXp: 300,
@@ -833,7 +833,7 @@ export function makeSandbox(seed: number): ChapterDef {
     },
     objectives: [{ id: "yikim", type: "destroyPercent", pct: 0.7, label: "Şehri küle çevir" }],
     fail: [{ type: "death" }],
-    abilities: { flame: true, fireball: true, roll: true, shock: true, rage: true },
+    abilities: { flame: true, fireball: true, roll: true, shock: true, rage: true, steepDive: true },
     par: { time: 420, score: 24000 },
     rewardEmbers: 600,
     bondXp: 40,

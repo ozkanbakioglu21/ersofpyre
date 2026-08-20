@@ -165,6 +165,7 @@ export default function PyreGame3D({
       if (e.code === "KeyR") c.dodge = c.yaw < 0 ? -1 : 1;
       if (e.code === "KeyC") c.shock = true;
       if (e.code === "KeyG") c.rage = true;
+      if (e.code === "KeyV") c.steepDive = true;
       if (e.code === "Escape") togglePause();
       if (e.code === "Enter") gameRef.current?.cmd({ t: "skipLine" });
       sync();

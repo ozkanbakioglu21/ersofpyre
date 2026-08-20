@@ -42,6 +42,8 @@ export type Ctrl = {
   shock: boolean;
   /** Ejderha Öfkesi — kenar tetikli. */
   rage: boolean;
+  /** Dik iniş — kenar tetikli. Burnu zorla aşağı iter, hızlı irtifa kaybı. */
+  steepDive: boolean;
   /** Hız boost butonu — toggle. Joystick'ten bağımsız, parmak kaldırınca
    *  sıfırlanmaz. */
   boost: boolean;
@@ -60,6 +62,7 @@ export function createCtrl(): Ctrl {
     dodge: 0,
     shock: false,
     rage: false,
+    steepDive: false,
     boost: false,
   };
 }
@@ -212,6 +215,8 @@ export type RunState = {
   snared: number;
   /** Işıldak işaretlemesi: kalan süre. */
   marked: number;
+  /** Dik iniş soğuması: kalan süre (s). */
+  steepDiveCd: number;
   /** En yakın merminin en-yakın-yaklaşma süresi; -1 = tehdit yok. */
   threatT: number;
   flap: number;
@@ -324,6 +329,7 @@ export type HudFrame = {
   fireballCd: number;
   shockCd: number;
   rollCd: number;
+  steepDiveCd: number;
   /** Burnun tutulan eğimi -1..1. Çubuktaki eğim göstergesi bunu çiziyor:
    *  pitch artık bırakınca sıfırlanmadığı için oyuncunun burnun nerede
    *  olduğunu görmesi gerekiyor. */

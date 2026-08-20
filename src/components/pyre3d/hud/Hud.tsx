@@ -16,6 +16,7 @@ const TOUCH_LABEL: Record<string, string> = {
   R: "TAKLA",
   C: "ŞOK",
   G: "ÖFKE",
+  V: "DİK İNİŞ",
   M: "KÖZ",
   F: "DUR",
   Shift: "Çubuğu sonuna it",
