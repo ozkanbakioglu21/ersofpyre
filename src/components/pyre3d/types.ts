@@ -42,6 +42,9 @@ export type Ctrl = {
   shock: boolean;
   /** Ejderha Öfkesi — kenar tetikli. */
   rage: boolean;
+  /** Hız boost butonu — toggle. Joystick'ten bağımsız, parmak kaldırınca
+   *  sıfırlanmaz. */
+  boost: boolean;
 };
 
 export function createCtrl(): Ctrl {
@@ -57,6 +60,7 @@ export function createCtrl(): Ctrl {
     dodge: 0,
     shock: false,
     rage: false,
+    boost: false,
   };
 }
 

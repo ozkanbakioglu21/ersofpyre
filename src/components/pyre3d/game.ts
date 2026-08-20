@@ -1602,6 +1602,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           ctrl.current.yaw = 0;
           ctrl.current.pitch = 0;
           ctrl.current.roll = 0;
+          ctrl.current.boost = false;
           break;
         case "resume":
           g.paused = false;

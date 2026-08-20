@@ -266,8 +266,7 @@ export function updateFlight(g: Game, dt: number): void {
   g.dive = a.diveAccum;
 
   /* ---- hız hesapla ---- */
-  // Hız sabit — ejderha daima aynı hızla uçar
-  const targetSpeed = braking ? 0 : FLIGHT.baseSpeed;
+  const targetSpeed = braking ? 0 : c.boost ? FLIGHT.boostSpeed : FLIGHT.baseSpeed;
   s.speed +=
     (targetSpeed - s.speed) * Math.min(1, dt * (braking ? FLIGHT.brakeLerp : FLIGHT.speedLerp));
 

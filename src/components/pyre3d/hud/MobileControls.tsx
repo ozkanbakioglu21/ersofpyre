@@ -427,8 +427,8 @@ function SpeedButton({ bridge, ctrl }: { bridge: HudBridge; ctrl: { current: Ctr
       onPointerDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        ctrl.current.throttle = ctrl.current.throttle > 0 ? 0 : 1;
-        buzz(ctrl.current.throttle > 0 ? 18 : 8);
+        ctrl.current.boost = !ctrl.current.boost;
+        buzz(ctrl.current.boost ? 18 : 8);
       }}
       style={{
         marginLeft: "env(safe-area-inset-left)",
