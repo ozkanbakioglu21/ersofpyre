@@ -153,6 +153,27 @@ const SFX_MANIFEST: Record<string, string[]> = {
     "scream_high_01.mp3", "scream_high_02.mp3",
   ],
   crowdScream: ["crowd_shout.ogg"],
+  dragonRoar: [
+    "dragon_roar_deep.wav", "dragon_roar_wild.wav", "dragon_roar_echo.wav",
+  ],
+  dragonGrowl: [
+    "dragon_growl_angry.wav", "troll_idle.ogg",
+  ],
+  dragonSnarl: [
+    "troll_roars.ogg", "dragon_growl_angry.wav",
+  ],
+  dragonBellow: [
+    "dragon_roar_deep.wav", "dragon_roar_echo.wav", "dragon_roar_wild.wav",
+  ],
+  dragonWingFlap: [
+    "dragon_flap.wav", "dragon_flap.mp3",
+  ],
+  dragonScreech: [
+    "dragon_roar_wild.wav", "dragon_roar_echo.wav",
+  ],
+  dragonFireBreath: [
+    "dragon_fire_breath.wav",
+  ],
 };
 
 function pickRandom<T>(arr: T[]): T {
@@ -1043,60 +1064,72 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     roar() {
       withCtx((c) => {
-        tone(c, { type: "sawtooth", from: 150, to: 55, dur: 1.3, peak: 0.32 });
-        noiseBurst(c, { dur: 1.4, peak: 0.24, type: "bandpass", from: 420, to: 160, q: 1.6 });
+        if (sfxCache.has("dragon_roar_deep.wav")) {
+          playSample(c, "dragonRoar", { pitch: 0.8 + Math.random() * 0.4, vol: 0.6 });
+          playSample(c, "dragonRoar", { pitch: 0.7 + Math.random() * 0.3, vol: 0.25, delay: 0.08 });
+        } else {
+          tone(c, { type: "sawtooth", from: 150, to: 55, dur: 1.3, peak: 0.32 });
+          noiseBurst(c, { dur: 1.4, peak: 0.24, type: "bandpass", from: 420, to: 160, q: 1.6 });
+        }
       });
     },
     diveScreech() {
       withCtx((c) => {
-        // Tiz sawtooth sweep: yüksekten alçağa → keskin ejderha çığlığı
-        tone(c, { type: "sawtooth", from: 520, to: 340, dur: 0.8, peak: 0.28 });
-        // Metalik square katmanı
-        tone(c, { type: "square", from: 680, to: 440, dur: 0.6, peak: 0.12 });
-        // Nefes/kükreme hissi
-        noiseBurst(c, { dur: 0.5, peak: 0.15, type: "bandpass", from: 1200, to: 600, q: 2.0 });
+        if (sfxCache.has("dragon_roar_wild.wav")) {
+          playSample(c, "dragonScreech", { pitch: 1.1 + Math.random() * 0.3, vol: 0.55 });
+          playSample(c, "dragonRoar", { pitch: 1.3 + Math.random() * 0.2, vol: 0.3, delay: 0.05 });
+        } else {
+          tone(c, { type: "sawtooth", from: 520, to: 340, dur: 0.8, peak: 0.28 });
+          tone(c, { type: "square", from: 680, to: 440, dur: 0.6, peak: 0.12 });
+          noiseBurst(c, { dur: 0.5, peak: 0.15, type: "bandpass", from: 1200, to: 600, q: 2.0 });
+        }
       });
     },
     growl() {
       withCtx((c) => {
-        // Derin sub-bass gürleme — ejderhanın boğazından gelen tehdit
-        tone(c, { type: "sawtooth", from: 40, to: 30, dur: 0.9, peak: 0.22 });
-        // Üst harmonik — triangular tınlama
-        tone(c, { type: "triangle", from: 120, to: 80, dur: 0.7, peak: 0.1 });
-        // Noise rumble — nefes titreşimi
-        noiseBurst(c, { dur: 0.6, peak: 0.12, type: "lowpass", from: 180, to: 60, q: 1.0 });
+        if (sfxCache.has("dragon_growl_angry.wav")) {
+          playSample(c, "dragonGrowl", { pitch: 0.7 + Math.random() * 0.4, vol: 0.45 });
+        } else {
+          tone(c, { type: "sawtooth", from: 40, to: 30, dur: 0.9, peak: 0.22 });
+          tone(c, { type: "triangle", from: 120, to: 80, dur: 0.7, peak: 0.1 });
+          noiseBurst(c, { dur: 0.6, peak: 0.12, type: "lowpass", from: 180, to: 60, q: 1.0 });
+        }
       });
     },
     bellow() {
       withCtx((c) => {
-        // Dev kükreme — 3 katmanlı güçlü ses
-        // Katman 1: sawtooth sweep (düşük→yüksek→düşük)
-        tone(c, { type: "sawtooth", from: 80, to: 200, dur: 0.3, peak: 0.35 });
-        tone(c, { type: "sawtooth", from: 200, to: 50, dur: 1.0, peak: 0.35, delay: 0.3 });
-        // Katman 2: square harmonik — metalik tınlama
-        tone(c, { type: "square", from: 160, to: 45, dur: 1.2, peak: 0.18 });
-        // Katman 3: deep noise — yer sarsıntısı hissi
-        noiseBurst(c, { dur: 1.4, peak: 0.25, type: "lowpass", from: 400, to: 80, q: 1.2 });
-        // Sub-hit — göğüsten gelen darbe
-        tone(c, { type: "sine", from: 35, to: 20, dur: 0.5, peak: 0.2 });
+        if (sfxCache.has("dragon_roar_deep.wav")) {
+          playSample(c, "dragonBellow", { pitch: 0.6 + Math.random() * 0.3, vol: 0.6 });
+          playSample(c, "dragonRoar", { pitch: 0.5, vol: 0.35, delay: 0.15 });
+          playSample(c, "dragonScreech", { pitch: 1.0, vol: 0.2, delay: 0.3 });
+        } else {
+          tone(c, { type: "sawtooth", from: 80, to: 200, dur: 0.3, peak: 0.35 });
+          tone(c, { type: "sawtooth", from: 200, to: 50, dur: 1.0, peak: 0.35, delay: 0.3 });
+          tone(c, { type: "square", from: 160, to: 45, dur: 1.2, peak: 0.18 });
+          noiseBurst(c, { dur: 1.4, peak: 0.25, type: "lowpass", from: 400, to: 80, q: 1.2 });
+          tone(c, { type: "sine", from: 35, to: 20, dur: 0.5, peak: 0.2 });
+        }
       });
     },
     snarl() {
       withCtx((c) => {
-        // Keskin hırlama — hasar tepkisi
-        tone(c, { type: "sawtooth", from: 300, to: 180, dur: 0.35, peak: 0.26 });
-        // Kısa noise burst — nefes kesilmesi
-        noiseBurst(c, { dur: 0.2, peak: 0.18, type: "bandpass", from: 900, to: 500, q: 1.5 });
-        // Sub-hit — darbe
-        tone(c, { type: "sine", from: 80, to: 40, dur: 0.15, peak: 0.14 });
+        if (sfxCache.has("troll_roars.ogg")) {
+          playSample(c, "dragonSnarl", { pitch: 0.9 + Math.random() * 0.4, vol: 0.5 });
+        } else {
+          tone(c, { type: "sawtooth", from: 300, to: 180, dur: 0.35, peak: 0.26 });
+          noiseBurst(c, { dur: 0.2, peak: 0.18, type: "bandpass", from: 900, to: 500, q: 1.5 });
+          tone(c, { type: "sine", from: 80, to: 40, dur: 0.15, peak: 0.14 });
+        }
       });
     },
     wingFlap() {
       withCtx((c) => {
-        // Ağır kanat çırpması — hava itme sesi
-        noiseBurst(c, { dur: 0.18, peak: 0.16, type: "bandpass", from: 800, to: 200, q: 0.8 });
-        // Sub-thump — kanat darbesi
-        tone(c, { type: "sine", from: 60, to: 30, dur: 0.1, peak: 0.1 });
+        if (sfxCache.has("dragon_flap.wav")) {
+          playSample(c, "dragonWingFlap", { pitch: 0.85 + Math.random() * 0.3, vol: 0.5 });
+        } else {
+          noiseBurst(c, { dur: 0.18, peak: 0.16, type: "bandpass", from: 800, to: 200, q: 0.8 });
+          tone(c, { type: "sine", from: 60, to: 30, dur: 0.1, peak: 0.1 });
+        }
       });
     },
     scream() {
