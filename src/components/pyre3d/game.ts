@@ -65,6 +65,7 @@ import { mulberry32 } from "./rng";
 import { bondBuffs, type BondBuffs, type SaveData } from "./save";
 import { createMission, type MissionRuntime } from "./story/mission";
 import {
+  buildDeco,
   buildVehicle,
   createFlagshipSilhouette,
   createGateRing,
@@ -201,9 +202,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   if (renderer.domElement.parentElement !== mount) mount.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x3a2828);
+  scene.background = new THREE.Color(chapter.world.skyColor ?? 0x3a2828);
   const fogScale = chapter.world.fogScale ?? 1;
-  const fog = new THREE.FogExp2(0x5a3838, preset.fogDensity * fogScale * FOG_SCALE);
+  const fog = new THREE.FogExp2(chapter.world.fogColor ?? 0x5a3838, preset.fogDensity * fogScale * FOG_SCALE);
   scene.fog = fog;
 
   const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.5, 2400);
@@ -221,9 +222,10 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   // 40 birim uzakta 3.6/1600 ≈ 0.002 ışınım üretiyordu, yani hiç yoktu.
   const fill = new THREE.PointLight(0xff9070, 600, 220, 2);
   scene.add(fill);
-  const sun = new THREE.DirectionalLight(0xffb070, 4.6);
+  const sun = new THREE.DirectionalLight(chapter.world.sunColor ?? 0xffb070, 4.6);
   sun.position.copy(SUN_OFFSET);
   sun.castShadow = true;
+  if (chapter.world.exposure) renderer.toneMappingExposure = 1.2 * chapter.world.exposure;
   sun.shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
   sun.shadow.camera.left = -140;
   sun.shadow.camera.right = 140;
@@ -349,6 +351,10 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         v.position.set(wx, terrainHeight(wx, wz), wz);
         scene.add(v);
       }
+    } else if (p.t === "deco") {
+      const deco = buildDeco(p.kind, rng, p.scale ?? 1);
+      deco.position.set(p.x, terrainHeight(p.x, p.z), p.z);
+      scene.add(deco);
     } else {
       const f = createFlagshipSilhouette();
       f.position.set(p.x, p.y, p.z);
@@ -508,8 +514,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     shakeAmp: 0,
     hitFlash: 0,
     wind: new THREE.Vector2(
-      Math.cos(chapter.world.wind.dir) * chapter.world.wind.strength,
-      Math.sin(chapter.world.wind.dir) * chapter.world.wind.strength,
+      Math.cos(chapter.world.wind?.dir ?? 0) * (chapter.world.wind?.strength ?? 0.2),
+      Math.sin(chapter.world.wind?.dir ?? 0) * (chapter.world.wind?.strength ?? 0.2),
     ),
     time: 0,
     status: "playing",

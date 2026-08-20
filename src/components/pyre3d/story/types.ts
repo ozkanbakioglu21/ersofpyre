@@ -27,7 +27,8 @@ export type PropSpec =
   | { t: "gate"; x: number; y: number; z: number; radius: number }
   | { t: "structure"; kind: TargetKind; x: number; z: number; scale: number; id?: string }
   | { t: "flagship"; x: number; y: number; z: number; hidden: boolean }
-  | { t: "caravan"; x: number; z: number; count: number; spacing: number; angle?: number };
+  | { t: "caravan"; x: number; z: number; count: number; spacing: number; angle?: number }
+  | { t: "deco"; x: number; z: number; kind: "rock" | "cactus" | "deadtree" | "tent" | "barrel" | "campfire"; scale?: number };
 
 export type AirshipSpawn = {
   x: number;
@@ -58,8 +59,15 @@ export type WorldSpec = {
   waves?: Record<string, WaveSpec>;
   zones?: ZoneDef[];
   /** Rüzgâr: yön (radyan) ve 0..1 şiddet. Yangın cephesini yönlendirir. */
-  wind: { dir: number; strength: number };
+  wind?: { dir: number; strength: number };
   fogScale?: number;
+  /** Bölüm özel gökyüzü/fog rengi (hex). Belirtilmezse global şafak paleti. */
+  skyColor?: number;
+  fogColor?: number;
+  /** Güneş ışık rengi (hex). */
+  sunColor?: number;
+  /** Exposure multiplier (1 = normal). */
+  exposure?: number;
   start?: { x: number; y: number; z: number };
   /** Sonsuz ileri yol modu: ejderha otomatik +Z'ye uçar, chunk'lar oluşturulur. */
   mode?: "infinite";

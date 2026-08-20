@@ -1506,7 +1506,110 @@ export function buildVehicle(kind: VehicleKind, rng: Rng): THREE.Group {
   return g;
 }
 
-/** Ağaç — gövde + dallı taç. Çeşitli tipler: yuvarlak, konik, uzun gövdeli. */
+export type DecoKind = "rock" | "cactus" | "deadtree" | "tent" | "barrel" | "campfire";
+
+/** Çöl dekoratif prop — yıkılamaz görsel. */
+export function buildDeco(kind: DecoKind, rng: Rng, scale = 1): THREE.Group {
+  const g = new THREE.Group();
+  const stone_ = cityMat(0x5a4a38);
+  const sand = cityMat(0x8a7a5a);
+  const wood = cityMat(0x3a2a18);
+  const dark = cityMat(0x1a1410);
+
+  if (kind === "rock") {
+    const r = rng.range(1.5, 4.5) * scale;
+    const h = r * rng.range(0.4, 0.9);
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 1), stone_);
+    rock.scale.set(1, h / r, rng.range(0.7, 1.0));
+    rock.position.y = h * 0.4;
+    rock.rotation.set(rng.range(0, 0.3), rng.range(0, Math.PI * 2), rng.range(0, 0.2));
+    g.add(rock);
+    if (rng.chance(0.4)) {
+      const r2 = r * rng.range(0.3, 0.6);
+      const rock2 = new THREE.Mesh(new THREE.DodecahedronGeometry(r2, 0), stone_);
+      rock2.position.set(rng.range(-r, r) * 0.8, r2 * 0.3, rng.range(-r, r) * 0.8);
+      g.add(rock2);
+    }
+  } else if (kind === "cactus") {
+    const trunkH = rng.range(4, 10) * scale;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * scale, 0.4 * scale, trunkH, 6), new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 0.9 }));
+    trunk.position.y = trunkH / 2;
+    g.add(trunk);
+    const armCount = rng.int(1, 4);
+    for (let i = 0; i < armCount; i++) {
+      const armH = rng.range(2, 4) * scale;
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * scale, 0.25 * scale, armH, 5), new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 0.9 }));
+      const armY = trunkH * rng.range(0.3, 0.7);
+      const armAngle = rng.range(-0.5, 0.5);
+      const dir = rng.chance(0.5) ? 1 : -1;
+      arm.position.set(dir * (1.2 + rng.range(0, 0.5)) * scale, armY + armH * 0.3, rng.range(-0.5, 0.5) * scale);
+      arm.rotation.z = dir * (0.3 + armAngle);
+      g.add(arm);
+    }
+  } else if (kind === "deadtree") {
+    const trunkH = rng.range(5, 12) * scale;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * scale, 0.5 * scale, trunkH, 5), wood);
+    trunk.position.y = trunkH / 2;
+    g.add(trunk);
+    const branches = rng.int(2, 5);
+    for (let i = 0; i < branches; i++) {
+      const bLen = rng.range(2, 5) * scale;
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.15 * scale, bLen, 4), wood);
+      const by = trunkH * rng.range(0.4, 0.9);
+      const dir = rng.chance(0.5) ? 1 : -1;
+      b.position.set(dir * bLen * 0.4, by + bLen * 0.2, rng.range(-0.5, 0.5) * scale);
+      b.rotation.z = dir * rng.range(0.4, 1.2);
+      g.add(b);
+    }
+  } else if (kind === "tent") {
+    const tw = rng.range(3, 5) * scale;
+    const td = rng.range(3, 6) * scale;
+    const th = rng.range(2, 3.5) * scale;
+    const cloth = new THREE.MeshStandardMaterial({ color: rng.chance(0.5) ? 0x8a7050 : 0x6a5a40, roughness: 1, side: THREE.DoubleSide });
+    const sideA = new THREE.Mesh(new THREE.PlaneGeometry(tw, th), cloth);
+    sideA.position.set(0, th * 0.45, -td * 0.25);
+    sideA.rotation.x = -0.35;
+    g.add(sideA);
+    const sideB = new THREE.Mesh(new THREE.PlaneGeometry(tw, th), cloth);
+    sideB.position.set(0, th * 0.45, td * 0.25);
+    sideB.rotation.x = 0.35;
+    g.add(sideB);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.08 * scale, th * 1.1, 4), wood);
+    pole.position.y = th * 0.55;
+    g.add(pole);
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(tw * 0.9, 0.1, td * 0.8), sand);
+    floor.position.y = 0.05;
+    g.add(floor);
+  } else if (kind === "barrel") {
+    const r = rng.range(0.5, 0.9) * scale;
+    const h = rng.range(1.0, 1.6) * scale;
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, h, 8), wood);
+    barrel.position.y = h / 2;
+    g.add(barrel);
+    for (const ringY of [0.2, 0.5, 0.8]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 1.02, 0.04 * scale, 4, 12), dark);
+      ring.position.y = h * ringY;
+      ring.rotation.x = Math.PI / 2;
+      g.add(ring);
+    }
+  } else if (kind === "campfire") {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.2 * scale, 0.2 * scale, 4, 12), stone_);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.15;
+    g.add(ring);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.08 * scale, 1.6 * scale, 4), wood);
+      log.position.set(Math.cos(a) * 0.5 * scale, 0.2, Math.sin(a) * 0.5 * scale);
+      log.rotation.z = Math.PI / 2;
+      log.rotation.y = a;
+      g.add(log);
+    }
+  }
+
+  g.rotation.y = rng.range(0, Math.PI * 2);
+  return g;
+}
 export function buildTree(rng: Rng): THREE.Group {
   const g = new THREE.Group();
   const type = rng.int(0, 3);
