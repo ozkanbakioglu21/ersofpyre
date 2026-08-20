@@ -1404,7 +1404,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       /* ---- geçitler ve bölgeler ---- */
       for (const gt of gates) {
         if (gt.passed) continue;
-        if (gt.pos.distanceTo(dp) < gt.radius * 0.95) {
+        const gdx = gt.pos.x - dp.x;
+        const gdz = gt.pos.z - dp.z;
+        if (Math.hypot(gdx, gdz) < gt.radius * 0.95) {
           gt.passed = true;
           (gt.group.children[0] as THREE.Mesh | undefined)?.scale.setScalar(1);
           audio.perfect();
