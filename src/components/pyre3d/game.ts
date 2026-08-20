@@ -729,6 +729,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   let firedOnce = false;
   let flamePushT = 0;
   let screamT = 0;
+  let growlT = 0;
+  let prevFlapSin = 0;
   let bestTime = o.save.chapters[chapter.id]?.bestTime ?? 0;
   let lastPush: HudSnapshot | null = null;
 
@@ -905,6 +907,10 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
 
       /* ---- uçuş ---- */
       updateFlight(g, dt);
+      // Kanat çırpma sesi: sin dalgası tepe noktasında (sıfır geçişi)
+      const curFlapSin = Math.sin(state.flap);
+      if (prevFlapSin < 0 && curFlapSin >= 0) audio.wingFlap();
+      prevFlapSin = curFlapSin;
       audio.diveWind(g.dive);
       fx.windStreak(dragon.root.position, g.flightAxes.heading, g.dive);
       if (g.infinite) updateInfinitePath(g, g.infinite, dt);
@@ -1036,6 +1042,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           state.rage = 0;
           state.rageT = 12;
           audio.rage();
+          audio.bellow();
         }
       }
 
@@ -1144,6 +1151,13 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             audio.scream();
           }
         }
+      }
+
+      /* ---- ejderha gürleme (periyodik) ---- */
+      growlT -= dt;
+      if (growlT <= 0) {
+        growlT = 4 + Math.random() * 2;
+        audio.growl();
       }
 
       state.comboT -= dt;
@@ -1389,6 +1403,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             state.hitFlash = 1;
             shake(g, 0.7);
             audio.hit();
+            audio.snarl();
             g.mission.emit({ kind: "damaged", amount: s.damage });
           }
           s.active = false;
@@ -1413,6 +1428,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             state.invuln = 0.35;
             state.hitFlash = 1;
             audio.hit();
+            audio.snarl();
             shake(g, 0.45);
             fx.ember(s.mesh.position, 14, 8);
             g.mission.emit({ kind: "damaged", amount: s.damage });
