@@ -1611,106 +1611,267 @@ export function buildDeco(kind: DecoKind, rng: Rng, scale = 1): THREE.Group {
   return g;
 }
 
-/** Deve — düşük poligon gövde, kambur, uzun boyun, 4 bacak. */
-export function buildCamel(rng: Rng, withRider = false, withCargo = false): THREE.Group {
+/** Deve — gerçekçi düşük poligon: kambur, eğri boyun, eklemli bacaklar, çene. */
+export function buildCamel(rng: Rng, opts: { rider?: boolean; cargo?: boolean; lead?: boolean } = {}): THREE.Group {
   const g = new THREE.Group();
-  const skin = cityMat(0x8a6a42);
-  const darkSkin = cityMat(0x6a4a2a);
+  const skin = cityMat(0x9a7a4a);
+  const darkSkin = cityMat(0x6a5030);
+  const belly = cityMat(0x7a6038);
   const cloth = cityMat(0x5a3a20);
+  const rope = cityMat(0x8a7060, 0.8, 0.3);
 
-  const bodyW = rng.range(1.8, 2.4);
-  const bodyH = rng.range(0.9, 1.2);
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), skin);
-  body.scale.set(bodyW, bodyH, bodyW * 0.6);
-  body.position.y = 2.6;
+  /* -- gövde: uzatılmış elips, hafif aşağı eğik -- */
+  const bw = rng.range(2.0, 2.6);
+  const bh = rng.range(1.0, 1.3);
+  const bd = bw * 0.55;
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), skin);
+  body.scale.set(bw, bh, bd);
+  body.position.y = 2.8;
+  body.rotation.z = 0.04;
   g.add(body);
 
-  const hump = new THREE.Mesh(new THREE.SphereGeometry(0.55, 6, 5), skin);
-  hump.scale.set(1.2, 0.9, 0.8);
-  hump.position.set(0, 3.4, 0);
+  // Karın — daha açık renk, alt kısım
+  const bellyM = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), belly);
+  bellyM.scale.set(bw * 0.85, bh * 0.5, bd * 0.9);
+  bellyM.position.y = 2.45;
+  g.add(bellyM);
+
+  /* -- kambur: tek hörgüç, yuvarlak tepe -- */
+  const hump = new THREE.Mesh(new THREE.SphereGeometry(0.65, 8, 6), skin);
+  hump.scale.set(1.0, 1.1, 0.75);
+  hump.position.set(-0.1, 3.7, 0);
   g.add(hump);
 
-  const neckH = rng.range(1.8, 2.4);
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, neckH, 6), skin);
-  neck.position.set(bodyW * 0.5, 2.8 + neckH * 0.35, 0);
-  neck.rotation.z = -0.35;
-  g.add(neck);
+  /* -- boyun: 3 segment, eğri S-şekli -- */
+  const neckBaseY = 2.9;
+  const neckLen = rng.range(2.2, 2.8);
+  const segments = 3;
+  let nx = bw * 0.55;
+  let ny = neckBaseY;
+  for (let i = 0; i < segments; i++) {
+    const t = i / segments;
+    const segH = neckLen / segments;
+    const r = 0.2 - t * 0.06;
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.85, r, segH, 6), i < 2 ? skin : darkSkin);
+    // S- eğrisi: önce yukarı-geri, sonra yukarı-ileri
+    const curveX = -Math.sin(t * Math.PI * 0.8) * 0.4;
+    const curveZ = Math.sin(t * Math.PI * 1.2) * 0.15;
+    nx += curveX;
+    ny += segH * 0.85;
+    seg.position.set(nx, ny, curveZ);
+    seg.rotation.z = 0.2 - t * 0.6;
+    g.add(seg);
+  }
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.35, 0.3), darkSkin);
-  head.position.set(bodyW * 0.5 + 0.4, 2.8 + neckH * 0.75, 0);
-  g.add(head);
-
-  for (const sx of [-0.15, 0.15]) {
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 4), darkSkin);
-    ear.position.set(head.position.x + sx, head.position.y + 0.2, 0);
+  /* -- baş: çene, burun, kulaklar -- */
+  const headX = nx - 0.3;
+  const headY = ny + 0.3;
+  // Kafatası
+  const skull = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.3, 0.28), darkSkin);
+  skull.position.set(headX, headY, 0);
+  g.add(skull);
+  // Çene/burun — uzunsnout
+  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.18, 0.22), darkSkin);
+  snout.position.set(headX - 0.35, headY - 0.08, 0);
+  g.add(snout);
+  // Gözler — yan taraflarda
+  for (const sz of [-0.16, 0.16]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 5, 4), cityMat(0x1a1008));
+    eye.position.set(headX - 0.1, headY + 0.08, sz);
+    g.add(eye);
+  }
+  // Kulaklar — küçük, üstte
+  for (const sz of [-0.12, 0.12]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.18, 4), darkSkin);
+    ear.position.set(headX + 0.1, headY + 0.22, sz);
+    ear.rotation.z = sz * 0.4;
     g.add(ear);
   }
 
-  const legH = rng.range(1.8, 2.2);
-  for (const [sx, sz] of [[-0.5, -0.3], [-0.5, 0.3], [0.5, -0.3], [0.5, 0.3]] as const) {
-    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, legH * 0.55, 5), darkSkin);
-    upper.position.set(bodyW * sx, legH * 0.4, bodyW * 0.6 * sz);
-    upper.rotation.x = sz * 0.08;
+  /* -- 4 bacak: üst + alt, eklem (diz) açısı -- */
+  const legH = rng.range(2.0, 2.4);
+  const legPairs: [number, number, number][] = [
+    [-0.55, -0.28, 0.12],   // sol ön
+    [-0.55, 0.28, -0.08],   // sol arka
+    [0.55, -0.28, -0.06],   // sağ ön
+    [0.55, 0.28, 0.1],      // sağ arka
+  ];
+  for (const [lx, lz, kneeAng] of legPairs) {
+    // Kalça
+    const hip = new THREE.Mesh(new THREE.SphereGeometry(0.12, 5, 4), darkSkin);
+    hip.position.set(bw * lx, 2.2, bd * lz);
+    g.add(hip);
+    // Üst bacak
+    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, legH * 0.5, 5), darkSkin);
+    upper.position.set(bw * lx, 2.2 - legH * 0.22, bd * lz);
+    upper.rotation.x = kneeAng;
     g.add(upper);
-    const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, legH * 0.45, 5), darkSkin);
-    lower.position.set(bodyW * sx, legH * 0.08, bodyW * 0.6 * sz + sz * 0.15);
+    // Diz eklemi
+    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.065, 4, 3), darkSkin);
+    const kneeY = 2.2 - legH * 0.45;
+    knee.position.set(bw * lx, kneeY, bd * lz + kneeAng * 0.5);
+    g.add(knee);
+    // Alt bacak
+    const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.05, legH * 0.42, 5), darkSkin);
+    lower.position.set(bw * lx, kneeY - legH * 0.2, bd * lz + kneeAng * 0.8);
     g.add(lower);
+    // Pati
+    const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.08, 6), cityMat(0x2a1e10));
+    hoof.position.set(bw * lx, 0.04, bd * lz + kneeAng * 1.0);
+    g.add(hoof);
   }
 
-  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.02, 0.6, 4), darkSkin);
-  tail.position.set(-bodyW * 0.55, 2.8, 0);
-  tail.rotation.z = 0.8;
+  /* -- kuyruk: ince, ucu tüylü -- */
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.015, 0.7, 4), darkSkin);
+  tail.position.set(-bw * 0.65, 2.8, 0);
+  tail.rotation.z = 0.9;
   g.add(tail);
+  const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 3), darkSkin);
+  tuft.position.set(-bw * 0.65 - 0.25, 3.15, 0);
+  g.add(tuft);
 
-  if (withCargo) {
-    const cargo = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.9), cloth);
-    cargo.position.set(0, 3.3, 0.4);
-    g.add(cargo);
-    const bag = new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 4), cloth);
-    bag.scale.set(1, 0.7, 0.8);
-    bag.position.set(0.3, 3.7, -0.3);
-    g.add(bag);
+  /* -- kargo: çuval, halı, kutu -- */
+  if (opts.cargo) {
+    // Halı/sedye
+    const saddle = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.15, 1.1), cloth);
+    saddle.position.set(0, 3.5, 0);
+    g.add(saddle);
+    // Yan çuval
+    for (const sz of [-0.55, 0.55]) {
+      const bag = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.4), cloth);
+      bag.position.set(0.1, 3.15, sz);
+      g.add(bag);
+    }
+    // Üst yük
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.6), cityMat(0x4a3a20));
+    crate.position.set(-0.1, 3.95, 0);
+    g.add(crate);
+    // Halat bağlama
+    for (const sz of [-0.55, 0.55]) {
+      const ropeLine = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.0, 3), rope);
+      ropeLine.position.set(0, 3.3, sz);
+      ropeLine.rotation.x = Math.PI / 2;
+      g.add(ropeLine);
+    }
   }
 
-  if (withRider) {
-    const riderBody = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.8, 6), cityMat(0x3a2a18));
-    riderBody.position.set(0, 3.9, 0.15);
-    g.add(riderBody);
-    const riderHead = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 5), cityMat(0xb09070));
-    riderHead.position.set(0, 4.45, 0.15);
-    g.add(riderHead);
-    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.3, 6), cityMat(0x4a3a28));
-    hat.position.set(0, 4.65, 0.15);
-    g.add(hat);
+  /* -- binici: oturur pozisyon, bornoz, sop -- */
+  if (opts.rider) {
+    // Kalça/oturma
+    const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.3, 6), cityMat(0x4a3520));
+    seat.position.set(0.1, 3.75, 0);
+    g.add(seat);
+    // Gövde — hafif öne eğik
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.7, 6), cityMat(0x2a1a10));
+    torso.position.set(0.15, 4.2, 0);
+    torso.rotation.z = 0.08;
+    g.add(torso);
+    // Baş
+    const rHead = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5), cityMat(0xb09070));
+    rHead.position.set(0.2, 4.65, 0);
+    g.add(rHead);
+    // Sarık/şapka
+    const turban = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 4), cityMat(0x6a5a40));
+    turban.scale.set(1, 0.7, 1);
+    turban.position.set(0.2, 4.82, 0);
+    g.add(turban);
+    // Kolu — sopa tutuyor
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.03, 0.5, 4), cityMat(0xb09070));
+    arm.position.set(0.35, 4.1, 0.15);
+    arm.rotation.z = -0.6;
+    arm.rotation.x = 0.3;
+    g.add(arm);
+    // Sopa
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.015, 1.2, 4), rope);
+    stick.position.set(0.5, 3.8, 0.2);
+    stick.rotation.z = 0.3;
+    g.add(stick);
   }
 
-  g.rotation.y = rng.range(-0.15, 0.15);
+  /* -- ön baş dekoru (lead deve) -- */
+  if (opts.lead) {
+    const decoration = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.025, 4, 8), cityMat(0xc8a040));
+    decoration.position.set(headX - 0.1, headY - 0.15, 0);
+    decoration.rotation.y = Math.PI / 2;
+    g.add(decoration);
+  }
+
+  g.rotation.y = rng.range(-0.08, 0.08);
   return g;
 }
 
-/** Kervan hattı — develer, vagonlar, biniciler. */
+/**
+ * Gerçekçi kervan hattı — çift sıralı, halat bağlantılı, önde rehber deve,
+ * ortada kargolu develer, arkada vagonlar.
+ */
 export function buildCaravanLine(
   count: number,
   spacing: number,
   rng: Rng,
 ): THREE.Group {
   const g = new THREE.Group();
+  const rope = cityMat(0x8a7060, 0.8, 0.3);
+  const laneGap = 3.0;
+
   for (let i = 0; i < count; i++) {
     const t = i - (count - 1) / 2;
-    const offsetX = rng.range(-2, 2);
-    const isRider = i % 5 === 0;
-    const isCargo = !isRider && rng.chance(0.55);
-    const camel = buildCamel(rng, isRider, isCargo);
-    camel.position.set(offsetX, 0, t * spacing);
-    camel.position.x += Math.sin(i * 0.7) * 1.5;
+    const lane = i % 2 === 0 ? -1 : 1;
+    const offsetX = lane * laneGap * 0.5 + rng.range(-0.8, 0.8);
+    const zWobble = rng.range(-0.6, 0.6);
+
+    const isLead = i === 0;
+    const isRider = i % 4 === 0 || isLead;
+    const isCargo = !isRider && rng.chance(0.6);
+
+    const camel = buildCamel(rng, { rider: isRider, cargo: isCargo, lead: isLead });
+    camel.position.set(offsetX, 0, t * spacing + zWobble);
     g.add(camel);
 
-    if (!isRider && !isCargo && rng.chance(0.3)) {
-      const cart = buildVehicle("cart", rng);
-      cart.position.set(offsetX, 0, t * spacing - 3.2);
+    // Halat bağlantısı — bir sonraki deveye
+    if (i < count - 1) {
+      const nextLane = (i + 1) % 2 === 0 ? -1 : 1;
+      const nextX = nextLane * laneGap * 0.5;
+      const ropeLen = Math.hypot(offsetX - nextX, spacing);
+      const ropeLine = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.012, 0.012, ropeLen, 3),
+        rope,
+      );
+      ropeLine.position.set(
+        (offsetX + nextX) / 2,
+        2.6,
+        t * spacing + spacing / 2,
+      );
+      ropeLine.rotation.x = Math.PI / 2;
+      ropeLine.rotation.z = Math.atan2(offsetX - nextX, spacing);
+      g.add(ropeLine);
+    }
+
+    // Sonlara doğru vagon ekle
+    if (i > count * 0.6 && i % 3 === 0 && !isRider) {
+      const cart = buildVehicle("wagon", rng);
+      cart.position.set(offsetX * 0.8, 0, t * spacing + spacing * 0.4);
       g.add(cart);
+      // Çekme halatı develerden vagona
+      const pullLen = spacing * 0.5;
+      const pull = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, pullLen, 3), rope);
+      pull.position.set(offsetX * 0.8, 1.5, t * spacing);
+      pull.rotation.x = Math.PI / 2;
+      g.add(pull);
     }
   }
+
+  // Kervan izi — zemin hizasında uzun şeritler
+  const trackLen = count * spacing + 10;
+  const trackMat = cityMat(0x6a5a40, 0.95, 0.05);
+  for (const lx of [-laneGap * 0.3, laneGap * 0.3]) {
+    const track = new THREE.Mesh(
+      new THREE.BoxGeometry(0.6, 0.05, trackLen),
+      trackMat,
+    );
+    track.position.set(lx, 0.02, 0);
+    g.add(track);
+  }
+
   return g;
 }
 
