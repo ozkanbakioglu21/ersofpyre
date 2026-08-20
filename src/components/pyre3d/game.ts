@@ -730,6 +730,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   let flamePushT = 0;
   let screamT = 0;
   let growlT = 0;
+  let monsterT = 0;
   let prevFlapSin = 0;
   let bestTime = o.save.chapters[chapter.id]?.bestTime ?? 0;
   let lastPush: HudSnapshot | null = null;
@@ -1160,6 +1161,12 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         audio.growl();
       }
 
+      monsterT -= dt;
+      if (monsterT <= 0) {
+        monsterT = 6 + Math.random() * 5;
+        audio.monsterAmbient();
+      }
+
       state.comboT -= dt;
       if (state.comboT <= 0) state.combo = 1;
 
@@ -1180,6 +1187,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             // Fünye ejderhanın o anki irtifasına ayarlanır: yüksek uçmak cezalı.
             shots.spawn("flak", tmp2, tmp.normalize().multiplyScalar(95), 14, dp.y);
             audio.enemyShot();
+            audio.trollShot();
           }
         } else if (t.tower === "tesla") {
           if (d < TESLA_RANGE) {
@@ -1235,6 +1243,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             tmp2.copy(gt.pos);
             shots.spawn("bolt", tmp2, tmp.normalize().multiplyScalar(90), 7, 0);
             audio.enemyShot();
+            audio.trollShot();
           }
         }
 
@@ -1257,6 +1266,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             // Alev efekti
             fx.flameJet(gf.pos, 7, new THREE.Vector3(0, 1, 0));
             audio.enemyShot();
+            audio.trollShot();
           }
         }
       }
@@ -1326,6 +1336,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           e.group.visible = false;
           fx.explosion(e.pos, 1.1);
           audio.explosion(1.1);
+          audio.trollDeath();
           addCombo(g);
           state.score += 380 * state.combo;
           state.embers += 120;
@@ -1373,6 +1384,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           tmp2.y += (Math.random() - 0.5) * 0.07;
           shots.spawn("harpoon", e.pos, tmp2.normalize().multiplyScalar(120), 10);
           audio.enemyShot();
+          audio.trollShot();
         }
       }
 

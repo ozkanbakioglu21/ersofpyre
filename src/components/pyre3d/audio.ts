@@ -29,6 +29,9 @@ export type AudioEngine = {
   bellow(): void;
   snarl(): void;
   wingFlap(): void;
+  trollShot(): void;
+  trollDeath(): void;
+  monsterAmbient(): void;
   /** Dalma rüzgarı: 0..1 yoğunluk. */
   diveWind(intensity: number): void;
   ui(): void;
@@ -71,6 +74,9 @@ const NOOP: AudioEngine = {
   bellow() {},
   snarl() {},
   wingFlap() {},
+  trollShot() {},
+  trollDeath() {},
+  monsterAmbient() {},
   diveWind() {},
   ui() {},
   win() {},
@@ -173,6 +179,16 @@ const SFX_MANIFEST: Record<string, string[]> = {
   ],
   dragonFireBreath: [
     "dragon_fire_breath.wav",
+  ],
+  trollShot: [
+    "troll_attack.ogg", "troll_roars.ogg",
+  ],
+  trollDeath: [
+    "troll_death.ogg", "troll_roars.ogg",
+  ],
+  monsterAmbient: [
+    "monster_growl_01.ogg", "monster_growl_02.ogg", "monster_scream_01.ogg",
+    "troll_idle.ogg",
   ],
 };
 
@@ -1129,6 +1145,36 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         } else {
           noiseBurst(c, { dur: 0.18, peak: 0.16, type: "bandpass", from: 800, to: 200, q: 0.8 });
           tone(c, { type: "sine", from: 60, to: 30, dur: 0.1, peak: 0.1 });
+        }
+      });
+    },
+    trollShot() {
+      withCtx((c) => {
+        if (sfxCache.has("troll_attack.ogg")) {
+          playSample(c, "trollShot", { pitch: 0.85 + Math.random() * 0.3, vol: 0.5 });
+        } else {
+          tone(c, { type: "sawtooth", from: 120, to: 60, dur: 0.4, peak: 0.25 });
+          noiseBurst(c, { dur: 0.3, peak: 0.15, type: "bandpass", from: 500, to: 200, q: 1.2 });
+        }
+      });
+    },
+    trollDeath() {
+      withCtx((c) => {
+        if (sfxCache.has("troll_death.ogg")) {
+          playSample(c, "trollDeath", { pitch: 0.8 + Math.random() * 0.4, vol: 0.55 });
+        } else {
+          tone(c, { type: "sawtooth", from: 200, to: 40, dur: 1.0, peak: 0.3 });
+          noiseBurst(c, { dur: 0.8, peak: 0.2, type: "lowpass", from: 600, to: 120, q: 1.0 });
+        }
+      });
+    },
+    monsterAmbient() {
+      withCtx((c) => {
+        if (sfxCache.has("monster_growl_01.ogg")) {
+          playSample(c, "monsterAmbient", { pitch: 0.7 + Math.random() * 0.5, vol: 0.35 });
+        } else {
+          tone(c, { type: "sawtooth", from: 55, to: 35, dur: 0.7, peak: 0.15 });
+          noiseBurst(c, { dur: 0.5, peak: 0.08, type: "lowpass", from: 200, to: 80, q: 1.0 });
         }
       });
     },

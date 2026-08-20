@@ -65,6 +65,10 @@ export function killTarget(g: Game, t: Target): void {
   tmp.copy(t.pos).setY(t.pos.y + Math.min(10, t.height * 0.4));
   g.fx.explosion(tmp, eSize);
   g.audio.explosion(t.kind === "factory" ? 1.6 : 1.2);
+  // Askeri binalar canavar sesi
+  if (t.kind === "barracks" || t.kind === "armory" || t.kind === "command_post" || t.kind === "ammo_depot" || t.kind === "watchtower") {
+    g.audio.trollDeath();
+  }
   // İkincil patlama — daha yüksekte, daha küçük (çatı patlaması)
   tmp.y += t.height * 0.3;
   g.fx.explosion(tmp, eSize * 0.6);
