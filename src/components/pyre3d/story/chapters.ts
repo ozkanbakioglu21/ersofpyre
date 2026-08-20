@@ -336,6 +336,7 @@ const c04: ChapterDef = {
       barracks: 2,
     },
     props: [
+      { t: "caravan", x: 0, z: -300, count: 28, spacing: 22, angle: 0.03 },
       { t: "structure", kind: "warehouse", x: 0, z: -300, scale: 1.2, id: "kervan1" },
       { t: "structure", kind: "warehouse", x: 20, z: -180, scale: 1.1, id: "kervan2" },
       { t: "structure", kind: "warehouse", x: -10, z: -60, scale: 1.3, id: "kervan3" },

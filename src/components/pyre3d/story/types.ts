@@ -26,7 +26,8 @@ export type ScatterSpec = Partial<Record<TargetKind, number>>;
 export type PropSpec =
   | { t: "gate"; x: number; y: number; z: number; radius: number }
   | { t: "structure"; kind: TargetKind; x: number; z: number; scale: number; id?: string }
-  | { t: "flagship"; x: number; y: number; z: number; hidden: boolean };
+  | { t: "flagship"; x: number; y: number; z: number; hidden: boolean }
+  | { t: "caravan"; x: number; z: number; count: number; spacing: number; angle?: number };
 
 export type AirshipSpawn = {
   x: number;

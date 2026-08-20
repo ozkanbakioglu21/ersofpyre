@@ -65,6 +65,7 @@ import { mulberry32 } from "./rng";
 import { bondBuffs, type BondBuffs, type SaveData } from "./save";
 import { createMission, type MissionRuntime } from "./story/mission";
 import {
+  buildVehicle,
   createFlagshipSilhouette,
   createGateRing,
   createStructure,
@@ -335,6 +336,19 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       target.id = nextId();
       targets.push(target);
       scene.add(group);
+    } else if (p.t === "caravan") {
+      const angle = p.angle ?? 0;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      for (let i = 0; i < p.count; i++) {
+        const t = i - (p.count - 1) / 2;
+        const wx = p.x + cos * t * p.spacing;
+        const wz = p.z + sin * t * p.spacing;
+        const kind: "wagon" | "truck" | "cart" = rng.chance(0.65) ? "wagon" : rng.chance(0.5) ? "cart" : "truck";
+        const v = buildVehicle(kind, rng);
+        v.position.set(wx, terrainHeight(wx, wz), wz);
+        scene.add(v);
+      }
     } else {
       const f = createFlagshipSilhouette();
       f.position.set(p.x, p.y, p.z);
