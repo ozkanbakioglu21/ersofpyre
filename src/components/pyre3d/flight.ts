@@ -534,13 +534,23 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
     camPos.y += (Math.random() - 0.5) * dAmp * 0.5;
   }
 
-  // Dik iniş sarsıntısı — korkscrew sallanması + sarsıntı
+  // Dik iniş: hareketli sinematik kamera
   if (a.steepDiveT > 0) {
-    const sdAmp = 0.8 * Math.min(1, (FLIGHT.steepDiveDuration - a.steepDiveT) / 0.5);
-    // Korkscrew kamerası: spiralle senkronize yatay salınım
-    const spiralSway = Math.sin(a.steepDivePhase) * 2.0;
-    camPos.x += spiralSway;
-    camPos.y += (Math.random() - 0.5) * sdAmp * 0.5;
+    const progress = 1 - a.steepDiveT / FLIGHT.steepDiveDuration; // 0→1
+    const mid = Math.sin(progress * Math.PI); // 0→1→0 parabola
+
+    // Dinamik yan ofset: roll ile TERS yönde kay → dramatik kamera açısı
+    const sideShift = -a.roll * 8;
+    camPos.x += Math.cos(ry) * sideShift;
+    camPos.z -= Math.sin(ry) * sideShift;
+
+    // Dinamik yükseklik: ortada daha alçak (swooping hissi)
+    camPos.y -= mid * 6;
+
+    // Hafif sarsıntı
+    const shakeAmt = 0.6 * mid;
+    camPos.x += (Math.random() - 0.5) * shakeAmt;
+    camPos.y += (Math.random() - 0.5) * shakeAmt * 0.4;
   }
 
   camPos.y = Math.max(terrainHeight(camPos.x, camPos.z) + 8, camPos.y);
@@ -555,11 +565,18 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
   tmpVec.set(a.yaw * 8, 0, 0).applyAxisAngle(UP, ry);
   lookGoal.add(tmpVec);
 
+  // Dik iniş: look-at aşağı ve ileri kaydır → dramatik bakış açısı
+  if (a.steepDiveT > 0) {
+    const mid = Math.sin((1 - a.steepDiveT / FLIGHT.steepDiveDuration) * Math.PI);
+    lookGoal.y -= mid * 5;
+  }
+
   g.camera.lookAt(lookGoal);
 
   // FOV: dalarken genişler (hız hissi), NORMAL'e dönüş yumuşak
   const steepFov = a.steepDiveT > 0 ? 8 * Math.min(1, a.steepDiveT / 0.2) : 0;
-  const targetFov = BASE_FOV + dive * 10 + Math.max(0, a.pitch) * -3 + steepFov;
+  const spiralPulse = a.steepDiveT > 0 ? Math.sin(a.steepDivePhase * 2) * 2 : 0;
+  const targetFov = BASE_FOV + dive * 10 + Math.max(0, a.pitch) * -3 + steepFov + spiralPulse;
   g.camera.fov += (targetFov - g.camera.fov) * Math.min(1, dt * 4);
   g.camera.updateProjectionMatrix();
 }
