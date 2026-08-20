@@ -1044,6 +1044,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         c.steepDive = false;
         if (trySteepDive(g)) {
           audio.roar();
+          audio.diveScreech();
           shake(g, 0.5);
         }
       }
