@@ -64,6 +64,8 @@ export function emptyFrame(): HudFrame {
     pitch: 0,
     braking: 0,
     markers: emptyMarkers(),
+    elapsed: 0,
+    bestTime: 0,
   };
 }
 
@@ -104,5 +106,7 @@ export function emptySnapshot(): HudSnapshot {
     boss: null,
     marked: false,
     chapterTitle: "",
+    elapsed: 0,
+    bestTime: 0,
   };
 }

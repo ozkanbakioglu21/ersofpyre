@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import type { Ctrl, HudFrame } from "../types";
+import { FLIGHT } from "../flight";
 import type { HudBridge } from "./bridge";
 
 /**
@@ -318,6 +319,7 @@ export function MobileControls({
               da gidip ejderhayı savuruyor. Basılı tutmak yerine geçiş:
               sağ başparmak ALEV'de kalırken frenlenebilsin. --- */}
       <BrakeButton bridge={bridge} ctrl={ctrl} />
+      <SpeedButton bridge={bridge} ctrl={ctrl} />
 
       {/* --- sağ alt: eylemler --- */}
       <ActionCluster bridge={bridge} buttons={buttons} onFire={ctrl} />
@@ -390,6 +392,53 @@ function BrakeButton({ bridge, ctrl }: { bridge: HudBridge; ctrl: { current: Ctr
       className="pointer-events-auto absolute bottom-[10.5rem] left-4 h-14 w-14 touch-none rounded-full border-2 font-display text-[10px] font-bold uppercase tracking-wider text-foreground/75 backdrop-blur-[2px]"
     >
       Dur
+    </button>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Hız (Boost)
+ * ------------------------------------------------------------------ */
+
+function SpeedButton({ bridge, ctrl }: { bridge: HudBridge; ctrl: { current: Ctrl } }) {
+  const btn = useRef<HTMLButtonElement | null>(null);
+  const on = useRef(false);
+
+  useLayoutEffect(
+    () =>
+      bridge.register((f: HudFrame) => {
+        const el = btn.current;
+        if (!el) return;
+        const active = f.speed > FLIGHT.baseSpeed * 1.1;
+        if (active === on.current) return;
+        on.current = active;
+        el.style.borderColor = active ? "var(--ember)" : "rgba(255,255,255,0.28)";
+        el.style.background = active
+          ? "color-mix(in oklab, var(--ember) 35%, transparent)"
+          : "rgba(0,0,0,0.35)";
+        el.style.color = active ? "var(--ember)" : "rgba(255,255,255,0.75)";
+      }),
+    [bridge],
+  );
+
+  return (
+    <button
+      ref={btn}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        ctrl.current.throttle = ctrl.current.throttle > 0 ? 0 : 1;
+        buzz(ctrl.current.throttle > 0 ? 18 : 8);
+      }}
+      style={{
+        marginLeft: "env(safe-area-inset-left)",
+        borderColor: "rgba(255,255,255,0.28)",
+        background: "rgba(0,0,0,0.35)",
+        transition: "background .12s, border-color .12s, color .12s",
+      }}
+      className="pointer-events-auto absolute bottom-[14.5rem] left-4 h-14 w-14 touch-none rounded-full border-2 font-display text-[10px] font-bold uppercase tracking-wider text-foreground/75 backdrop-blur-[2px]"
+    >
+      Hız
     </button>
   );
 }

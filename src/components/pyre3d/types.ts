@@ -276,6 +276,8 @@ export type HudSnapshot = {
   boss: { label: string; hp: number; modules: { label: string; dead: boolean }[] } | null;
   marked: boolean;
   chapterTitle: string;
+  elapsed: number;
+  bestTime: number;
 };
 
 export type MarkerKind = "objective" | "threat" | "weakpoint" | "optional";
@@ -326,6 +328,10 @@ export type HudFrame = {
    *  bitince oyun döngüsü freni zorla kapatabiliyor. */
   braking: number;
   markers: Marker[];
+  /** Bölümde geçen süre (saniye). */
+  elapsed: number;
+  /** Kişisel en iyi süre (saniye, 0 = henüz yok). */
+  bestTime: number;
 };
 
 export type MissionResult = {

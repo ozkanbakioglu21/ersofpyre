@@ -713,6 +713,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   let firedOnce = false;
   let flamePushT = 0;
   let screamT = 0;
+  let bestTime = o.save.chapters[chapter.id]?.bestTime ?? 0;
   let lastPush: HudSnapshot | null = null;
 
   const markers = bridge.frame.markers;
@@ -1480,6 +1481,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     f.fireballCd = state.fireballCd / FIREBALL.cooldown;
     f.shockCd = state.shockCd / 5;
     f.rollCd = state.rollCd / FLIGHT.rollCooldown;
+    f.elapsed = Math.round(state.time);
+    f.bestTime = bestTime;
     bridge.paint();
 
     pushT += rawDt;
@@ -1507,15 +1510,14 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         boss: bossSnapshot(),
         marked: state.marked > 0,
         chapterTitle: chapter.title,
+        elapsed: Math.round(state.time),
+        bestTime,
       };
       const p = lastPush;
       if (
         !p ||
         p.score !== snap.score ||
         p.hp !== snap.hp ||
-        // Isı/stamina/öfke HUD'a 60 Hz'te doğrudan boyanıyor, ama `onStats`
-        // tüketicileri (harness, testler) yalnız bu anlık görüntüyü görüyor:
-        // karşılaştırmadan düşürülürlerse bayat kalıyorlar.
         p.heat !== snap.heat ||
         p.stamina !== snap.stamina ||
         p.rage !== snap.rage ||
@@ -1523,6 +1525,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         p.combo !== snap.combo ||
         p.status !== snap.status ||
         p.marked !== snap.marked ||
+        p.elapsed !== snap.elapsed ||
         p.subtitle?.text !== snap.subtitle?.text ||
         p.hint?.text !== snap.hint?.text ||
         p.objectives.some((x, i) => {
@@ -1566,14 +1569,18 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   if (cancelled) return null;
 
   audio.ambient(true);
-  audio.siren(true);
-  // İlk 5 saniye siren, ardından müzik başlar
-  setTimeout(() => {
-    if (finished) return;
+  if (chapter.id === "c01") {
     musicStarted = true;
-    audio.siren(false);
     audio.music(true);
-  }, 10000);
+  } else {
+    audio.siren(true);
+    setTimeout(() => {
+      if (finished) return;
+      musicStarted = true;
+      audio.siren(false);
+      audio.music(true);
+    }, 10000);
+  }
   o.onReady();
   last = performance.now();
   raf = requestAnimationFrame(loop);
