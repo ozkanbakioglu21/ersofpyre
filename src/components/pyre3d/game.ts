@@ -916,6 +916,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       if (prevFlapSin < 0 && curFlapSin >= 0) audio.wingFlap();
       prevFlapSin = curFlapSin;
       audio.diveWind(g.dive);
+      audio.diveScream(g.dive);
       fx.windStreak(dragon.root.position, g.flightAxes.heading, g.dive);
       // Dalış çığlığı: dive 0'dan 0.15'e çıkınca ses ver
       if (prevDive < 0.15 && g.dive >= 0.15) audio.scream();

@@ -33,6 +33,8 @@ export type AudioEngine = {
   monsterAmbient(): void;
   /** Dalma rüzgarı: 0..1 yoğunluk. */
   diveWind(intensity: number): void;
+  /** Dalma çığlığı: 0..1 yoğunluk. */
+  diveScream(intensity: number): void;
   ui(): void;
   win(): void;
   lose(): void;
@@ -76,6 +78,7 @@ const NOOP: AudioEngine = {
   trollDeath() {},
   monsterAmbient() {},
   diveWind() {},
+  diveScream() {},
   ui() {},
   win() {},
   lose() {},
@@ -294,6 +297,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   let sirenWanted = false;
   let musicWanted = false;
   let diveWindNodes: { src: AudioBufferSourceNode; gain: GainNode; lfo: OscillatorNode } | null = null;
+  let diveScreamNodes: { osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode; lfo: OscillatorNode } | null = null;
   let musicNodes: {
     pad1: OscillatorNode;
     pad2: OscillatorNode;
@@ -1251,6 +1255,47 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       const target = intensity * 0.18;
       diveWindNodes.gain.gain.setTargetAtTime(target, now, 0.08);
     },
+    diveScream(intensity: number) {
+      const c = ctx;
+      if (!c) return;
+      if (!diveScreamNodes) {
+        const t = c.ac.currentTime;
+        // Ejderha çığlığı: iki osc + vibrato LFO — tiz, keskin, kesik
+        const osc1 = c.ac.createOscillator();
+        osc1.type = "sawtooth";
+        osc1.frequency.value = 1800;
+        const osc2 = c.ac.createOscillator();
+        osc2.type = "square";
+        osc2.frequency.value = 1820;
+        // Vibrato LFO
+        const lfo = c.ac.createOscillator();
+        lfo.type = "sine";
+        lfo.frequency.value = 6;
+        const lfoGain = c.ac.createGain();
+        lfoGain.gain.value = 120;
+        lfo.connect(lfoGain).connect(osc1.frequency);
+        lfo.connect(lfoGain).connect(osc2.frequency);
+        // Bandpass — ejderha ciyagher havası
+        const bp = c.ac.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 1600;
+        bp.Q.value = 2.5;
+        const gain = c.ac.createGain();
+        gain.gain.value = 0.0001;
+        osc1.connect(bp);
+        osc2.connect(bp);
+        bp.connect(gain).connect(c.master);
+        osc1.start(t);
+        osc2.start(t);
+        lfo.start(t);
+        diveScreamNodes = { osc1, osc2, gain, lfo };
+      }
+      const now = c.ac.currentTime;
+      diveScreamNodes.gain.gain.cancelScheduledValues(now);
+      // 0.15 eşik altında sustain yok, sadece dur
+      const target = intensity > 0.15 ? (intensity - 0.15) * 0.35 : 0;
+      diveScreamNodes.gain.gain.setTargetAtTime(target, now, 0.12);
+    },
     ui() {
       withCtx((c) => {
         tone(c, { type: "square", from: 420, to: 300, dur: 0.05, peak: 0.05 });
@@ -1290,6 +1335,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         diveWindNodes.lfo.stop(c.ac.currentTime + 0.1);
         diveWindNodes = null;
       }
+      if (diveScreamNodes) {
+        diveScreamNodes.gain.gain.cancelScheduledValues(c.ac.currentTime);
+        diveScreamNodes.gain.gain.setValueAtTime(0.0001, c.ac.currentTime);
+        diveScreamNodes.osc1.stop(c.ac.currentTime + 0.1);
+        diveScreamNodes.osc2.stop(c.ac.currentTime + 0.1);
+        diveScreamNodes.lfo.stop(c.ac.currentTime + 0.1);
+        diveScreamNodes = null;
+      }
       flameWanted = false;
       ambientWanted = false;
       sirenWanted = false;
@@ -1306,6 +1359,12 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         diveWindNodes.src.stop();
         diveWindNodes.lfo.stop();
         diveWindNodes = null;
+      }
+      if (diveScreamNodes) {
+        diveScreamNodes.osc1.stop();
+        diveScreamNodes.osc2.stop();
+        diveScreamNodes.lfo.stop();
+        diveScreamNodes = null;
       }
       ctx = null;
       void c.ac.close().catch(() => {});
