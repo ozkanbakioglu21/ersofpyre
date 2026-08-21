@@ -135,10 +135,6 @@ const SFX_MANIFEST: Record<string, string[]> = {
     "glass_break_04.wav",
   ],
   metalHit: ["metal_hit_01.ogg", "metal_hit_02.ogg", "metal_hit_03.ogg"],
-  metalFall: ["metal_fall_01.ogg", "metal_fall_02.ogg"],
-  rockBreak: ["rock_break_01.ogg", "rock_break_02.ogg"],
-  debris: ["debris_01.ogg", "debris_02.ogg", "debris_03.ogg"],
-  woodBreak: ["wood_break_01.ogg", "wood_break_02.ogg"],
   crack: ["crack_01.ogg", "crack_02.ogg"],
   gunshot: [
     "gunshot_01.ogg", "gunshot_02.ogg", "gunshot_03.ogg",
@@ -148,7 +144,6 @@ const SFX_MANIFEST: Record<string, string[]> = {
     "laser_01.wav", "laser_02.wav", "laser_03.wav",
     "laser_rifle.ogg",
   ],
-  cannon: ["cannon_01.ogg", "cannon_02.ogg", "cannon_03.ogg"],
   rocket: ["rocket_01.wav"],
   fireWhoosh: [
     "fire_whoosh.wav", "flame_burst_01.ogg", "flame_burst_02.ogg",
@@ -185,9 +180,6 @@ const SFX_MANIFEST: Record<string, string[]> = {
   ],
   dragonScreech: [
     "dragon_roar_wild.wav", "dragon_roar_echo.wav",
-  ],
-  dragonFireBreath: [
-    "dragon_fire_breath.wav",
   ],
   creatureAttack: [
     "creature_attack_01.wav", "creature_attack_02.wav", "beast_growl_01.mp3",
@@ -243,6 +235,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
 
   /* ── sample buffer önbellek ── */
   const sfxCache = new Map<string, AudioBuffer>();
+  const sfxFailed = new Set<string>();
   let sfxLoaded = 0;
   const SFX_WARMUP = 12;
   let sfxLoading = false;
@@ -251,10 +244,11 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   const loadSample = async (file: string): Promise<AudioBuffer | null> => {
     const cached = sfxCache.get(file);
     if (cached) return cached;
+    if (sfxFailed.has(file)) return null;
     try {
       const url = SFX_BASE + file;
       const res = await fetch(url);
-      if (!res.ok) return null;
+      if (!res.ok) { sfxFailed.add(file); return null; }
       const ab = await res.arrayBuffer();
       const c = ctx;
       if (!c) return null;
@@ -263,6 +257,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       sfxLoaded++;
       return buf;
     } catch {
+      sfxFailed.add(file);
       return null;
     }
   };
@@ -332,13 +327,19 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     src: AudioBufferSourceNode;
     gain: GainNode;
     lfo: OscillatorNode;
+    lfo2: OscillatorNode;
+    lfo3: OscillatorNode;
     sub: OscillatorNode;
     subGain: GainNode;
-    loopSrc: AudioBufferSourceNode;
-    loopGain: GainNode;
-    crackleTimer: number;
+    subLfo: OscillatorNode;
+    band: BiquadFilterNode;
+    band2: BiquadFilterNode;
+    ws: WaveShaperNode;
+    low: BiquadFilterNode;
+    loopSrc: AudioBufferSourceNode | null;
+    loopGain: GainNode | null;
   } | null = null;
-  let ambientNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  let ambientNodes: { src: AudioBufferSourceNode; gain: GainNode; lfo: OscillatorNode; low: BiquadFilterNode } | null = null;
   let sirenNodes: { osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null = null;
   let flameWanted = false;
   let ambientWanted = false;
@@ -347,10 +348,12 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   let diveWindNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
   let diveScreamNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
   let diveScreamLastStart = 0;
+  let onVis: (() => void) | null = null;
   let musicNodes: {
     padGain: GainNode;
     drumGain: GainNode;
     masterGain: GainNode;
+    padOscs: OscillatorNode[];
     _timer: ReturnType<typeof setInterval>;
     _tensionTimer: ReturnType<typeof setTimeout>;
     _tensionOsc: OscillatorNode;
@@ -373,7 +376,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       master.connect(limiter).connect(ac.destination);
       ctx = { ac, master, noise: makeNoise(ac) };
       // Tab arka plana gittiğinde otomatik durdur/ön plana geldiğinde devam ettir
-      const onVis = () => {
+      onVis = () => {
         if (document.hidden) {
           if (ac.state === "running") void ac.suspend();
         } else {
@@ -556,7 +559,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
 
     // ── flame_loop sample katmanı — sürekli yanan ateş sesi ──
     let loopSrc: AudioBufferSourceNode | null = null;
-    let loopGain: AudioBufferSourceNode | null = null;
+    let loopGain: GainNode | null = null;
     const flameBuf = sfxCache.get("flame_loop.ogg");
     if (flameBuf) {
       const lSrc = c.ac.createBufferSource();
@@ -565,7 +568,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       const lGain = c.ac.createGain();
       lGain.gain.setValueAtTime(0.0001, t);
       lGain.gain.exponentialRampToValueAtTime(0.3, t + 0.15);
-      // Bandpass ile orta frekansları vurgula
       const lBand = c.ac.createBiquadFilter();
       lBand.type = "bandpass";
       lBand.frequency.value = 520;
@@ -573,47 +575,52 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       lSrc.connect(lBand).connect(lGain).connect(c.master);
       lSrc.start(t);
       loopSrc = lSrc;
-      loopGain = lGain as unknown as AudioBufferSourceNode;
+      loopGain = lGain;
     }
 
     flameNodes = {
-      src, gain, lfo, sub, subGain,
-      loopSrc: loopSrc as unknown as AudioBufferSourceNode,
-      loopGain: loopGain as unknown as GainNode,
-      crackleTimer: 0,
+      src, gain, lfo, lfo2, lfo3, sub, subGain, subLfo,
+      band, band2, ws, low,
+      loopSrc,
+      loopGain,
     };
   };
 
   const stopFlame = (c: Ctx) => {
     if (!flameNodes) return;
-    const { src, gain, lfo, sub, subGain, loopSrc, loopGain } = flameNodes;
+    const n = flameNodes;
     flameNodes = null;
     const t = c.ac.currentTime;
-    gain.gain.cancelScheduledValues(t);
-    gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
-    subGain.gain.cancelScheduledValues(t);
-    subGain.gain.setValueAtTime(Math.max(0.0001, subGain.gain.value), t);
-    subGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
-    if (loopGain) {
-      const lg = loopGain as unknown as GainNode;
-      lg.gain.cancelScheduledValues(t);
-      lg.gain.setValueAtTime(Math.max(0.0001, lg.gain.value), t);
-      lg.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    // Fade out
+    n.gain.gain.cancelScheduledValues(t);
+    n.gain.gain.setValueAtTime(Math.max(0.0001, n.gain.gain.value), t);
+    n.gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    n.subGain.gain.cancelScheduledValues(t);
+    n.subGain.gain.setValueAtTime(Math.max(0.0001, n.subGain.gain.value), t);
+    n.subGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    if (n.loopGain) {
+      n.loopGain.gain.cancelScheduledValues(t);
+      n.loopGain.gain.setValueAtTime(Math.max(0.0001, n.loopGain.gain.value), t);
+      n.loopGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
     }
-    src.stop(t + 0.18);
-    lfo.stop(t + 0.18);
-    sub.stop(t + 0.18);
-    const loopSrcNode = loopSrc as unknown as AudioBufferSourceNode | null;
-    if (loopSrcNode) loopSrcNode.stop(t + 0.25);
-    src.onended = () => {
-      src.disconnect();
-      gain.disconnect();
-      lfo.disconnect();
-      sub.disconnect();
-      subGain.disconnect();
-      if (loopSrcNode) { loopSrcNode.disconnect(); }
-      if (loopGain) { (loopGain as unknown as GainNode).disconnect(); }
+    // Tüm oscillator'ları durdur
+    n.src.stop(t + 0.18);
+    n.lfo.stop(t + 0.18);
+    n.lfo2.stop(t + 0.18);
+    n.lfo3.stop(t + 0.18);
+    n.sub.stop(t + 0.18);
+    n.subLfo.stop(t + 0.18);
+    if (n.loopSrc) n.loopSrc.stop(t + 0.25);
+    // Tüm node'ları disconnect et
+    n.src.onended = () => {
+      try {
+        n.src.disconnect(); n.gain.disconnect();
+        n.lfo.disconnect(); n.lfo2.disconnect(); n.lfo3.disconnect();
+        n.sub.disconnect(); n.subGain.disconnect(); n.subLfo.disconnect();
+        n.band.disconnect(); n.band2.disconnect(); n.ws.disconnect(); n.low.disconnect();
+        if (n.loopSrc) n.loopSrc.disconnect();
+        if (n.loopGain) n.loopGain.disconnect();
+      } catch {}
     };
   };
 
@@ -639,21 +646,21 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     src.connect(low).connect(gain).connect(c.master);
     src.start(t);
     lfo.start(t);
-    ambientNodes = { src, gain };
+    ambientNodes = { src, gain, lfo, low };
   };
 
   const stopAmbient = (c: Ctx) => {
     if (!ambientNodes) return;
-    const { src, gain } = ambientNodes;
+    const { src, gain, lfo, low } = ambientNodes;
     ambientNodes = null;
     const t = c.ac.currentTime;
     gain.gain.cancelScheduledValues(t);
     gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), t);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
     src.stop(t + 0.7);
+    lfo.stop(t + 0.7);
     src.onended = () => {
-      src.disconnect();
-      gain.disconnect();
+      try { src.disconnect(); gain.disconnect(); lfo.disconnect(); low.disconnect(); } catch {}
     };
   };
 
@@ -749,6 +756,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     padGain.gain.value = 0.25;
     padGain.connect(masterGain);
 
+    const padOscs: OscillatorNode[] = [];
     [146.8, 174.6, 220].forEach((f) => {
       const osc = c.ac.createOscillator();
       osc.type = "sawtooth";
@@ -768,6 +776,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       g.connect(padGain);
       osc.start(t);
       osc2.start(t);
+      padOscs.push(osc, osc2);
     });
 
     // KATMAN 2: War drums
@@ -854,7 +863,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     let tensionTimer = setTimeout(scheduleTension, 3000);
 
     musicNodes = {
-      padGain, drumGain, masterGain,
+      padGain, drumGain, masterGain, padOscs,
       _timer: drumTimer,
       _tensionTimer: tensionTimer,
       _tensionOsc: tensionOsc,
@@ -875,13 +884,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     m.masterGain.gain.exponentialRampToValueAtTime(0.0001, t + 2);
 
     m._tensionOsc.stop(t + 2.5);
+    m.padOscs.forEach((o) => { try { o.stop(t + 2.5); } catch {} });
 
     m._tensionOsc.onended = () => {
-      m.masterGain.disconnect();
-      m.padGain.disconnect();
-      m.drumGain.disconnect();
-      m._tensionOsc.disconnect();
-      m._tensionFilter.disconnect();
+      try {
+        m.masterGain.disconnect(); m.padGain.disconnect(); m.drumGain.disconnect();
+        m._tensionOsc.disconnect(); m._tensionFilter.disconnect();
+        m.padOscs.forEach((o) => o.disconnect());
+      } catch {}
     };
   };
 
@@ -910,10 +920,12 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       c.master.gain.setTargetAtTime(m ? 0 : volume, c.ac.currentTime, 0.02);
       if (m) {
         stopFlame(c);
+        stopAmbient(c);
         stopSiren(c);
         stopMusic(c);
       } else {
         if (flameWanted) startFlame(c);
+        if (ambientWanted) startAmbient(c);
         if (sirenWanted) startSiren(c);
         if (musicWanted) startMusic(c);
       }
@@ -1119,7 +1131,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     roar() {
       withCtx((c) => {
-        if (sfxCache.has("dragon_roar_deep.wav")) {
+        if (sfxLoaded >= SFX_WARMUP) {
           playSample(c, "dragonRoar", { pitch: 0.8 + Math.random() * 0.4, vol: 0.6 });
           playSample(c, "dragonRoar", { pitch: 0.7 + Math.random() * 0.3, vol: 0.25, delay: 0.08 });
         } else {
@@ -1130,7 +1142,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     growl() {
       withCtx((c) => {
-        if (sfxCache.has("dragon_growl_angry.wav")) {
+        if (sfxLoaded >= SFX_WARMUP) {
           playSample(c, "dragonGrowl", { pitch: 0.7 + Math.random() * 0.4, vol: 0.45 });
         } else {
           tone(c, { type: "sawtooth", from: 40, to: 30, dur: 0.9, peak: 0.22 });
@@ -1141,7 +1153,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     bellow() {
       withCtx((c) => {
-        if (sfxCache.has("dragon_roar_deep.wav")) {
+        if (sfxLoaded >= SFX_WARMUP) {
           playSample(c, "dragonBellow", { pitch: 0.6 + Math.random() * 0.3, vol: 0.6 });
           playSample(c, "dragonRoar", { pitch: 0.5, vol: 0.35, delay: 0.15 });
           playSample(c, "dragonScreech", { pitch: 1.0, vol: 0.2, delay: 0.3 });
@@ -1156,7 +1168,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     snarl() {
       withCtx((c) => {
-        if (sfxCache.has("creature_roar_01.wav")) {
+        if (sfxLoaded >= SFX_WARMUP) {
           playSample(c, "dragonSnarl", { pitch: 0.9 + Math.random() * 0.4, vol: 0.5 });
         } else {
           tone(c, { type: "sawtooth", from: 300, to: 180, dur: 0.35, peak: 0.26 });
@@ -1167,7 +1179,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     wingFlap() {
       withCtx((c) => {
-        if (sfxCache.has("dragon_flap.wav")) {
+        if (sfxLoaded >= SFX_WARMUP) {
           playSample(c, "dragonWingFlap", { pitch: 0.85 + Math.random() * 0.3, vol: 0.5 });
         } else {
           noiseBurst(c, { dur: 0.18, peak: 0.16, type: "bandpass", from: 800, to: 200, q: 0.8 });
@@ -1220,7 +1232,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     diveWind(intensity: number) {
       const c = ctx;
-      if (!c) return;
+      if (!c || muted || c.ac.state !== "running") {
+        // Sessiz/askıya alındıysa mevcut wind'i durdur
+        if (diveWindNodes) {
+          diveWindNodes.gain.gain.cancelScheduledValues(c?.ac.currentTime ?? 0);
+          diveWindNodes.gain.gain.setTargetAtTime(0, c?.ac.currentTime ?? 0, 0.08);
+        }
+        return;
+      }
       if (!diveWindNodes) {
         const buf = sfxCache.get("dive_wind_real.wav");
         const src = c.ac.createBufferSource();
@@ -1271,10 +1290,10 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           diveScreamNodes.gain.gain.cancelScheduledValues(now);
           diveScreamNodes.gain.gain.setTargetAtTime(0, now, 0.15);
           const old = diveScreamNodes;
-          setTimeout(() => { try { old.src.stop(); } catch {} }, 200);
+          setTimeout(() => { try { old.src.stop(); old.gain.disconnect(); } catch {} }, 200);
         }
         // Rastgele dragon sample seç
-        const files = SFX_MANIFEST["dragonScream"] ?? [];
+        const files = SFX_MANIFEST["diveScream"] ?? [];
         if (!files.length) return;
         const file = files[Math.floor(Math.random() * files.length)]!;
         const buf = sfxCache.get(file);
@@ -1330,35 +1349,34 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       stopSiren(c);
       stopMusic(c);
       if (diveWindNodes) {
-        diveWindNodes.gain.gain.cancelScheduledValues(c.ac.currentTime);
-        diveWindNodes.gain.gain.setValueAtTime(0.0001, c.ac.currentTime);
-        diveWindNodes.src.stop(c.ac.currentTime + 0.1);
+        const t = c.ac.currentTime;
+        diveWindNodes.gain.gain.cancelScheduledValues(t);
+        diveWindNodes.gain.gain.setTargetAtTime(0, t, 0.05);
+        diveWindNodes.src.stop(t + 0.15);
         diveWindNodes = null;
       }
       if (diveScreamNodes) {
-        diveScreamNodes.gain.gain.cancelScheduledValues(c.ac.currentTime);
-        diveScreamNodes.gain.gain.setValueAtTime(0.0001, c.ac.currentTime);
-        diveScreamNodes.src.stop(c.ac.currentTime + 0.1);
+        const t = c.ac.currentTime;
+        diveScreamNodes.gain.gain.cancelScheduledValues(t);
+        diveScreamNodes.gain.gain.setTargetAtTime(0, t, 0.05);
+        diveScreamNodes.src.stop(t + 0.15);
         diveScreamNodes = null;
       }
-      flameWanted = false;
-      ambientWanted = false;
-      sirenWanted = false;
-      musicWanted = false;
     },
     dispose() {
       const c = ctx;
       if (!c) return;
+      if (onVis) { document.removeEventListener("visibilitychange", onVis); onVis = null; }
       stopFlame(c);
       stopAmbient(c);
       stopSiren(c);
       stopMusic(c);
       if (diveWindNodes) {
-        diveWindNodes.src.stop();
+        try { diveWindNodes.src.stop(); diveWindNodes.gain.disconnect(); } catch {}
         diveWindNodes = null;
       }
       if (diveScreamNodes) {
-        diveScreamNodes.src.stop();
+        try { diveScreamNodes.src.stop(); diveScreamNodes.gain.disconnect(); } catch {}
         diveScreamNodes = null;
       }
       ctx = null;
