@@ -481,18 +481,18 @@ const c05: ChapterDef = {
     lore:
       "Lonca cevabını gönderdi: 'Bulwark' sınıfı bir toplu firkateyn. Gövdesi " +
       "konik aleve kapalı — kırılacak yeri modülleri. Balon hücreleri, motor " +
-      "podları, kanat konsolları, anten, kalkan, yakıt ve komuta merkezi. " +
-      "Modülleri imha ettikçe gemi zayıflıyor.",
+      "podları, topçu kuleleri, zırh plakaları, egzoz, navigasyon ve komuta merkezi. " +
+      "Yanlarında zırhlı bombardıman uçakları da var.",
     objectives: [
-      "Bulwark'ın 12 modülünü imha et",
-      "Firkateyni düşür",
-      "Tüm eskortları temizle",
+      "Bulwark'ın 17 modülünü imha et",
+      "Bombardıman uçaklarını düşür",
+      "Firkateyni indir",
     ],
     tips: [
       "Köz Mermisi modüllere 2.5 kat hasar verir",
-      "Bataryayı alırsan top ateşi kesilir",
+      "Topçu kulelerini alırsan top ateşi kesilir",
       "Modüller_boldukça gemi alçalır ve yavaşlar",
-      "Eskort wasplar modüllerden sonra hedeflenebilir",
+      "Bombardıman uçakları bomba bırakıyor — aşağıdan yaklaşma",
     ],
   },
   world: {
@@ -500,10 +500,12 @@ const c05: ChapterDef = {
     scatter: {},
     airships: [
       { x: 0, y: 150, z: 260, role: "frigate", id: "bulwark", weakPoints: true },
-      { x: 220, y: 130, z: 320, role: "scout" },
-      { x: -240, y: 140, z: 300, role: "scout" },
-      { x: 340, y: 120, z: 200, role: "scout" },
-      { x: -320, y: 160, z: 180, role: "scout" },
+      { x: 180, y: 130, z: 220, role: "bomber", weakPoints: true },
+      { x: -200, y: 140, z: 240, role: "bomber", weakPoints: true },
+      { x: 300, y: 120, z: 320, role: "scout" },
+      { x: -320, y: 160, z: 300, role: "scout" },
+      { x: 420, y: 110, z: 260, role: "scout" },
+      { x: -400, y: 150, z: 280, role: "scout" },
     ],
     waves: {
       eskort: { enemy: "wasp", count: 5, radius: 280, altitude: [110, 180] },
@@ -521,17 +523,18 @@ const c05: ChapterDef = {
       modules: [
         "balonOn", "balonArka", "motorSol", "motorSag", "batarya", "kopru",
         "kanatSol", "kanatSag", "radar", "kalkan", "yakit", "komuta",
+        "taretSol", "taretSag", "egzost", "navigasyon", "zirh",
       ],
       label: "Bulwark modülleri",
     },
-    { id: "gemi", type: "killAirships", role: "frigate", count: 1, label: "Firkateyni düşür" },
+    { id: "bomber", type: "killAirships", role: "bomber", count: 2, label: "Bombardıman uçakları" },
     { id: "esort", type: "killEnemies", enemy: "wasp", count: 18, label: "Eskortları temizle" },
   ],
   fail: [{ type: "death" }],
   abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true },
-  par: { time: 420, score: 22000 },
-  rewardEmbers: 2200,
-  bondXp: 200,
+  par: { time: 480, score: 28000 },
+  rewardEmbers: 2800,
+  bondXp: 220,
   unlocks: ["c06"],
   beats: [
     {
@@ -539,12 +542,18 @@ const c05: ChapterDef = {
       trigger: { at: "start" },
       lines: [
         { who: "Ashkeep", text: "Bulwark angaje oluyor. Tüm bataryalar açık.", dur: 3.4 },
-        { who: "Kayra", text: "12 modül var — hepsini kır, sonra gemiyi indir.", dur: 3.8 },
+        { who: "Kayra", text: "17 modül, 2 bombardıman uçağı — hepsini kır.", dur: 3.8 },
       ],
       actions: [
         { do: "hint", text: "Modülleri hedefle — Köz Mermisiyle", keys: ["M"], dur: 9 },
         { do: "spawnWave", wave: "eskort" },
       ],
+    },
+    {
+      id: "bomberSinyali",
+      trigger: { at: "time", t: 10 },
+      lines: [{ who: "Kayra", text: "Bombardıman uçakları yaklaşıyor! Bomba atıyorlar!", dur: 3.2 }],
+      actions: [],
     },
     {
       id: "sokKilidi",

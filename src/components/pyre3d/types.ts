@@ -129,7 +129,8 @@ export type Target = Burnable & {
 
 export type WeakPointId =
   | "balonOn" | "balonArka" | "motorSol" | "motorSag" | "batarya" | "kopru" | "cekirdek"
-  | "kanatSol" | "kanatSag" | "radar" | "kalkan" | "yakit" | "komuta";
+  | "kanatSol" | "kanatSag" | "radar" | "kalkan" | "yakit" | "komuta"
+  | "taretSol" | "taretSag" | "egzost" | "navigasyon" | "zirh";
 
 export type WeakPointEffect = "sink" | "disableGuns" | "disableEngine" | "phase";
 
@@ -146,7 +147,7 @@ export type WeakPoint = {
   onDestroy: WeakPointEffect;
 };
 
-export type AirshipRole = "scout" | "frigate" | "flagship";
+export type AirshipRole = "scout" | "bomber" | "frigate" | "flagship";
 
 export type Airship = Burnable & {
   id: string;
