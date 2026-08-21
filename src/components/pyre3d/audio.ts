@@ -238,7 +238,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   // yaratma maliyeti kare süresine yansıyor: yangın zinciri onlarca binayı
   // aynı saniyede yıkabiliyor.
   let voices = 0;
-  const MAX_VOICES = 48;
+  const MAX_VOICES = 72;
   let lastExplosion = 0;
 
   /* ── sample buffer önbellek ── */
@@ -341,7 +341,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       const ac = new AC();
       const master = ac.createGain();
       master.gain.value = muted ? 0 : volume;
-      master.connect(ac.destination);
+      // Limiter — birden fazla ses üst üste bindiğinde kliplamayı önler
+      const limiter = ac.createDynamicsCompressor();
+      limiter.threshold.value = -12;
+      limiter.knee.value = 6;
+      limiter.ratio.value = 8;
+      limiter.attack.value = 0.002;
+      limiter.release.value = 0.15;
+      master.connect(limiter).connect(ac.destination);
       ctx = { ac, master, noise: makeNoise(ac) };
       return ctx;
     } catch {
@@ -976,7 +983,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     bombHit() {
       withCtx((c) => {
         const compGain = c.ac.createGain();
-        compGain.gain.value = 1.4;
+        compGain.gain.value = 1.0;
         compGain.connect(c.master);
 
         const p = (cat: string, v: number, pt: number, d: number) => {
@@ -1243,7 +1250,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       // Mevcut sample'ın gain'ini ayarla
       if (diveScreamNodes) {
         diveScreamNodes.gain.gain.cancelScheduledValues(now);
-        const target = intensity > 0.15 ? Math.min((intensity - 0.15) * 1.0, 1.0) : 0;
+        const target = intensity > 0.15 ? Math.min((intensity - 0.15) * 0.75, 0.7) : 0;
         diveScreamNodes.gain.gain.setTargetAtTime(target, now, 0.1);
       }
     },
