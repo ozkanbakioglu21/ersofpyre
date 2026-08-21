@@ -28,7 +28,13 @@ export type PropSpec =
   | { t: "structure"; kind: TargetKind; x: number; z: number; scale: number; id?: string }
   | { t: "flagship"; x: number; y: number; z: number; hidden: boolean }
   | { t: "caravan"; x: number; z: number; count: number; spacing: number; angle?: number }
-  | { t: "deco"; x: number; z: number; kind: "rock" | "cactus" | "deadtree" | "tent" | "barrel" | "campfire"; scale?: number };
+  | {
+      t: "deco";
+      x: number;
+      z: number;
+      kind: "rock" | "cactus" | "deadtree" | "tent" | "barrel" | "campfire";
+      scale?: number;
+    };
 
 export type AirshipSpawn = {
   x: number;

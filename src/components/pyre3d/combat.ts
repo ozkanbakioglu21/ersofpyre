@@ -39,6 +39,7 @@ export const BREATH = {
 
 const tmp = new THREE.Vector3();
 const tmp2 = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
 const neighbours: Target[] = [];
 
 export function addCombo(g: Game): void {
@@ -66,7 +67,13 @@ export function killTarget(g: Game, t: Target): void {
   g.fx.explosion(tmp, eSize);
   g.audio.explosion(t.kind === "factory" ? 1.6 : 1.2);
   // Askeri binalar canavar sesi
-  if (t.kind === "barracks" || t.kind === "armory" || t.kind === "command_post" || t.kind === "ammo_depot" || t.kind === "watchtower") {
+  if (
+    t.kind === "barracks" ||
+    t.kind === "armory" ||
+    t.kind === "command_post" ||
+    t.kind === "ammo_depot" ||
+    t.kind === "watchtower"
+  ) {
     g.audio.creatureDeath();
   }
   // İkincil patlama — daha yüksekte, daha küçük (çatı patlaması)
@@ -345,12 +352,27 @@ export function explode(g: Game, at: THREE.Vector3, o: BlastOpts): void {
  * Yanma ve yayılma
  * ------------------------------------------------------------------ */
 
+/** Yanma FX imleci — bütçe dolunca sıradaki kare kaldığı yangından sürer. */
+let burnFxCursor = 0;
+
 export function updateBurning(g: Game, dt: number): void {
-  for (const t of g.burning) {
+  // Kare başına FX bütçesi: 300 bina yanarken her karede yüzlerce partikül
+  // üretmek havuzları 2 karede tüketiyor ve kare süresini şişiriyordu.
+  // Hasar/ölüm her yangında her kare işler; yalnız GÖRSELLER bütçeli.
+  let emberBudget = 40;
+  let jetBudget = 12;
+  const dp = g.dragon.root.position;
+  const n = g.burning.length;
+  const start = n ? burnFxCursor % n : 0;
+
+  for (let i = 0; i < n; i++) {
+    const t = g.burning[(start + i) % n]!;
+    const fxAllowed = (emberBudget > 0 || jetBudget > 0) && t.pos.distanceToSquared(dp) < 300 * 300;
     if (t.dead) {
       // Ölü binalar: sadece yangın görselleri (hasar yok)
-      if (t.burn > 0.04) {
-        if (Math.random() < dt * 20) {
+      if (t.burn > 0.04 && fxAllowed) {
+        if (emberBudget >= 4 && Math.random() < dt * 20) {
+          emberBudget -= 4;
           tmp.set(
             t.pos.x + (Math.random() - 0.5) * t.radius * 2,
             t.pos.y + 1 + Math.random() * Math.min(10, t.height * 0.6),
@@ -358,13 +380,14 @@ export function updateBurning(g: Game, dt: number): void {
           );
           g.fx.ember(tmp, 4, 6);
         }
-        if (Math.random() < dt * 10) {
+        if (jetBudget >= 6 && Math.random() < dt * 10) {
+          jetBudget -= 6;
           tmp.set(
             t.pos.x + (Math.random() - 0.5) * t.radius,
             t.pos.y + 0.5,
             t.pos.z + (Math.random() - 0.5) * t.radius,
           );
-          g.fx.flameJet(tmp, 6, new THREE.Vector3(0, 1, 0));
+          g.fx.flameJet(tmp, 6, UP);
         }
       }
       continue;
@@ -374,7 +397,8 @@ export function updateBurning(g: Game, dt: number): void {
       t.wrote = t.burn;
       t.apply(t);
     }
-    if (Math.random() < t.burn * dt * 24) {
+    if (fxAllowed && emberBudget >= 3 && Math.random() < t.burn * dt * 24) {
+      emberBudget -= 3;
       tmp.set(
         t.pos.x + (Math.random() - 0.5) * t.radius * 2,
         t.pos.y + 2 + Math.random() * Math.min(14, t.height),
@@ -384,14 +408,18 @@ export function updateBurning(g: Game, dt: number): void {
     }
     if (t.hp <= 0) killTarget(g, t);
   }
+  burnFxCursor = start + 17; // asal adım: her kare farklı yangınlar öncelik alır
 }
 
 let spreadTimer = 0;
 let igniteBudget = 0;
+/** Yayılma imleci — her tick en fazla 24 kaynak işlenir, sıradakiler devreder. */
+let spreadCursor = 0;
 
 export function resetSpread(): void {
   spreadTimer = 0;
   igniteBudget = 0;
+  spreadCursor = 0;
 }
 
 export function updateFireSpread(g: Game, dt: number): void {
@@ -404,7 +432,16 @@ export function updateFireSpread(g: Game, dt: number): void {
   const windLen = wind.length();
   const radius = SPREAD.radius * (1 + windLen * SPREAD.windBoost);
 
-  for (const src of g.burning) {
+  // 300 yanan binada tek karede 300 grid sorgusu 15 karede bir hıçkırık
+  // üretiyordu. Tick başına 24 kaynak işleyip imleci döndürüyoruz; toplam
+  // yayılma hızını korumak için şans, atlanan tick sayısıyla çarpılıyor.
+  const total = g.burning.length;
+  const batch = Math.min(24, total);
+  const rounds = total > 24 ? Math.min(3, total / 24) : 1;
+  const startIdx = total ? spreadCursor % total : 0;
+
+  for (let bi = 0; bi < batch; bi++) {
+    const src = g.burning[(startIdx + bi) % total]!;
     if (src.dead || src.burn < 0.25 || igniteBudget < 1) continue;
     g.grid.query(src.pos.x, src.pos.z, radius, neighbours);
     for (const t of neighbours) {
@@ -431,13 +468,15 @@ export function updateFireSpread(g: Game, dt: number): void {
         Math.max(0, w) *
         (street ? SPREAD.streetBreak : 1) *
         (1 - d / radius) *
-        SPREAD.tick;
+        SPREAD.tick *
+        rounds;
       if (Math.random() < chance) {
         t.burn = Math.min(1, t.burn + 0.35);
         igniteBudget -= 1;
       }
     }
   }
+  spreadCursor = startIdx + batch;
 }
 
 export const FIREBALL_BLAST: BlastOpts = {

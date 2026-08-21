@@ -336,9 +336,10 @@ function FlightChip({ bridge }: { bridge: HudBridge }) {
         const min = Math.floor(t / 60);
         const sec = Math.floor(t % 60);
         const timer = `${min}:${String(sec).padStart(2, "0")}`;
-        const best = f.bestTime > 0
-          ? ` · En iyi ${Math.floor(f.bestTime / 60)}:${String(Math.floor(f.bestTime % 60)).padStart(2, "0")}`
-          : "";
+        const best =
+          f.bestTime > 0
+            ? ` · En iyi ${Math.floor(f.bestTime / 60)}:${String(Math.floor(f.bestTime % 60)).padStart(2, "0")}`
+            : "";
         el.current.textContent = `${Math.round(f.speed)} hız · ${Math.round(f.alt)} m · ${timer}${best} · ${f.fps} fps`;
       }),
     [bridge],

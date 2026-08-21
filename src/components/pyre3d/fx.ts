@@ -37,7 +37,10 @@ export function createFx(scene: THREE.Scene): FxSystem {
   const emVel = new Float32Array(EMBERS * 3);
   const emLife = new Float32Array(EMBERS);
   const emGeo = new THREE.BufferGeometry();
-  emGeo.setAttribute("position", new THREE.BufferAttribute(emPos, 3));
+  emGeo.setAttribute(
+    "position",
+    new THREE.BufferAttribute(emPos, 3).setUsage(THREE.DynamicDrawUsage),
+  );
   const emberMat = new THREE.PointsMaterial({
     color: 0xffb840,
     map: softParticleTexture(),
@@ -66,8 +69,11 @@ export function createFx(scene: THREE.Scene): FxSystem {
   const fpLife = new Float32Array(FLAME);
   const fpMax = new Float32Array(FLAME);
   const fpGeo = new THREE.BufferGeometry();
-  fpGeo.setAttribute("position", new THREE.BufferAttribute(fpPos, 3));
-  fpGeo.setAttribute("color", new THREE.BufferAttribute(fpCol, 3));
+  fpGeo.setAttribute(
+    "position",
+    new THREE.BufferAttribute(fpPos, 3).setUsage(THREE.DynamicDrawUsage),
+  );
+  fpGeo.setAttribute("color", new THREE.BufferAttribute(fpCol, 3).setUsage(THREE.DynamicDrawUsage));
   const flameMat = new THREE.PointsMaterial({
     color: 0xffffff,
     map: softParticleTexture(),
@@ -99,7 +105,10 @@ export function createFx(scene: THREE.Scene): FxSystem {
   const smMax = new Float32Array(SMOKE);
   const smSize = new Float32Array(SMOKE);
   const smGeo = new THREE.BufferGeometry();
-  smGeo.setAttribute("position", new THREE.BufferAttribute(smPos, 3));
+  smGeo.setAttribute(
+    "position",
+    new THREE.BufferAttribute(smPos, 3).setUsage(THREE.DynamicDrawUsage),
+  );
   const smokeMat = new THREE.PointsMaterial({
     color: 0x222222,
     map: softParticleTexture(),
@@ -197,7 +206,10 @@ export function createFx(scene: THREE.Scene): FxSystem {
   const wsLife = new Float32Array(WIND_STREAKS);
   const wsMax = new Float32Array(WIND_STREAKS);
   const wsGeo = new THREE.BufferGeometry();
-  wsGeo.setAttribute("position", new THREE.BufferAttribute(wsPos, 3));
+  wsGeo.setAttribute(
+    "position",
+    new THREE.BufferAttribute(wsPos, 3).setUsage(THREE.DynamicDrawUsage),
+  );
   const wsMat = new THREE.PointsMaterial({
     color: 0xffffff,
     map: softParticleTexture(),
@@ -217,6 +229,12 @@ export function createFx(scene: THREE.Scene): FxSystem {
   }
 
   let density = 1;
+  // Canlı parçacık sayaçları: havuz boşken tam dizi taraması ve GPU'ya
+  // 30 KB/kare attribute yüklemesi yapmamak için.
+  let emAlive = 0;
+  let fpAlive = 0;
+  let smAlive = 0;
+  let wsAlive = 0;
 
   return {
     setDensity(k) {
@@ -232,6 +250,7 @@ export function createFx(scene: THREE.Scene): FxSystem {
         emVel[i3] = rand(-spread, spread);
         emVel[i3 + 1] = rand(2, spread);
         emVel[i3 + 2] = rand(-spread, spread);
+        if (emLife[emIdx]! <= 0) emAlive++;
         emLife[emIdx] = rand(0.7, 2);
         emIdx = (emIdx + 1) % EMBERS;
       }
@@ -253,6 +272,7 @@ export function createFx(scene: THREE.Scene): FxSystem {
         fpVel[i3 + 1] = rand(3, 12);
         fpVel[i3 + 2] = sz * speed + pz * spread;
         const life = rand(0.35, 0.85);
+        if (fpLife[fpIdx]! <= 0) fpAlive++;
         fpLife[fpIdx] = life;
         fpMax[fpIdx] = life;
         fpCol[i3] = fpA.r;
@@ -272,6 +292,7 @@ export function createFx(scene: THREE.Scene): FxSystem {
         smVel[i3 + 1] = rand(5, 14);
         smVel[i3 + 2] = -sz * rand(4, 12) + rand(-3, 3);
         const life = rand(0.6, 1.6);
+        if (smLife[smIdx]! <= 0) smAlive++;
         smLife[smIdx] = life;
         smMax[smIdx] = life;
         smSize[smIdx] = rand(4, 8);
@@ -324,80 +345,98 @@ export function createFx(scene: THREE.Scene): FxSystem {
         wsPos[i3 + 1] = camPos.y + vert;
         wsPos[i3 + 2] = camPos.z + cosH * fwd - sinH * lateral;
         const life = rand(0.15, 0.35);
+        if (wsLife[wsIdx]! <= 0) wsAlive++;
         wsLife[wsIdx] = life;
         wsMax[wsIdx] = life;
         wsIdx = (wsIdx + 1) % WIND_STREAKS;
       }
     },
     update(dt, now) {
-      for (let i = 0; i < EMBERS; i++) {
-        if (emLife[i]! <= 0) continue;
-        emLife[i] = emLife[i]! - dt;
-        const i3 = i * 3;
-        emPos[i3] = emPos[i3]! + emVel[i3]! * dt;
-        emPos[i3 + 1] = emPos[i3 + 1]! + emVel[i3 + 1]! * dt;
-        emPos[i3 + 2] = emPos[i3 + 2]! + emVel[i3 + 2]! * dt;
-        emVel[i3 + 1] = emVel[i3 + 1]! + 6 * dt;
-        if (emLife[i]! <= 0) emPos[i3 + 1] = -9999;
+      if (emAlive > 0) {
+        for (let i = 0; i < EMBERS; i++) {
+          if (emLife[i]! <= 0) continue;
+          emLife[i] = emLife[i]! - dt;
+          const i3 = i * 3;
+          emPos[i3] = emPos[i3]! + emVel[i3]! * dt;
+          emPos[i3 + 1] = emPos[i3 + 1]! + emVel[i3 + 1]! * dt;
+          emPos[i3 + 2] = emPos[i3 + 2]! + emVel[i3 + 2]! * dt;
+          emVel[i3 + 1] = emVel[i3 + 1]! + 6 * dt;
+          if (emLife[i]! <= 0) {
+            emPos[i3 + 1] = -9999;
+            emAlive--;
+          }
+        }
+        (emGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
       }
-      (emGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
 
-      for (let i = 0; i < FLAME; i++) {
-        if (fpLife[i]! <= 0) continue;
-        fpLife[i] = fpLife[i]! - dt;
-        const i3 = i * 3;
-        fpVel[i3 + 1] = fpVel[i3 + 1]! + 14 * dt;
-        const drag = Math.max(0, 1 - 1.2 * dt);
-        fpVel[i3] = fpVel[i3]! * drag;
-        fpVel[i3 + 1] = fpVel[i3 + 1]! * drag;
-        fpVel[i3 + 2] = fpVel[i3 + 2]! * drag;
-        fpVel[i3] = fpVel[i3]! + Math.sin(now * 0.02 + i) * 10 * dt;
-        fpPos[i3] = fpPos[i3]! + fpVel[i3]! * dt;
-        fpPos[i3 + 1] = fpPos[i3 + 1]! + fpVel[i3 + 1]! * dt;
-        fpPos[i3 + 2] = fpPos[i3 + 2]! + fpVel[i3 + 2]! * dt;
-        const age = 1 - Math.max(0, fpLife[i]!) / Math.max(1e-5, fpMax[i]!);
-        if (age < 0.25) fpTmp.lerpColors(fpA, fpB, age / 0.25);
-        else if (age < 0.6) fpTmp.lerpColors(fpB, fpC, (age - 0.25) / 0.35);
-        else fpTmp.lerpColors(fpC, fpD, Math.min(1, (age - 0.6) / 0.4));
-        fpCol[i3] = fpTmp.r;
-        fpCol[i3 + 1] = fpTmp.g;
-        fpCol[i3 + 2] = fpTmp.b;
-        if (fpLife[i]! <= 0) fpPos[i3 + 1] = -9999;
+      if (fpAlive > 0) {
+        for (let i = 0; i < FLAME; i++) {
+          if (fpLife[i]! <= 0) continue;
+          fpLife[i] = fpLife[i]! - dt;
+          const i3 = i * 3;
+          fpVel[i3 + 1] = fpVel[i3 + 1]! + 14 * dt;
+          const drag = Math.max(0, 1 - 1.2 * dt);
+          fpVel[i3] = fpVel[i3]! * drag;
+          fpVel[i3 + 1] = fpVel[i3 + 1]! * drag;
+          fpVel[i3 + 2] = fpVel[i3 + 2]! * drag;
+          fpVel[i3] = fpVel[i3]! + Math.sin(now * 0.02 + i) * 10 * dt;
+          fpPos[i3] = fpPos[i3]! + fpVel[i3]! * dt;
+          fpPos[i3 + 1] = fpPos[i3 + 1]! + fpVel[i3 + 1]! * dt;
+          fpPos[i3 + 2] = fpPos[i3 + 2]! + fpVel[i3 + 2]! * dt;
+          const age = 1 - Math.max(0, fpLife[i]!) / Math.max(1e-5, fpMax[i]!);
+          if (age < 0.25) fpTmp.lerpColors(fpA, fpB, age / 0.25);
+          else if (age < 0.6) fpTmp.lerpColors(fpB, fpC, (age - 0.25) / 0.35);
+          else fpTmp.lerpColors(fpC, fpD, Math.min(1, (age - 0.6) / 0.4));
+          fpCol[i3] = fpTmp.r;
+          fpCol[i3 + 1] = fpTmp.g;
+          fpCol[i3 + 2] = fpTmp.b;
+          if (fpLife[i]! <= 0) {
+            fpPos[i3 + 1] = -9999;
+            fpAlive--;
+          }
+        }
+        (fpGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
+        (fpGeo.attributes["color"] as THREE.BufferAttribute).needsUpdate = true;
       }
-      (fpGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
-      (fpGeo.attributes["color"] as THREE.BufferAttribute).needsUpdate = true;
 
       /* ---- duman trail güncellemesi ---- */
-      for (let i = 0; i < SMOKE; i++) {
-        if (smLife[i]! <= 0) continue;
-        smLife[i] = smLife[i]! - dt;
-        const i3 = i * 3;
-        smVel[i3] = smVel[i3]! * Math.max(0, 1 - 0.6 * dt);
-        smVel[i3 + 1] = smVel[i3 + 1]! * Math.max(0, 1 - 0.5 * dt);
-        smVel[i3 + 2] = smVel[i3 + 2]! * Math.max(0, 1 - 0.6 * dt);
-        smVel[i3] = smVel[i3]! + Math.sin(now * 0.008 + i * 0.5) * 3 * dt;
-        smPos[i3] = smPos[i3]! + smVel[i3]! * dt;
-        smPos[i3 + 1] = smPos[i3 + 1]! + smVel[i3 + 1]! * dt;
-        smPos[i3 + 2] = smPos[i3 + 2]! + smVel[i3 + 2]! * dt;
-        // Boyut yaşla büyür (duman genişler)
-        const age = 1 - Math.max(0, smLife[i]!) / Math.max(1e-5, smMax[i]!);
-        smSize[i] = smSize[i]! * (1 + age * 0.5);
-        if (smLife[i]! <= 0) smPos[i3 + 1] = -9999;
+      if (smAlive > 0) {
+        for (let i = 0; i < SMOKE; i++) {
+          if (smLife[i]! <= 0) continue;
+          smLife[i] = smLife[i]! - dt;
+          const i3 = i * 3;
+          smVel[i3] = smVel[i3]! * Math.max(0, 1 - 0.6 * dt);
+          smVel[i3 + 1] = smVel[i3 + 1]! * Math.max(0, 1 - 0.5 * dt);
+          smVel[i3 + 2] = smVel[i3 + 2]! * Math.max(0, 1 - 0.6 * dt);
+          smVel[i3] = smVel[i3]! + Math.sin(now * 0.008 + i * 0.5) * 3 * dt;
+          smPos[i3] = smPos[i3]! + smVel[i3]! * dt;
+          smPos[i3 + 1] = smPos[i3 + 1]! + smVel[i3 + 1]! * dt;
+          smPos[i3 + 2] = smPos[i3 + 2]! + smVel[i3 + 2]! * dt;
+          // Boyut yaşla büyür (duman genişler)
+          const age = 1 - Math.max(0, smLife[i]!) / Math.max(1e-5, smMax[i]!);
+          smSize[i] = smSize[i]! * (1 + age * 0.5);
+          if (smLife[i]! <= 0) {
+            smPos[i3 + 1] = -9999;
+            smAlive--;
+          }
+        }
+        (smGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
       }
-      (smGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
-      // Duman opaklığı: aktif duman yoksa sıfırla
-      const hasSmoke = smLife.some((l) => l > 0);
-      smokeMat.opacity = hasSmoke ? 0.32 : 0;
+      smokeMat.opacity = smAlive > 0 ? 0.32 : 0;
 
       /* ---- rüzgar çizgileri ---- */
-      for (let i = 0; i < WIND_STREAKS; i++) {
-        if (wsLife[i]! <= 0) continue;
-        wsLife[i] = wsLife[i]! - dt;
-        if (wsLife[i]! <= 0) wsPos[i * 3 + 1] = -9999;
+      if (wsAlive > 0) {
+        for (let i = 0; i < WIND_STREAKS; i++) {
+          if (wsLife[i]! <= 0) continue;
+          wsLife[i] = wsLife[i]! - dt;
+          if (wsLife[i]! <= 0) {
+            wsPos[i * 3 + 1] = -9999;
+            wsAlive--;
+          }
+        }
+        (wsGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
       }
-      const hasStreaks = wsLife.some((l) => l > 0);
-      wsMat.opacity = hasStreaks ? 0.35 : 0;
-      (wsGeo.attributes["position"] as THREE.BufferAttribute).needsUpdate = true;
+      wsMat.opacity = wsAlive > 0 ? 0.35 : 0;
 
       for (const b of blasts) {
         if (b.t < 0) continue;

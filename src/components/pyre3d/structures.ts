@@ -119,7 +119,14 @@ function addFacades(parent: THREE.Object3D, w: number, h: number, d: number, rng
  * ------------------------------------------------------------------ */
 
 /** Tek çatı引发 çizgisi (ridge). */
-function addRidge(parent: THREE.Object3D, w: number, h: number, d: number, rot: number, mat: THREE.Material) {
+function addRidge(
+  parent: THREE.Object3D,
+  w: number,
+  h: number,
+  d: number,
+  rot: number,
+  mat: THREE.Material,
+) {
   const len = Math.max(w, d) * 0.88;
   const ridge = new THREE.Mesh(new THREE.BoxGeometry(len, 0.2, 0.35), mat);
   ridge.position.y = h + 0.1;
@@ -128,13 +135,17 @@ function addRidge(parent: THREE.Object3D, w: number, h: number, d: number, rot: 
 }
 
 /** Üst üste çatı kiremit satırı (3 basamalı) — çatı yüzeyine derinlik katar. */
-function addShingleRows(parent: THREE.Object3D, w: number, h: number, d: number, rot: number, mat: THREE.Material) {
+function addShingleRows(
+  parent: THREE.Object3D,
+  w: number,
+  h: number,
+  d: number,
+  rot: number,
+  mat: THREE.Material,
+) {
   const span = Math.max(w, d) * 0.82;
   for (let i = 0; i < 3; i++) {
-    const plank = new THREE.Mesh(
-      new THREE.BoxGeometry(span - i * 1.2, 0.12, 0.7 - i * 0.12),
-      mat,
-    );
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(span - i * 1.2, 0.12, 0.7 - i * 0.12), mat);
     plank.position.y = h + 0.4 + i * 0.35;
     plank.rotation.y = rot;
     parent.add(plank);
@@ -142,16 +153,20 @@ function addShingleRows(parent: THREE.Object3D, w: number, h: number, d: number,
 }
 
 /** Dormer pencere — büyük çatılarda çatının yüzeyinden çıkan mini ev. */
-function addDormer(parent: THREE.Object3D, x: number, y: number, z: number, faceAngle: number, rng: Rng) {
+function addDormer(
+  parent: THREE.Object3D,
+  x: number,
+  y: number,
+  z: number,
+  faceAngle: number,
+  rng: Rng,
+) {
   const dw = rng.range(1.2, 1.8);
   const dh = rng.range(1.0, 1.6);
   const body = new THREE.Mesh(new THREE.BoxGeometry(dw, dh, 0.8), cityMat(0x3a2a1e));
   body.position.set(x, y + dh / 2, z);
   parent.add(body);
-  const dRoof = new THREE.Mesh(
-    new THREE.ConeGeometry(dw * 0.7, 1.0, 4),
-    cityMat(0x2c1c14),
-  );
+  const dRoof = new THREE.Mesh(new THREE.ConeGeometry(dw * 0.7, 1.0, 4), cityMat(0x2c1c14));
   dRoof.position.set(x, y + dh + 0.5, z);
   dRoof.rotation.y = Math.PI / 4;
   parent.add(dRoof);
@@ -167,7 +182,10 @@ function addPorch(parent: THREE.Object3D, x: number, z: number, w: number, h: nu
   parent.add(slab);
   // Sütunlar
   for (const sx of [-pw / 2 + 0.2, pw / 2 - 0.2]) {
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, h + 1.2, 6), cityMat(0x4a3a2c));
+    const col = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.22, h + 1.2, 6),
+      cityMat(0x4a3a2c),
+    );
     col.position.set(x + sx, (h + 1.2) / 2, z + pd + 0.15);
     parent.add(col);
   }
@@ -180,26 +198,26 @@ function addPorch(parent: THREE.Object3D, x: number, z: number, w: number, h: nu
 /** Temel / sawaz bandı — binanın dibinde genişletilmiş şerit. */
 function addFoundation(parent: THREE.Object3D, w: number, d: number, h: number, rng: Rng) {
   const fh = rng.range(0.5, 1.0);
-  const base = new THREE.Mesh(
-    new THREE.BoxGeometry(w + 0.5, fh, d + 0.5),
-    cityMat(0x3a3028),
-  );
+  const base = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, fh, d + 0.5), cityMat(0x3a3028));
   base.position.y = fh / 2;
   parent.add(base);
 }
 
 /** Kat bandı — çok katlı binalarda katları ayıran yatay çıkıntı. */
 function addFloorBand(parent: THREE.Object3D, w: number, d: number, y: number, rng: Rng) {
-  const band = new THREE.Mesh(
-    new THREE.BoxGeometry(w + 0.35, 0.22, d + 0.35),
-    cityMat(0x3a2a1e),
-  );
+  const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.35, 0.22, d + 0.35), cityMat(0x3a2a1e));
   band.position.y = y;
   parent.add(band);
 }
 
 /** Kapı_specific — kemerli çerçeve, eşik, kulplu ahşap kapı. */
-function addDetailedDoor(parent: THREE.Object3D, x: number, z: number, faceAngle: number, rng: Rng) {
+function addDetailedDoor(
+  parent: THREE.Object3D,
+  x: number,
+  z: number,
+  faceAngle: number,
+  rng: Rng,
+) {
   const dw = rng.range(1.0, 1.4);
   const dh = rng.range(2.0, 2.6);
   // Kemerli üst
@@ -226,7 +244,14 @@ function addDetailedDoor(parent: THREE.Object3D, x: number, z: number, faceAngle
 }
 
 /** Pencere çerçevesi — pencere etrafında ince kutu çerçeve. */
-function addWindowFrame(parent: THREE.Object3D, x: number, y: number, z: number, faceAngle: number, rng: Rng) {
+function addWindowFrame(
+  parent: THREE.Object3D,
+  x: number,
+  y: number,
+  z: number,
+  faceAngle: number,
+  rng: Rng,
+) {
   const ww = rng.range(0.8, 1.3);
   const wh = rng.range(1.0, 1.6);
   const depth = 0.18;
@@ -235,7 +260,10 @@ function addWindowFrame(parent: THREE.Object3D, x: number, y: number, z: number,
   top.position.set(x, y + wh / 2 + 0.07, z);
   parent.add(top);
   // Alt sill
-  const bot = new THREE.Mesh(new THREE.BoxGeometry(ww + 0.3, 0.14, depth + 0.08), cityMat(0x4a3a2c));
+  const bot = new THREE.Mesh(
+    new THREE.BoxGeometry(ww + 0.3, 0.14, depth + 0.08),
+    cityMat(0x4a3a2c),
+  );
   bot.position.set(x, y - wh / 2 - 0.07, z + 0.04);
   parent.add(bot);
 }
@@ -265,10 +293,7 @@ function addChimneyTop(parent: THREE.Object3D, x: number, y: number, z: number, 
   cap.position.set(x, y + 0.18, z);
   parent.add(cap);
   // Baca içi karanlık
-  const hole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.22, 0.22, 0.3, 6),
-    cityMat(0x0a0604),
-  );
+  const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.3, 6), cityMat(0x0a0604));
   hole.position.set(x, y + 0.35, z);
   parent.add(hole);
 }
@@ -346,20 +371,14 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
       addRidge(parts, w, h, d, rng.chance(0.5) ? 0 : Math.PI / 2, cityMat(0x1a100a));
     } else if (roofStyle === 1) {
       // eğimli düz çatı
-      const roof = new THREE.Mesh(
-        new THREE.BoxGeometry(w + 0.5, 0.3, d + 0.5),
-        cityMat(0x352820),
-      );
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, 0.3, d + 0.5), cityMat(0x352820));
       roof.position.y = h + 0.15;
       roof.rotation.x = 0.08 * (rng.chance(0.5) ? 1 : -1);
       parts.add(roof);
     } else if (roofStyle === 2) {
       // —atTipi çatı (ikiz eğim)
       const hw = Math.max(w, d) * 0.85;
-      const roof = new THREE.Mesh(
-        new THREE.ConeGeometry(hw, 2.2, 4),
-        cityMat(0x301e16),
-      );
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(hw, 2.2, 4), cityMat(0x301e16));
       roof.position.y = h + 1.1;
       roof.rotation.y = Math.PI / 4;
       parts.add(roof);
@@ -385,10 +404,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     }
 
     // Korniş / saçak (her eve)
-    const cornice = new THREE.Mesh(
-      new THREE.BoxGeometry(w + 0.6, 0.3, d + 0.6),
-      cityMat(0x3a2a1e),
-    );
+    const cornice = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.3, d + 0.6), cityMat(0x3a2a1e));
     cornice.position.y = h + 0.15;
     parts.add(cornice);
 
@@ -461,10 +477,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     }
 
     // Korniş / saçak
-    const cornice = new THREE.Mesh(
-      new THREE.BoxGeometry(w + 0.8, 0.5, d + 0.8),
-      cityMat(0x3a2a1e),
-    );
+    const cornice = new THREE.Mesh(new THREE.BoxGeometry(w + 0.8, 0.5, d + 0.8), cityMat(0x3a2a1e));
     cornice.position.y = h + 0.25;
     parts.add(cornice);
     const cap = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.7, d + 0.6), cityMat(0x2a1d15));
@@ -481,26 +494,17 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     for (let i = 0; i < balconies; i++) {
       const bw = rng.range(2, Math.min(4, w - 1));
       const by = h * rng.range(0.2, 0.8);
-      const balcony = new THREE.Mesh(
-        new THREE.BoxGeometry(bw, 0.2, 1.4),
-        cityMat(0x3a2a1e),
-      );
+      const balcony = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.2, 1.4), cityMat(0x3a2a1e));
       balcony.position.set(rng.range(-w / 4, w / 4), by, d / 2 + 0.7);
       parts.add(balcony);
       // Korkuluk — dikey çubuklar
-      const rail = new THREE.Mesh(
-        new THREE.BoxGeometry(bw, 1.0, 0.1),
-        cityMat(0x2b241e),
-      );
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(bw, 1.0, 0.1), cityMat(0x2b241e));
       rail.position.set(balcony.position.x, by + 0.6, d / 2 + 1.35);
       parts.add(rail);
       // Korkuluk dikey destekleri
       for (let j = 0; j < 3; j++) {
-        const post = new THREE.Mesh(
-          new THREE.BoxGeometry(0.08, 1.0, 0.08),
-          cityMat(0x2b241e),
-        );
-        post.position.set(balcony.position.x + (j - 1) * bw / 2.5, by + 0.5, d / 2 + 1.35);
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.0, 0.08), cityMat(0x2b241e));
+        post.position.set(balcony.position.x + ((j - 1) * bw) / 2.5, by + 0.5, d / 2 + 1.35);
         parts.add(post);
       }
     }
@@ -575,10 +579,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     for (let i = 0; i < stacks; i++) {
       const sx = w / 2 - 1.2 - i * 1.5;
       const stackH = rng.range(3, 6);
-      const st = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.6, 0.8, stackH, 6),
-        cityMat(0x2b241e),
-      );
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, stackH, 6), cityMat(0x2b241e));
       st.position.set(sx, h + stackH / 2, -d / 2 + 1.2);
       parts.add(st);
       addChimneyTop(parts, sx, h + stackH + 0.1, -d / 2 + 1.2, rng);
@@ -864,10 +865,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     parts.add(base);
 
     // Temel halka
-    const fRing = new THREE.Mesh(
-      new THREE.CylinderGeometry(3.0, 3.0, 0.6, 10),
-      cityMat(0x3a3028),
-    );
+    const fRing = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.0, 0.6, 10), cityMat(0x3a3028));
     fRing.position.y = 0.3;
     parts.add(fRing);
 
@@ -875,12 +873,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     const bands = Math.floor(h / 4.5);
     for (let i = 1; i <= bands; i++) {
       const bRing = new THREE.Mesh(
-        new THREE.TorusGeometry(
-          2.8 - (i / bands) * 0.8,
-          0.12,
-          5,
-          10,
-        ),
+        new THREE.TorusGeometry(2.8 - (i / bands) * 0.8, 0.12, 5, 10),
         cityMat(0x5a4a30, 0.6, 0.5),
       );
       bRing.rotation.x = Math.PI / 2;
@@ -902,10 +895,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
       const a = (i / merlons) * Math.PI * 2;
       const mx = Math.cos(a) * 3.0;
       const mz = Math.sin(a) * 3.0;
-      const merlon = new THREE.Mesh(
-        new THREE.BoxGeometry(0.45, 0.7, 0.45),
-        cityMat(0x463a2c),
-      );
+      const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.7, 0.45), cityMat(0x463a2c));
       merlon.position.set(mx, h + 2.2, mz);
       parts.add(merlon);
     }
@@ -916,10 +906,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
       const a = (i / winCount) * Math.PI * 2 + rng.range(0, 0.5);
       const wy = rng.range(4, h - 3);
       const r = 2.0 - (wy / h) * 0.3;
-      const win = new THREE.Mesh(
-        new THREE.BoxGeometry(0.5, 0.8, 0.2),
-        cityMat(0x150d07),
-      );
+      const win = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.2), cityMat(0x150d07));
       win.position.set(Math.cos(a) * r, wy, Math.sin(a) * r);
       win.rotation.y = a;
       parts.add(win);
@@ -968,10 +955,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
       mount.position.y = h + 1.9;
       parts.add(mount);
       // Mermi kutusu
-      const ammoBox = new THREE.Mesh(
-        new THREE.BoxGeometry(1.2, 0.8, 0.8),
-        cityMat(0x2b241e),
-      );
+      const ammoBox = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.8), cityMat(0x2b241e));
       ammoBox.position.set(1.4, h + 1.6, 0);
       parts.add(ammoBox);
     } else {
@@ -1018,16 +1002,10 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
       parts.add(win);
     }
     // Nöbet kulübesi
-    const booth = new THREE.Mesh(
-      new THREE.BoxGeometry(1.8, 2.5, 1.8),
-      cityMat(0x3a3028),
-    );
+    const booth = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.5, 1.8), cityMat(0x3a3028));
     booth.position.set(w / 2 + 1.5, 1.25, 0);
     parts.add(booth);
-    const boothRoof = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 0.3, 2.2),
-      cityMat(0x2a221a),
-    );
+    const boothRoof = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.3, 2.2), cityMat(0x2a221a));
     boothRoof.position.set(w / 2 + 1.5, 2.65, 0);
     parts.add(boothRoof);
     radius = Math.max(w, d) / 2 + 1;
@@ -1052,10 +1030,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
       parts.add(panel);
     }
     // Demir kapı
-    const door = new THREE.Mesh(
-      new THREE.BoxGeometry(2.0, 2.8, 0.2),
-      cityMat(0x2b241e, 0.6, 0.7),
-    );
+    const door = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.8, 0.2), cityMat(0x2b241e, 0.6, 0.7));
     door.position.set(0, 1.4, d / 2 + 0.1);
     parts.add(door);
     // Kapı perçinleri
@@ -1103,17 +1078,11 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     antenna.position.set(w * 0.25, h + 2.5, 0);
     parts.add(antenna);
     // Anten topu
-    const antTop = new THREE.Mesh(
-      new THREE.SphereGeometry(0.3, 6, 5),
-      cityMat(0x8a6b32, 0.3, 0.8),
-    );
+    const antTop = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 5), cityMat(0x8a6b32, 0.3, 0.8));
     antTop.position.set(w * 0.25, h + 5.2, 0);
     parts.add(antTop);
     // Sinyal ışığı
-    const sigLight = new THREE.Mesh(
-      new THREE.SphereGeometry(0.18, 5, 4),
-      lanternMat,
-    );
+    const sigLight = new THREE.Mesh(new THREE.SphereGeometry(0.18, 5, 4), lanternMat);
     sigLight.position.set(w * 0.25, h + 5.5, 0);
     parts.add(sigLight);
     // Pencereler — geniş komuta pencereleri
@@ -1159,19 +1128,13 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
       const a = (i / 6) * Math.PI * 2;
       const bx = Math.cos(a) * (r + 1.5);
       const bz = Math.sin(a) * (r + 1.5);
-      const bar = new THREE.Mesh(
-        new THREE.BoxGeometry(1.2, 1.0, 0.3),
-        cityMat(0x2b241e, 0.9, 0.1),
-      );
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 0.3), cityMat(0x2b241e, 0.9, 0.1));
       bar.position.set(bx, 0.5, bz);
       bar.rotation.y = a + Math.PI / 2;
       parts.add(bar);
     }
     // Kapı
-    const door = new THREE.Mesh(
-      new THREE.BoxGeometry(1.8, 2.4, 0.2),
-      cityMat(0x2b241e, 0.6, 0.6),
-    );
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.4, 0.2), cityMat(0x2b241e, 0.6, 0.6));
     door.position.set(0, 1.2, r + 0.1);
     parts.add(door);
     // Patlama uyarısı — sarı şerit
@@ -1196,10 +1159,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     foundation.position.y = 0.75;
     parts.add(foundation);
     // Direk gövdesi
-    const pole = new THREE.Mesh(
-      new THREE.BoxGeometry(base, h, base),
-      cityMat(0x4a4035, 0.88, 0.1),
-    );
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(base, h, base), cityMat(0x4a4035, 0.88, 0.1));
     pole.position.y = h / 2 + 1.5;
     parts.add(pole);
     // Platform — üstte geniş
@@ -1212,10 +1172,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     // Korkuluk
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
-        const post = new THREE.Mesh(
-          new THREE.BoxGeometry(0.15, 1.2, 0.15),
-          cityMat(0x2b241e, 0.9),
-        );
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.2, 0.15), cityMat(0x2b241e, 0.9));
         post.position.set(sx * (base / 2 + 0.8), h + 2.5, sz * (base / 2 + 0.8));
         parts.add(post);
       }
@@ -1228,11 +1185,7 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
         new THREE.BoxGeometry(isX ? base + 2 : 0.2, 0.8, isX ? 0.2 : base + 2),
         cityMat(0x3a3228, 0.85),
       );
-      wall.position.set(
-        isX ? 0 : s * (base / 2 + 0.9),
-        h + 2.5,
-        isX ? s * (base / 2 + 0.9) : 0,
-      );
+      wall.position.set(isX ? 0 : s * (base / 2 + 0.9), h + 2.5, isX ? s * (base / 2 + 0.9) : 0);
       parts.add(wall);
     }
     // Tüfek slotları
@@ -1440,7 +1393,12 @@ export function buildVehicle(kind: VehicleKind, rng: Rng): THREE.Group {
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(bodyW + 0.6, 0.25, bodyD + 0.2), dark);
     chassis.position.y = 0.7;
     g.add(chassis);
-    for (const [sx, sz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]] as const) {
+    for (const [sx, sz] of [
+      [-1, -1],
+      [-1, 1],
+      [1, -1],
+      [1, 1],
+    ] as const) {
       const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.2, 8), wheelMat);
       wheel.rotation.x = Math.PI / 2;
       wheel.position.set(sx * (bodyW / 2 - 0.3), 0.45, sz * (bodyD / 2 + 0.15));
@@ -1460,10 +1418,7 @@ export function buildVehicle(kind: VehicleKind, rng: Rng): THREE.Group {
     const box = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyD), dark);
     box.position.y = 1.5;
     g.add(box);
-    const boiler = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.6, 0.6, bodyW * 0.4, 8),
-      metal,
-    );
+    const boiler = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, bodyW * 0.4, 8), metal);
     boiler.rotation.z = Math.PI / 2;
     boiler.position.set(-bodyW / 4, 1.5, 0);
     g.add(boiler);
@@ -1532,29 +1487,45 @@ export function buildDeco(kind: DecoKind, rng: Rng, scale = 1): THREE.Group {
     }
   } else if (kind === "cactus") {
     const trunkH = rng.range(4, 10) * scale;
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * scale, 0.4 * scale, trunkH, 6), new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 0.9 }));
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3 * scale, 0.4 * scale, trunkH, 6),
+      new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 0.9 }),
+    );
     trunk.position.y = trunkH / 2;
     g.add(trunk);
     const armCount = rng.int(1, 4);
     for (let i = 0; i < armCount; i++) {
       const armH = rng.range(2, 4) * scale;
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * scale, 0.25 * scale, armH, 5), new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 0.9 }));
+      const arm = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.2 * scale, 0.25 * scale, armH, 5),
+        new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 0.9 }),
+      );
       const armY = trunkH * rng.range(0.3, 0.7);
       const armAngle = rng.range(-0.5, 0.5);
       const dir = rng.chance(0.5) ? 1 : -1;
-      arm.position.set(dir * (1.2 + rng.range(0, 0.5)) * scale, armY + armH * 0.3, rng.range(-0.5, 0.5) * scale);
+      arm.position.set(
+        dir * (1.2 + rng.range(0, 0.5)) * scale,
+        armY + armH * 0.3,
+        rng.range(-0.5, 0.5) * scale,
+      );
       arm.rotation.z = dir * (0.3 + armAngle);
       g.add(arm);
     }
   } else if (kind === "deadtree") {
     const trunkH = rng.range(5, 12) * scale;
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * scale, 0.5 * scale, trunkH, 5), wood);
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2 * scale, 0.5 * scale, trunkH, 5),
+      wood,
+    );
     trunk.position.y = trunkH / 2;
     g.add(trunk);
     const branches = rng.int(2, 5);
     for (let i = 0; i < branches; i++) {
       const bLen = rng.range(2, 5) * scale;
-      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.15 * scale, bLen, 4), wood);
+      const b = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08 * scale, 0.15 * scale, bLen, 4),
+        wood,
+      );
       const by = trunkH * rng.range(0.4, 0.9);
       const dir = rng.chance(0.5) ? 1 : -1;
       b.position.set(dir * bLen * 0.4, by + bLen * 0.2, rng.range(-0.5, 0.5) * scale);
@@ -1565,7 +1536,11 @@ export function buildDeco(kind: DecoKind, rng: Rng, scale = 1): THREE.Group {
     const tw = rng.range(3, 5) * scale;
     const td = rng.range(3, 6) * scale;
     const th = rng.range(2, 3.5) * scale;
-    const cloth = new THREE.MeshStandardMaterial({ color: rng.chance(0.5) ? 0x8a7050 : 0x6a5a40, roughness: 1, side: THREE.DoubleSide });
+    const cloth = new THREE.MeshStandardMaterial({
+      color: rng.chance(0.5) ? 0x8a7050 : 0x6a5a40,
+      roughness: 1,
+      side: THREE.DoubleSide,
+    });
     const sideA = new THREE.Mesh(new THREE.PlaneGeometry(tw, th), cloth);
     sideA.position.set(0, th * 0.45, -td * 0.25);
     sideA.rotation.x = -0.35;
@@ -1574,7 +1549,10 @@ export function buildDeco(kind: DecoKind, rng: Rng, scale = 1): THREE.Group {
     sideB.position.set(0, th * 0.45, td * 0.25);
     sideB.rotation.x = 0.35;
     g.add(sideB);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.08 * scale, th * 1.1, 4), wood);
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08 * scale, 0.08 * scale, th * 1.1, 4),
+      wood,
+    );
     pole.position.y = th * 0.55;
     g.add(pole);
     const floor = new THREE.Mesh(new THREE.BoxGeometry(tw * 0.9, 0.1, td * 0.8), sand);
@@ -1599,7 +1577,10 @@ export function buildDeco(kind: DecoKind, rng: Rng, scale = 1): THREE.Group {
     g.add(ring);
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2;
-      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.08 * scale, 1.6 * scale, 4), wood);
+      const log = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08 * scale, 0.08 * scale, 1.6 * scale, 4),
+        wood,
+      );
       log.position.set(Math.cos(a) * 0.5 * scale, 0.2, Math.sin(a) * 0.5 * scale);
       log.rotation.z = Math.PI / 2;
       log.rotation.y = a;
@@ -1612,7 +1593,10 @@ export function buildDeco(kind: DecoKind, rng: Rng, scale = 1): THREE.Group {
 }
 
 /** Deve — gerçekçi düşük poligon: kambur, eğri boyun, eklemli bacaklar, çene. */
-export function buildCamel(rng: Rng, opts: { rider?: boolean; cargo?: boolean; lead?: boolean } = {}): THREE.Group {
+export function buildCamel(
+  rng: Rng,
+  opts: { rider?: boolean; cargo?: boolean; lead?: boolean } = {},
+): THREE.Group {
   const g = new THREE.Group();
   const skin = cityMat(0x9a7a4a);
   const darkSkin = cityMat(0x6a5030);
@@ -1652,7 +1636,10 @@ export function buildCamel(rng: Rng, opts: { rider?: boolean; cargo?: boolean; l
     const t = i / segments;
     const segH = neckLen / segments;
     const r = 0.2 - t * 0.06;
-    const seg = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.85, r, segH, 6), i < 2 ? skin : darkSkin);
+    const seg = new THREE.Mesh(
+      new THREE.CylinderGeometry(r * 0.85, r, segH, 6),
+      i < 2 ? skin : darkSkin,
+    );
     // S- eğrisi: önce yukarı-geri, sonra yukarı-ileri
     const curveX = -Math.sin(t * Math.PI * 0.8) * 0.4;
     const curveZ = Math.sin(t * Math.PI * 1.2) * 0.15;
@@ -1691,10 +1678,10 @@ export function buildCamel(rng: Rng, opts: { rider?: boolean; cargo?: boolean; l
   /* -- 4 bacak: üst + alt, eklem (diz) açısı -- */
   const legH = rng.range(2.0, 2.4);
   const legPairs: [number, number, number][] = [
-    [-0.55, -0.28, 0.12],   // sol ön
-    [-0.55, 0.28, -0.08],   // sol arka
-    [0.55, -0.28, -0.06],   // sağ ön
-    [0.55, 0.28, 0.1],      // sağ arka
+    [-0.55, -0.28, 0.12], // sol ön
+    [-0.55, 0.28, -0.08], // sol arka
+    [0.55, -0.28, -0.06], // sağ ön
+    [0.55, 0.28, 0.1], // sağ arka
   ];
   for (const [lx, lz, kneeAng] of legPairs) {
     // Kalça
@@ -1790,7 +1777,10 @@ export function buildCamel(rng: Rng, opts: { rider?: boolean; cargo?: boolean; l
 
   /* -- ön baş dekoru (lead deve) -- */
   if (opts.lead) {
-    const decoration = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.025, 4, 8), cityMat(0xc8a040));
+    const decoration = new THREE.Mesh(
+      new THREE.TorusGeometry(0.15, 0.025, 4, 8),
+      cityMat(0xc8a040),
+    );
     decoration.position.set(headX - 0.1, headY - 0.15, 0);
     decoration.rotation.y = Math.PI / 2;
     g.add(decoration);
@@ -1804,11 +1794,7 @@ export function buildCamel(rng: Rng, opts: { rider?: boolean; cargo?: boolean; l
  * Gerçekçi kervan hattı — çift sıralı, halat bağlantılı, önde rehber deve,
  * ortada kargolu develer, arkada vagonlar.
  */
-export function buildCaravanLine(
-  count: number,
-  spacing: number,
-  rng: Rng,
-): THREE.Group {
+export function buildCaravanLine(count: number, spacing: number, rng: Rng): THREE.Group {
   const g = new THREE.Group();
   const rope = cityMat(0x8a7060, 0.8, 0.3);
   const laneGap = 3.0;
@@ -1832,15 +1818,8 @@ export function buildCaravanLine(
       const nextLane = (i + 1) % 2 === 0 ? -1 : 1;
       const nextX = nextLane * laneGap * 0.5;
       const ropeLen = Math.hypot(offsetX - nextX, spacing);
-      const ropeLine = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.012, 0.012, ropeLen, 3),
-        rope,
-      );
-      ropeLine.position.set(
-        (offsetX + nextX) / 2,
-        2.6,
-        t * spacing + spacing / 2,
-      );
+      const ropeLine = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, ropeLen, 3), rope);
+      ropeLine.position.set((offsetX + nextX) / 2, 2.6, t * spacing + spacing / 2);
       ropeLine.rotation.x = Math.PI / 2;
       ropeLine.rotation.z = Math.atan2(offsetX - nextX, spacing);
       g.add(ropeLine);
@@ -1864,10 +1843,7 @@ export function buildCaravanLine(
   const trackLen = count * spacing + 10;
   const trackMat = cityMat(0x6a5a40, 0.95, 0.05);
   for (const lx of [-laneGap * 0.3, laneGap * 0.3]) {
-    const track = new THREE.Mesh(
-      new THREE.BoxGeometry(0.6, 0.05, trackLen),
-      trackMat,
-    );
+    const track = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, trackLen), trackMat);
     track.position.set(lx, 0.02, 0);
     g.add(track);
   }
@@ -1883,7 +1859,10 @@ export function buildTree(rng: Rng): THREE.Group {
   const trunkR = rng.range(0.15, 0.35);
   const barkCol = rng.chance(0.5) ? 0x3d2b1f : rng.chance(0.5) ? 0x4a3728 : 0x2e1e14;
   const trunkMat = cityMat(barkCol, 0.9, 0.05);
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(trunkR * 0.6, trunkR, trunkH, 7), trunkMat);
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(trunkR * 0.6, trunkR, trunkH, 7),
+    trunkMat,
+  );
   trunk.position.y = trunkH / 2;
   g.add(trunk);
 
@@ -1902,8 +1881,15 @@ export function buildTree(rng: Rng): THREE.Group {
       const a = rng.range(0, Math.PI * 2);
       const d = rng.range(0.8, 1.8);
       const s = crownR * rng.range(0.35, 0.55);
-      const puff = new THREE.Mesh(new THREE.SphereGeometry(s, 6, 5), i % 2 === 0 ? leafMat2 : leafMat);
-      puff.position.set(Math.cos(a) * d, trunkH + crownR * 0.3 + rng.range(-0.5, 0.8), Math.sin(a) * d);
+      const puff = new THREE.Mesh(
+        new THREE.SphereGeometry(s, 6, 5),
+        i % 2 === 0 ? leafMat2 : leafMat,
+      );
+      puff.position.set(
+        Math.cos(a) * d,
+        trunkH + crownR * 0.3 + rng.range(-0.5, 0.8),
+        Math.sin(a) * d,
+      );
       g.add(puff);
     }
   } else if (type === 1) {
@@ -1932,10 +1918,7 @@ export function buildTree(rng: Rng): THREE.Group {
     for (let i = 0; i < 4; i++) {
       const a = rng.range(0, Math.PI * 2);
       const branchL = rng.range(0.8, 1.8);
-      const branch = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.06, 0.1, branchL, 5),
-        trunkMat,
-      );
+      const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, branchL, 5), trunkMat);
       branch.position.set(
         Math.cos(a) * crownR * 0.6,
         trunkH + rng.range(-0.5, 0.5),

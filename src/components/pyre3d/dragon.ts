@@ -73,9 +73,7 @@ const eyeMat = shared(
   }),
 );
 // Göz bebeği
-const pupilMat = shared(
-  new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.2 }),
-);
+const pupilMat = shared(new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.2 }));
 // Zar
 const membraneMat = shared(
   new THREE.MeshStandardMaterial({
@@ -115,7 +113,13 @@ const fireSackMat = shared(
  * ------------------------------------------------------------------ */
 
 /** Sırt dikenleri */
-function backSpines(parent: THREE.Object3D, count: number, from: number, to: number, maxSize: number) {
+function backSpines(
+  parent: THREE.Object3D,
+  count: number,
+  from: number,
+  to: number,
+  maxSize: number,
+) {
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1 || 1);
     const sz = maxSize * (0.4 + Math.sin(t * Math.PI) * 0.8);
@@ -130,7 +134,14 @@ function backSpines(parent: THREE.Object3D, count: number, from: number, to: num
 }
 
 /** Küçük dikenler (yan taraflar) */
-function sideSpines(parent: THREE.Object3D, count: number, from: number, to: number, size: number, side: 1 | -1) {
+function sideSpines(
+  parent: THREE.Object3D,
+  count: number,
+  from: number,
+  to: number,
+  size: number,
+  side: 1 | -1,
+) {
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1 || 1);
     const s = size * (0.3 + Math.sin(t * Math.PI) * 0.5);
@@ -146,7 +157,13 @@ function sideSpines(parent: THREE.Object3D, count: number, from: number, to: num
 }
 
 /** Deri kabartma / pullu plaka */
-function armorPlates(parent: THREE.Object3D, count: number, from: number, to: number, size: number) {
+function armorPlates(
+  parent: THREE.Object3D,
+  count: number,
+  from: number,
+  to: number,
+  size: number,
+) {
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1 || 1);
     const plate = new THREE.Mesh(
@@ -214,11 +231,7 @@ export function createDragon(): DragonRig {
       new THREE.SphereGeometry(0.1 + Math.random() * 0.06, 6, 6),
       i < 3 ? magmaHot : magma,
     );
-    vein.position.set(
-      Math.sin(i * 0.7) * 0.3,
-      1.05 - i * 0.02,
-      1.8 - i * 0.5,
-    );
+    vein.position.set(Math.sin(i * 0.7) * 0.3, 1.05 - i * 0.02, 1.8 - i * 0.5);
     body.add(vein);
   }
 
@@ -252,10 +265,7 @@ export function createDragon(): DragonRig {
 
     // Boyun altı — karın rengi (ilk 4 segment)
     if (i < 4) {
-      const throat = new THREE.Mesh(
-        new THREE.SphereGeometry(r * 0.7, 8, 6),
-        belly,
-      );
+      const throat = new THREE.Mesh(new THREE.SphereGeometry(r * 0.7, 8, 6), belly);
       throat.scale.set(0.8, 0.6, 1.1);
       throat.position.set(0, -r * 0.35, 0);
       seg.add(throat);
@@ -263,10 +273,7 @@ export function createDragon(): DragonRig {
 
     // Boyun dikenleri (orta segmentler)
     if (i > 0 && i < neckSegs - 1 && i % 2 === 1) {
-      const ns = new THREE.Mesh(
-        new THREE.ConeGeometry(0.1, 0.35, 4),
-        scaleMat(0x1a1410, 0.8),
-      );
+      const ns = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.35, 4), scaleMat(0x1a1410, 0.8));
       ns.position.set(0, r * 0.7, 0);
       seg.add(ns);
     }
@@ -295,10 +302,7 @@ export function createDragon(): DragonRig {
 
   // Kaş çıkıntısı — gözlerin üstünde
   for (const s of [-1, 1]) {
-    const brow = new THREE.Mesh(
-      new THREE.BoxGeometry(0.28, 0.18, 0.5),
-      scaleMat(0x1a1410, 0.8),
-    );
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.5), scaleMat(0x1a1410, 0.8));
     brow.position.set(0.28 * s, 0.32, 0.3);
     brow.rotation.z = s * 0.2;
     head.add(brow);
@@ -321,10 +325,7 @@ export function createDragon(): DragonRig {
     head.add(nostril);
 
     // Burun deliği çıkıntısı
-    const nRidge = new THREE.Mesh(
-      new THREE.ConeGeometry(0.06, 0.2, 4),
-      scaleMat(0x1a1410, 0.8),
-    );
+    const nRidge = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 4), scaleMat(0x1a1410, 0.8));
     nRidge.position.set(0.12 * s, 0.1, 1.1);
     nRidge.rotation.x = -0.5;
     nRidge.rotation.z = s * 0.3;
@@ -338,10 +339,7 @@ export function createDragon(): DragonRig {
   head.add(jaw);
 
   // Çene ucu sivri
-  const chin = new THREE.Mesh(
-    new THREE.ConeGeometry(0.12, 0.35, 5),
-    scaleMat(0x1a1410, 0.8),
-  );
+  const chin = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 5), scaleMat(0x1a1410, 0.8));
   chin.position.set(0, -0.35, 1.15);
   chin.rotation.x = Math.PI * 0.6;
   head.add(chin);
@@ -349,20 +347,14 @@ export function createDragon(): DragonRig {
   // Dişler — üst ve alt çene
   for (const s of [-1, 1]) {
     // Üst canine
-    const fang = new THREE.Mesh(
-      new THREE.ConeGeometry(0.04, 0.28, 5),
-      toothMat,
-    );
+    const fang = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.28, 5), toothMat);
     fang.position.set(0.18 * s, -0.12, 1.05);
     fang.rotation.x = Math.PI + 0.3;
     head.add(fang);
 
     // Yan dişler (3'er tane)
     for (let i = 0; i < 3; i++) {
-      const tooth = new THREE.Mesh(
-        new THREE.ConeGeometry(0.025, 0.16, 4),
-        toothMat,
-      );
+      const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.16, 4), toothMat);
       tooth.position.set(0.22 * s, -0.18, 0.7 + i * 0.15);
       tooth.rotation.x = Math.PI + 0.2;
       tooth.rotation.z = s * 0.3;
@@ -385,10 +377,7 @@ export function createDragon(): DragonRig {
   head.add(maw);
 
   // Ateş kesesi — boğazın altında, alev püskürtmeden önce şişer
-  const fireSack = new THREE.Mesh(
-    new THREE.SphereGeometry(0.22, 8, 8),
-    fireSackMat,
-  );
+  const fireSack = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), fireSackMat);
   fireSack.position.set(0, -0.45, 0.5);
   fireSack.scale.set(0.7, 0.5, 1.2);
   head.add(fireSack);
@@ -404,10 +393,7 @@ export function createDragon(): DragonRig {
     eyeGroup.add(eye);
 
     // Dikey pupil
-    const pupil = new THREE.Mesh(
-      new THREE.BoxGeometry(0.025, 0.08, 0.02),
-      pupilMat,
-    );
+    const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.08, 0.02), pupilMat);
     pupil.position.set(0, 0, 0.08);
     eyeGroup.add(pupil);
 
@@ -424,28 +410,19 @@ export function createDragon(): DragonRig {
   // Boynuzlar — 2 ana boynuz + 2 küçük
   for (const s of [-1, 1]) {
     // Ana boynuz — geriye doğru eğik, kalın
-    const horn = new THREE.Mesh(
-      new THREE.ConeGeometry(0.14, 1.2, 6),
-      hornMat,
-    );
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.14, 1.2, 6), hornMat);
     horn.position.set(0.28 * s, 0.5, -0.25);
     horn.rotation.set(-0.75, 0, 0.3 * s);
     head.add(horn);
 
     // Küçük boynuz — yan tarafta
-    const smallHorn = new THREE.Mesh(
-      new THREE.ConeGeometry(0.07, 0.5, 5),
-      hornMat,
-    );
+    const smallHorn = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.5, 5), hornMat);
     smallHorn.position.set(0.4 * s, 0.25, 0.0);
     smallHorn.rotation.set(-0.4, 0, 0.6 * s);
     head.add(smallHorn);
 
     // Başın arkasında diken
-    const crest = new THREE.Mesh(
-      new THREE.ConeGeometry(0.08, 0.4, 4),
-      scaleMat(0x1a1410, 0.8),
-    );
+    const crest = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.4, 4), scaleMat(0x1a1410, 0.8));
     crest.position.set(0.15 * s, 0.4, -0.45);
     crest.rotation.set(-0.5, 0, 0.4 * s);
     head.add(crest);
@@ -464,10 +441,7 @@ export function createDragon(): DragonRig {
     g.position.set(0.95 * side, 0.5, 0.3);
 
     // Omuz eklemi
-    const shoulder = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 8, 6),
-      scaleMat(0x1a1410, 0.75),
-    );
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), scaleMat(0x1a1410, 0.75));
     g.add(shoulder);
 
     // Üst kol (humerus)
@@ -480,10 +454,7 @@ export function createDragon(): DragonRig {
     g.add(upper);
 
     // Dirsek eklemi
-    const elbow = new THREE.Mesh(
-      new THREE.SphereGeometry(0.14, 6, 6),
-      scaleMat(0x1a1410, 0.8),
-    );
+    const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 6), scaleMat(0x1a1410, 0.8));
     elbow.position.set(2.9 * side, 0, 0);
     g.add(elbow);
 
@@ -556,27 +527,18 @@ export function createDragon(): DragonRig {
   const legs: { thigh: THREE.Mesh; shin: THREE.Mesh }[] = [];
   for (const s of [-1, 1]) {
     // Üst bacak (uyluk)
-    const thigh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.28, 1.3, 4, 8),
-      hide,
-    );
+    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 1.3, 4, 8), hide);
     thigh.position.set(0.7 * s, -0.85, 0.8);
     thigh.rotation.x = 0.55;
     body.add(thigh);
 
     // Diz eklemi
-    const knee = new THREE.Mesh(
-      new THREE.SphereGeometry(0.16, 6, 6),
-      scaleMat(0x1a1410, 0.75),
-    );
+    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), scaleMat(0x1a1410, 0.75));
     knee.position.set(0.7 * s, -1.4, 1.2);
     body.add(knee);
 
     // Alt bacak (kaval)
-    const shin = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.16, 0.9, 4, 6),
-      hide,
-    );
+    const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.9, 4, 6), hide);
     shin.position.set(0.7 * s, -1.7, 1.1);
     shin.rotation.x = -0.2;
     body.add(shin);
@@ -587,10 +549,7 @@ export function createDragon(): DragonRig {
     const footPos = new THREE.Vector3(0.7 * s, -2.1, 1.4);
     for (let c = 0; c < 3; c++) {
       const angle = (c - 1) * 0.35;
-      const claw = new THREE.Mesh(
-        new THREE.ConeGeometry(0.06, 0.55, 5),
-        hornMat,
-      );
+      const claw = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.55, 5), hornMat);
       claw.position.set(
         footPos.x + Math.sin(angle) * 0.25 * s,
         footPos.y - 0.1,
@@ -602,10 +561,7 @@ export function createDragon(): DragonRig {
     }
 
     // Arka pençe (dikandan)
-    const rearClaw = new THREE.Mesh(
-      new THREE.ConeGeometry(0.05, 0.35, 4),
-      hornMat,
-    );
+    const rearClaw = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.35, 4), hornMat);
     rearClaw.position.set(0.7 * s, -1.9, 0.9);
     rearClaw.rotation.x = Math.PI * 0.7;
     body.add(rearClaw);
@@ -620,11 +576,7 @@ export function createDragon(): DragonRig {
   for (let i = 0; i < tailSegs; i++) {
     const seg = new THREE.Group();
     const t = i / (tailSegs - 1);
-    seg.position.set(
-      0,
-      i === 0 ? 0.08 : (i < 3 ? 0.02 : 0),
-      i === 0 ? -2.5 : -0.5,
-    );
+    seg.position.set(0, i === 0 ? 0.08 : i < 3 ? 0.02 : 0, i === 0 ? -2.5 : -0.5);
     const r = THREE.MathUtils.lerp(0.55, 0.06, t);
     const m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), hide);
     m.scale.set(1, 0.9, 1.4);
@@ -654,22 +606,16 @@ export function createDragon(): DragonRig {
   }
 
   // Kuyruk ucu — kama şeklinde, zehirli diken
-  const spade = new THREE.Mesh(
-    new THREE.ConeGeometry(0.4, 1.4, 4),
-    magma,
-  );
+  const spade = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.4, 4), magma);
   spade.rotation.x = -Math.PI / 2;
   spade.position.set(0, 0, -0.7);
   tAttach.add(spade);
 
   // Kama yan dikenleri
   for (const s of [-1, 1]) {
-    const sideBarb = new THREE.Mesh(
-      new THREE.ConeGeometry(0.1, 0.5, 4),
-      scaleMat(0x1a1410, 0.8),
-    );
+    const sideBarb = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.5, 4), scaleMat(0x1a1410, 0.8));
     sideBarb.position.set(0.2 * s, 0, -0.3);
-    sideBarb.rotation.z = s * Math.PI / 3;
+    sideBarb.rotation.z = (s * Math.PI) / 3;
     tAttach.add(sideBarb);
   }
 

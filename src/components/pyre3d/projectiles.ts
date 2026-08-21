@@ -50,16 +50,31 @@ export function createShotPool(scene: THREE.Scene): ShotPool {
 
   const shots: Shot[] = [];
   const make = (kind: ShotKind) => {
-    const geo = kind === "bolt" ? boltGeo : kind === "flak" ? flakGeo : kind === "harpoon" ? harpoonGeo : fireboltGeo;
-    const mat = kind === "bolt" ? boltMat : kind === "flak" ? flakMat : kind === "harpoon" ? harpoonMat : fireboltMat;
+    const geo =
+      kind === "bolt"
+        ? boltGeo
+        : kind === "flak"
+          ? flakGeo
+          : kind === "harpoon"
+            ? harpoonGeo
+            : fireboltGeo;
+    const mat =
+      kind === "bolt"
+        ? boltMat
+        : kind === "flak"
+          ? flakMat
+          : kind === "harpoon"
+            ? harpoonMat
+            : fireboltMat;
     const mesh = new THREE.Mesh(geo, mat);
     mesh.visible = false;
     scene.add(mesh);
     return mesh;
   };
-  // Üç türden de havuzda örnek bulunsun ki ilk atışta materyal derlenmesin.
+  // Tüm türlerden havuzda örnek bulunsun ki ilk atışta materyal derlenmesin.
   for (let i = 0; i < SHOT_CAP; i++) {
-    const kind: ShotKind = i % 5 === 0 ? "flak" : i % 7 === 0 ? "harpoon" : i % 3 === 0 ? "firebolt" : "bolt";
+    const kind: ShotKind =
+      i % 5 === 0 ? "flak" : i % 7 === 0 ? "harpoon" : i % 3 === 0 ? "firebolt" : "bolt";
     shots.push({
       active: false,
       kind,
@@ -72,17 +87,30 @@ export function createShotPool(scene: THREE.Scene): ShotPool {
     });
   }
 
+  // Tür başına yuva indeksleri: spawn her çağrıda 140 yuvayı baştan taramasın.
+  const slotsByKind = new Map<ShotKind, Shot[]>();
+  for (const s of shots) {
+    const list = slotsByKind.get(s.kind) ?? [];
+    list.push(s);
+    slotsByKind.set(s.kind, list);
+  }
+  const ringIdx = new Map<ShotKind, number>();
+
   return {
     shots,
     spawn(kind, from, vel, damage, fuseY = 0) {
-      // Aynı türden boş yuva ara: mesh geometrisi türe bağlı.
+      const list = slotsByKind.get(kind)!;
       let slot: Shot | null = null;
-      for (const s of shots) {
-        if (!s.active && s.kind === kind) {
+      let idx = ringIdx.get(kind) ?? 0;
+      for (let n = 0; n < list.length; n++) {
+        const s = list[(idx + n) % list.length]!;
+        if (!s.active) {
           slot = s;
+          idx = (idx + n + 1) % list.length;
           break;
         }
       }
+      ringIdx.set(kind, idx);
       if (!slot) return;
       slot.active = true;
       slot.mesh.visible = true;

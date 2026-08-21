@@ -200,11 +200,7 @@ const c03: ChapterDef = {
       "bu asansörler. Köz Mermisi ile yangını caddenin öbür tarafına sıçrat — " +
       "cadde yangın duvarıdır.",
     objectives: ["Şehrin %30'unu yık", "3 köz madeni asansörünü imha et"],
-    tips: [
-      "M ile Köz Mermisi at",
-      "Caddeler yangın duvarıdır",
-      "Rüzgâr cepheyi taşır",
-    ],
+    tips: ["M ile Köz Mermisi at", "Caddeler yangın duvarıdır", "Rüzgâr cepheyi taşır"],
   },
   world: {
     radius: 760,
@@ -310,11 +306,7 @@ const c04: ChapterDef = {
       "ortasından Ashkeep'in ana ikmal yolu geçiyor — tonlarca lexil, " +
       "barut ve yiyecek. Bu ikmal yolunu imha edersen sovereign'in ordusu " +
       "beslenemez. Ama yolu koruyan muhafız kuleleri ve kamp var.",
-    objectives: [
-      "Hedeflerin %60'ını yok et",
-      "4 muhafız kulesini yık",
-      "Kampı küle çevir",
-    ],
+    objectives: ["Hedeflerin %60'ını yok et", "4 muhafız kulesini yık", "Kampı küle çevir"],
     tips: [
       "Hedefler uzun bir hat üzerinde — boydan boya geç",
       "Kuleler seni hedef alıyor, düşür",
@@ -396,7 +388,13 @@ const c04: ChapterDef = {
   },
   objectives: [
     { id: "kervan", type: "destroyPercent", pct: 0.6, label: "Kervanı yok et" },
-    { id: "kuleler", type: "destroyKind", kind: "watchtower", count: 4, label: "Muhafız kulelerini yık" },
+    {
+      id: "kuleler",
+      type: "destroyKind",
+      kind: "watchtower",
+      count: 4,
+      label: "Muhafız kulelerini yık",
+    },
     { id: "kamp", type: "destroyKind", kind: "barracks", count: 1, label: "Kampı küle çevir" },
   ],
   fail: [{ type: "death" }],
@@ -411,16 +409,24 @@ const c04: ChapterDef = {
       trigger: { at: "start" },
       lines: [
         { who: "Kayra", text: "Çöl. Kervan güzergahı kuzeyden güneye uzanıyor.", dur: 3.8 },
-        { who: "Pyra", text: "(Kumlar arasında uzun bir kuyruk görülüyor — develer, vagonlar.)", dur: 3.6 },
+        {
+          who: "Pyra",
+          text: "(Kumlar arasında uzun bir kuyruk görülüyor — develer, vagonlar.)",
+          dur: 3.6,
+        },
       ],
-      actions: [
-        { do: "hint", text: "Kervan boyunca uç, hepsini yak", keys: [], dur: 6 },
-      ],
+      actions: [{ do: "hint", text: "Kervan boyunca uç, hepsini yak", keys: [], dur: 6 }],
     },
     {
       id: "ilkVagon",
       trigger: { at: "event", event: "targetDestroyed" },
-      lines: [{ who: "Kayra", text: "İlk vagon gitti. Lexil doluydu — alev topu gibi patladı.", dur: 3.4 }],
+      lines: [
+        {
+          who: "Kayra",
+          text: "İlk vagon gitti. Lexil doluydu — alev topu gibi patladı.",
+          dur: 3.4,
+        },
+      ],
       actions: [
         { do: "unlockAbility", ability: "roll" },
         { do: "hint", text: "Takla — hedeflerden ve mermilerden kurtul", keys: ["R"], dur: 8 },
@@ -444,9 +450,7 @@ const c04: ChapterDef = {
     {
       id: "kampSaldiri",
       trigger: { at: "objectiveProgress", id: "kervan", pct: 0.7 },
-      lines: [
-        { who: "Ashkeep", text: "Tüm birlikler kampa! Ejderhayı durdurun!", dur: 3.6 },
-      ],
+      lines: [{ who: "Ashkeep", text: "Tüm birlikler kampa! Ejderhayı durdurun!", dur: 3.6 }],
       actions: [
         { do: "spawnWave", wave: "kule" },
         { do: "hint", text: "Takla ile saldırılardan korun", keys: ["R"], dur: 6 },
@@ -521,9 +525,23 @@ const c05: ChapterDef = {
       type: "destroyWeakPoints",
       shipId: "bulwark",
       modules: [
-        "balonOn", "balonArka", "motorSol", "motorSag", "batarya", "kopru",
-        "kanatSol", "kanatSag", "radar", "kalkan", "yakit", "komuta",
-        "taretSol", "taretSag", "egzost", "navigasyon", "zirh",
+        "balonOn",
+        "balonArka",
+        "motorSol",
+        "motorSag",
+        "batarya",
+        "kopru",
+        "kanatSol",
+        "kanatSag",
+        "radar",
+        "kalkan",
+        "yakit",
+        "komuta",
+        "taretSol",
+        "taretSag",
+        "egzost",
+        "navigasyon",
+        "zirh",
       ],
       label: "Bulwark modülleri",
     },
@@ -552,7 +570,9 @@ const c05: ChapterDef = {
     {
       id: "bomberSinyali",
       trigger: { at: "time", t: 10 },
-      lines: [{ who: "Kayra", text: "Bombardıman uçakları yaklaşıyor! Bomba atıyorlar!", dur: 3.2 }],
+      lines: [
+        { who: "Kayra", text: "Bombardıman uçakları yaklaşıyor! Bomba atıyorlar!", dur: 3.2 },
+      ],
       actions: [],
     },
     {
@@ -759,7 +779,11 @@ const c07: ChapterDef = {
       id: "acilis",
       trigger: { at: "start" },
       lines: [
-        { who: "Vorren", text: "Son perde. Burası Ashkeep'in kalbi — ve sen onu yakacaksın.", dur: 4.2 },
+        {
+          who: "Vorren",
+          text: "Son perde. Burası Ashkeep'in kalbi — ve sen onu yakacaksın.",
+          dur: 4.2,
+        },
         { who: "Kayra", text: "Pyra, hazır mısın? Son kez.", dur: 3 },
         { who: "Pyra", text: "(Kanatlar genişliyor. Köz göğünden akıyor.)", dur: 3.2 },
       ],
@@ -783,9 +807,7 @@ const c07: ChapterDef = {
     {
       id: "firkateynUyari",
       trigger: { at: "objectiveProgress", id: "fabrika", pct: 0.5 },
-      lines: [
-        { who: "Ashkeep", text: "Firkateynler angaje oluyor! Bataryalar açık!", dur: 3.6 },
-      ],
+      lines: [{ who: "Ashkeep", text: "Firkateynler angaje oluyor! Bataryalar açık!", dur: 3.6 }],
       actions: [{ do: "shake", amp: 0.8 }],
     },
     {

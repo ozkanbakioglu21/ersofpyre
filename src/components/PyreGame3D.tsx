@@ -105,8 +105,13 @@ export default function PyreGame3D({
 
   useEffect(() => {
     settingsRef.current = { quality, fps: fpsTarget, invertY };
-    gameRef.current?.cmd({ t: "applyQuality" });
   }, [quality, fpsTarget, invertY]);
+
+  // invertY yalnız girdi eğrisini etkiler; applyQuality (gölge/materyal
+  // yeniden kurulumu) sadece kalite/FPS değişince tetiklenmeli.
+  useEffect(() => {
+    gameRef.current?.cmd({ t: "applyQuality" });
+  }, [quality, fpsTarget]);
 
   /* ---------------- cihaz / yön ---------------- */
   useEffect(() => {

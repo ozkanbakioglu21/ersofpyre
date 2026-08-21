@@ -88,10 +88,31 @@ const DENSITY_MIN_AREA: Record<CitySpec["density"], number> = {
 const RINGS = [0.13, 0.3, 0.52, 0.76, 1.0];
 
 const DISTRICT_WEIGHTS: Record<District, Partial<Record<TargetKind, number>>> = {
-  core: { factory: 0.2, workshop: 0.25, tenement: 0.25, warehouse: 0.08, command_post: 0.12, barracks: 0.1 },
+  core: {
+    factory: 0.2,
+    workshop: 0.25,
+    tenement: 0.25,
+    warehouse: 0.08,
+    command_post: 0.12,
+    barracks: 0.1,
+  },
   residential: { tenement: 0.5, house: 0.3, workshop: 0.08, barracks: 0.07, watchtower: 0.05 },
-  market: { house: 0.3, workshop: 0.25, tenement: 0.2, warehouse: 0.1, armory: 0.08, ammo_depot: 0.07 },
-  industrial: { factory: 0.35, workshop: 0.22, warehouse: 0.18, armory: 0.1, ammo_depot: 0.08, command_post: 0.07 },
+  market: {
+    house: 0.3,
+    workshop: 0.25,
+    tenement: 0.2,
+    warehouse: 0.1,
+    armory: 0.08,
+    ammo_depot: 0.07,
+  },
+  industrial: {
+    factory: 0.35,
+    workshop: 0.22,
+    warehouse: 0.18,
+    armory: 0.1,
+    ammo_depot: 0.08,
+    command_post: 0.07,
+  },
   docks: { warehouse: 0.45, workshop: 0.2, house: 0.15, barracks: 0.12, watchtower: 0.08 },
 };
 
@@ -174,10 +195,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
     // Cadde kenarları (kerb) — her iki taraf
     const kerbMat = cityMat(0x2a2018, 0.95);
     for (const side of [-1, 1]) {
-      const kerb = new THREE.Mesh(
-        new THREE.BoxGeometry(len, 0.35, 0.4),
-        kerbMat,
-      );
+      const kerb = new THREE.Mesh(new THREE.BoxGeometry(len, 0.35, 0.4), kerbMat);
       kerb.rotation.x = -Math.PI / 2;
       kerb.rotation.z = -a;
       kerb.position.set(
@@ -195,7 +213,13 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       const lx = spec.cx + Math.cos(a) * (R * RINGS[0]! + len * t);
       const lz = spec.cz + Math.sin(a) * (R * RINGS[0]! + len * t);
       const side = k % 2 === 0 ? 1 : -1;
-      addStreetLamp(parts, lx + Math.cos(a + Math.PI / 2) * side * (AVENUE_HALF - 1.5), baseY, lz + Math.sin(a + Math.PI / 2) * side * (AVENUE_HALF - 1.5), rng);
+      addStreetLamp(
+        parts,
+        lx + Math.cos(a + Math.PI / 2) * side * (AVENUE_HALF - 1.5),
+        baseY,
+        lz + Math.sin(a + Math.PI / 2) * side * (AVENUE_HALF - 1.5),
+        rng,
+      );
     }
 
     // Cadde kenarlarına ağaçlar — lambaların ters tarafına
@@ -385,11 +409,12 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
 
       // Ana palisade duvarı — ahşap kütükler
       const wallH = rng.range(10, 13);
-      const wall = new THREE.Mesh(
-        new THREE.BoxGeometry(3, wallH, wallLen),
-        palisadeMat,
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(3, wallH, wallLen), palisadeMat);
+      wall.position.set(
+        spec.cx + Math.cos(a) * wallR,
+        baseY + wallH / 2,
+        spec.cz + Math.sin(a) * wallR,
       );
-      wall.position.set(spec.cx + Math.cos(a) * wallR, baseY + wallH / 2, spec.cz + Math.sin(a) * wallR);
       wall.rotation.y = -a;
       parts.add(wall);
 
@@ -397,10 +422,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       const logCount = Math.max(2, Math.floor(wallLen / 1.2));
       for (let j = 0; j < logCount; j++) {
         const offset = (j / (logCount - 1) - 0.5) * wallLen;
-        const log = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.12, 0.18, 2.2, 5),
-          palisadeMat,
-        );
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 2.2, 5), palisadeMat);
         log.position.set(
           spec.cx + Math.cos(a) * wallR + Math.cos(a + Math.PI / 2) * offset * Math.cos(a),
           baseY + wallH + 1.1,
@@ -412,10 +434,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
 
       // Metal destek direkleri — her 3 parçada bir
       if (i % 3 === 0) {
-        const support = new THREE.Mesh(
-          new THREE.BoxGeometry(0.5, wallH + 2, 0.5),
-          metalMat,
-        );
+        const support = new THREE.Mesh(new THREE.BoxGeometry(0.5, wallH + 2, 0.5), metalMat);
         support.position.set(
           spec.cx + Math.cos(a) * wallR,
           baseY + (wallH + 2) / 2,
@@ -437,10 +456,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
         parts.add(spotlight);
 
         // Işık.createQuery
-        const lightGlow = new THREE.Mesh(
-          new THREE.SphereGeometry(0.3, 6, 5),
-          lanternMat,
-        );
+        const lightGlow = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 5), lanternMat);
         lightGlow.position.set(
           spec.cx + Math.cos(a) * wallR,
           baseY + wallH + 2.2,
@@ -452,10 +468,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       // Dikenli tel — duvarın üstünde
       if (i % 2 === 0) {
         const wireLen = wallLen * 0.6;
-        const wire = new THREE.Mesh(
-          new THREE.BoxGeometry(0.08, 0.3, wireLen),
-          metalMat,
-        );
+        const wire = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.3, wireLen), metalMat);
         wire.position.set(
           spec.cx + Math.cos(a) * wallR,
           baseY + wallH + 0.4,
@@ -526,19 +539,13 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       const ty = baseY;
 
       // Kule temeli
-      const base = new THREE.Mesh(
-        new THREE.BoxGeometry(4, 2, 4),
-        cityMat(0x3a3228, 0.85, 0.15),
-      );
+      const base = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 4), cityMat(0x3a3228, 0.85, 0.15));
       base.position.set(tx, ty + 1, tz);
       parts.add(base);
 
       // Kule gövdesi — ahşap
       const towerH = rng.range(8, 11);
-      const towerBody = new THREE.Mesh(
-        new THREE.BoxGeometry(3, towerH, 3),
-        palisadeMat,
-      );
+      const towerBody = new THREE.Mesh(new THREE.BoxGeometry(3, towerH, 3), palisadeMat);
       towerBody.position.set(tx, ty + 2 + towerH / 2, tz);
       parts.add(towerBody);
 
@@ -553,15 +560,8 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       // Korkuluk
       for (const sx of [-1, 1]) {
         for (const sz of [-1, 1]) {
-          const post = new THREE.Mesh(
-            new THREE.BoxGeometry(0.15, 1.2, 0.15),
-            palisadeMat,
-          );
-          post.position.set(
-            tx + sx * 1.7,
-            ty + 2 + towerH + 0.8,
-            tz + sz * 1.7,
-          );
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.2, 0.15), palisadeMat);
+          post.position.set(tx + sx * 1.7, ty + 2 + towerH + 0.8, tz + sz * 1.7);
           parts.add(post);
         }
       }
@@ -582,10 +582,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       }
 
       // Tüfek yuvası
-      const rifleSlot = new THREE.Mesh(
-        new THREE.BoxGeometry(1.2, 0.3, 0.15),
-        metalMat,
-      );
+      const rifleSlot = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.15), metalMat);
       rifleSlot.position.set(tx, ty + 2 + towerH - 0.8, tz + 1.6);
       parts.add(rifleSlot);
     }
@@ -681,10 +678,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
         // Korkuluk dişleri — platform etrafında
         for (let pi = 0; pi < 12; pi++) {
           const pa = (pi / 12) * Math.PI * 2;
-          const merlon = new THREE.Mesh(
-            new THREE.BoxGeometry(0.5, 1.0, 0.5),
-            palisadeMat,
-          );
+          const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.0, 0.5), palisadeMat);
           merlon.position.set(
             kx + Math.cos(pa) * (machR - 0.3),
             machY + 0.9,
@@ -702,10 +696,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
         parts.add(roofCone);
 
         // Çatı tepesi — metal top
-        const roofFinial = new THREE.Mesh(
-          new THREE.SphereGeometry(0.25, 6, 5),
-          metalMat,
-        );
+        const roofFinial = new THREE.Mesh(new THREE.SphereGeometry(0.25, 6, 5), metalMat);
         roofFinial.position.set(kx, machY + 0.4 + 3.6, kz);
         parts.add(roofFinial);
 
@@ -735,10 +726,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
         );
         kLamp.position.set(kx, machY - 1.2, kz + towerR + 0.5);
         parts.add(kLamp);
-        const kGlow = new THREE.Mesh(
-          new THREE.SphereGeometry(0.22, 6, 5),
-          lanternMat,
-        );
+        const kGlow = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), lanternMat);
         kGlow.position.set(kx, machY - 1.5, kz + towerR + 0.5);
         parts.add(kGlow);
       }
@@ -854,11 +842,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
             new THREE.BoxGeometry(doorW / plankCount - 0.08, doorH * 0.95, 0.12),
             cityMat(p % 2 === 0 ? 0x4a3527 : 0x3d2b1f, 0.92, 0.05),
           );
-          plank.position.set(
-            doorX + perpX * plankX,
-            doorY,
-            doorZ + radX * 0.38,
-          );
+          plank.position.set(doorX + perpX * plankX, doorY, doorZ + radX * 0.38);
           plank.rotation.y = -gateA;
           parts.add(plank);
         }
@@ -888,10 +872,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
 
         // Demir bantlar — 2 yatay, kalın
         for (const yFrac of [0.25, 0.75]) {
-          const band = new THREE.Mesh(
-            new THREE.BoxGeometry(doorW * 0.95, 0.35, 0.1),
-            metalMat,
-          );
+          const band = new THREE.Mesh(new THREE.BoxGeometry(doorW * 0.95, 0.35, 0.1), metalMat);
           band.position.set(doorX, baseY + doorH * yFrac + 0.3, doorZ + radX * 0.82);
           band.rotation.y = -gateA;
           parts.add(band);
@@ -923,10 +904,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
 
         // Menteşe plakaları — üst ve alt
         for (const hy of [-doorH / 2 + 0.8, doorH / 2 - 0.8]) {
-          const hingePlate = new THREE.Mesh(
-            new THREE.BoxGeometry(0.4, 1.0, 0.35),
-            metalMat,
-          );
+          const hingePlate = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.0, 0.35), metalMat);
           hingePlate.position.set(
             gx + perpX * side * 0.2,
             baseY + doorH / 2 + 0.3 + hy,
@@ -935,10 +913,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
           parts.add(hingePlate);
 
           // Menteşe pimi
-          const pin = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.06, 0.06, 0.5, 5),
-            metalMat,
-          );
+          const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 5), metalMat);
           pin.position.set(
             gx + perpX * side * 0.1,
             baseY + doorH / 2 + 0.3 + hy,
@@ -949,10 +924,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
         }
 
         // Kapı demir halka sapı
-        const handleRing = new THREE.Mesh(
-          new THREE.TorusGeometry(0.22, 0.04, 5, 8),
-          metalMat,
-        );
+        const handleRing = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.04, 5, 8), metalMat);
         handleRing.position.set(
           gx + perpX * side * (doorW * 0.3),
           baseY + doorH / 2,
@@ -969,10 +941,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       const portZ = gz + radX * 1.8;
 
       // Izgara çerçevesi — üst
-      const portFrame = new THREE.Mesh(
-        new THREE.BoxGeometry(portW + 0.6, 0.5, 0.3),
-        metalMat,
-      );
+      const portFrame = new THREE.Mesh(new THREE.BoxGeometry(portW + 0.6, 0.5, 0.3), metalMat);
       portFrame.position.set(gx, baseY + gateH + 0.3, portZ);
       portFrame.rotation.y = -gateA;
       parts.add(portFrame);
@@ -981,38 +950,21 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       const barCount = Math.floor(portW / 0.65);
       for (let bi = 0; bi < barCount; bi++) {
         const bx = -portW / 2 + (bi + 0.5) * (portW / barCount);
-        const bar = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.05, 0.08, portH, 5),
-          metalMat,
-        );
-        bar.position.set(
-          gx + perpX * bx,
-          portY + portH / 2,
-          portZ,
-        );
+        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, portH, 5), metalMat);
+        bar.position.set(gx + perpX * bx, portY + portH / 2, portZ);
         parts.add(bar);
 
         // Sivri uç — altta
-        const tip = new THREE.Mesh(
-          new THREE.ConeGeometry(0.08, 0.25, 4),
-          metalMat,
-        );
-        tip.position.set(
-          gx + perpX * bx,
-          portY - 0.12,
-          portZ,
-        );
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.25, 4), metalMat);
+        tip.position.set(gx + perpX * bx, portY - 0.12, portZ);
         tip.rotation.z = Math.PI;
         parts.add(tip);
       }
 
       // Yatay çubuklar
       for (let hj = 0; hj < 3; hj++) {
-        const hy = portY + portH * (hj + 1) / 4;
-        const hBar = new THREE.Mesh(
-          new THREE.BoxGeometry(portW, 0.1, 0.1),
-          metalMat,
-        );
+        const hy = portY + (portH * (hj + 1)) / 4;
+        const hBar = new THREE.Mesh(new THREE.BoxGeometry(portW, 0.1, 0.1), metalMat);
         hBar.position.set(gx, hy, portZ);
         hBar.rotation.y = -gateA;
         parts.add(hBar);
@@ -1025,24 +977,14 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
 
         // Zincir dikey — 8 halka
         for (let ci = 0; ci < 8; ci++) {
-          const link = new THREE.Mesh(
-            new THREE.TorusGeometry(0.1, 0.025, 4, 6),
-            metalMat,
-          );
-          link.position.set(
-            chainX,
-            portY + portH * 0.5 + ci * 0.35,
-            chainBaseZ,
-          );
+          const link = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.025, 4, 6), metalMat);
+          link.position.set(chainX, portY + portH * 0.5 + ci * 0.35, chainBaseZ);
           link.rotation.x = ci % 2 === 0 ? 0 : Math.PI / 2;
           parts.add(link);
         }
 
         // Makara dişlisi
-        const sprocket = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.25, 0.25, 0.15, 8),
-          metalMat,
-        );
+        const sprocket = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.15, 8), metalMat);
         sprocket.position.set(chainX, baseY + gateH + 0.5, chainBaseZ);
         sprocket.rotation.x = Math.PI / 2;
         parts.add(sprocket);
@@ -1050,10 +992,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
         // Dişli tırnakları
         for (let ti = 0; ti < 6; ti++) {
           const ta = (ti / 6) * Math.PI * 2;
-          const tooth = new THREE.Mesh(
-            new THREE.BoxGeometry(0.06, 0.08, 0.06),
-            metalMat,
-          );
+          const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.06), metalMat);
           tooth.position.set(
             chainX + Math.cos(ta) * 0.25,
             baseY + gateH + 0.5 + Math.sin(ta) * 0.25,
@@ -1064,10 +1003,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
       }
 
       // Üst makara kirişi
-      const crossBeam = new THREE.Mesh(
-        new THREE.BoxGeometry(portW + 2, 0.55, 0.55),
-        palisadeMat,
-      );
+      const crossBeam = new THREE.Mesh(new THREE.BoxGeometry(portW + 2, 0.55, 0.55), palisadeMat);
       crossBeam.position.set(gx, baseY + gateH + 1.0, portZ);
       crossBeam.rotation.y = -gateA;
       parts.add(crossBeam);
@@ -1078,20 +1014,14 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
         const bX = gx + perpX * side * (gateW / 2 + 3.5);
         const bZ = gz + perpZ * side * (gateW / 2 + 3.5) + radX * 3;
 
-        const barricade = new THREE.Mesh(
-          new THREE.BoxGeometry(2.5, 1.8, 0.5),
-          metalMat,
-        );
+        const barricade = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.8, 0.5), metalMat);
         barricade.position.set(bX, baseY + 0.9, bZ);
         barricade.rotation.y = -gateA;
         parts.add(barricade);
 
         // Çapraz sivri tahta kirişler — X
         for (const dir of [1, -1]) {
-          const spike = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.05, 0.12, 2.5, 5),
-            palisadeMat,
-          );
+          const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.12, 2.5, 5), palisadeMat);
           spike.position.set(bX, baseY + 1.8, bZ);
           spike.rotation.z = dir * 0.5;
           spike.rotation.y = -gateA;
@@ -1099,10 +1029,7 @@ function buildPavement(spec: CitySpec, baseY: number, rng: Rng): THREE.Group {
         }
 
         // Çivi tel rulo
-        const wireRoll = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.4, 0.4, 1.6, 8),
-          metalMat,
-        );
+        const wireRoll = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.6, 8), metalMat);
         wireRoll.rotation.z = Math.PI / 2;
         wireRoll.position.set(
           gx + perpX * side * (gateW / 2 + 5.5),
@@ -1408,16 +1335,24 @@ export async function createCity(
     for (let j = 0; j < SECTORS; j++) {
       const ga = j * da2;
       for (const side of [-1, 1]) {
-        const kx = spec.cx + Math.cos(ga) * wallRt + Math.cos(ga + Math.PI / 2) * side * (7 / 2 + 3.2 + 0.8);
-        const kz = spec.cz + Math.sin(ga) * wallRt + Math.sin(ga + Math.PI / 2) * side * (7 / 2 + 3.2 + 0.8);
-        gateTurrets.push({ pos: new THREE.Vector3(kx, baseY + 14, kz), y: baseY + 14, cool: rng.range(0, 2) });
+        const kx =
+          spec.cx + Math.cos(ga) * wallRt + Math.cos(ga + Math.PI / 2) * side * (7 / 2 + 3.2 + 0.8);
+        const kz =
+          spec.cz + Math.sin(ga) * wallRt + Math.sin(ga + Math.PI / 2) * side * (7 / 2 + 3.2 + 0.8);
+        gateTurrets.push({
+          pos: new THREE.Vector3(kx, baseY + 14, kz),
+          y: baseY + 14,
+          cool: rng.range(0, 2),
+        });
       }
     }
   }
 
-  // Yer ateş kaynakları — şehirdeki çıralar, ocaklar, savunma mevzileri
+  // Yer ateş kaynakları — şehirdeki çıralar, ocaklar, savunma mevzileri.
+  // Üst sınır 48: eski R*0.35 formülü 150+ görünmez atış noktası üretiyor,
+  // mermi havuzunu ve ses bütçesini tek başına doyuruyordu.
   const groundFires: GroundFire[] = [];
-  const gfCount = Math.floor(R * 0.35);
+  const gfCount = Math.min(48, Math.floor(R * 0.35));
   for (let i = 0; i < gfCount; i++) {
     const a = rng.range(0, Math.PI * 2);
     const d = rng.range(R * 0.1, R * 0.98);

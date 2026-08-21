@@ -425,9 +425,10 @@ export function updateFlight(g: Game, dt: number): void {
     // Alev topu geri tepmesi: boyun da geriye eğilir, uç segment daha fazla
     if (s.fireballKickT > 0) {
       const k = 1 - s.fireballKickT;
-      const neckKick = k < 0.35
-        ? THREE.MathUtils.lerp(0, -0.35, k / 0.35)
-        : THREE.MathUtils.lerp(-0.35, 0, (k - 0.35) / 0.65);
+      const neckKick =
+        k < 0.35
+          ? THREE.MathUtils.lerp(0, -0.35, k / 0.35)
+          : THREE.MathUtils.lerp(-0.35, 0, (k - 0.35) / 0.65);
       n.rotation.x += neckKick * (0.3 + norm * 0.7);
     }
     n.rotation.y = yawS - a.roll * 0.06 * (1 - norm * 0.3);
@@ -441,9 +442,10 @@ export function updateFlight(g: Game, dt: number): void {
   let kickPitch = 0;
   if (s.fireballKickT > 0) {
     const k = 1 - s.fireballKickT; // 0→1
-    kickPitch = k < 0.35
-      ? THREE.MathUtils.lerp(0, -0.7, k / 0.35)       // geri çek
-      : THREE.MathUtils.lerp(-0.7, 0.5, (k - 0.35) / 0.65); // ileri fırla → zero
+    kickPitch =
+      k < 0.35
+        ? THREE.MathUtils.lerp(0, -0.7, k / 0.35) // geri çek
+        : THREE.MathUtils.lerp(-0.7, 0.5, (k - 0.35) / 0.65); // ileri fırla → zero
   }
   d.headLook.rotation.x += (pitchLead + kickPitch - d.headLook.rotation.x) * Math.min(1, dt * 7);
   d.headLook.rotation.y += (yawLead - d.headLook.rotation.y) * Math.min(1, dt * 7);
@@ -460,7 +462,8 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
   // Kamera geri mesafesi: dalarken yakınlaşır, pitch yukarı çıktıkça uzar.
   const pitchBackOffset = Math.max(0, a.pitch) * 6;
   const diveClose = dive * 6;
-  const back = (playing ? 34 + s.speed * 0.16 : 40) + (s.rageT > 0 ? 8 : 0) + pitchBackOffset - diveClose;
+  const back =
+    (playing ? 34 + s.speed * 0.16 : 40) + (s.rageT > 0 ? 8 : 0) + pitchBackOffset - diveClose;
 
   // Kamera yüksekliği: pitch yukarı çıkınca biraz yukarı, dalarken biraz alçalır.
   const pitchHeightOffset = a.pitch * 8;

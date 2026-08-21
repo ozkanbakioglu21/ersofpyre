@@ -94,13 +94,7 @@ export function updateInfinitePath(g: Game, inf: InfinitePath, dt: number): void
   }
 }
 
-const BUILDING_KINDS: Target["kind"][] = [
-  "house",
-  "tenement",
-  "workshop",
-  "warehouse",
-  "factory",
-];
+const BUILDING_KINDS: Target["kind"][] = ["house", "tenement", "workshop", "warehouse", "factory"];
 
 function spawnChunk(g: Game, inf: InfinitePath, z: number): void {
   const { rng } = inf;

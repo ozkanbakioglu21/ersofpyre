@@ -125,12 +125,29 @@ export type Target = Burnable & {
   wrote: number;
   /** Bina yarıya ayrıldı mı? */
   splitDone: boolean;
+  /** İşaretçi seçiminde geçici mesafe anahtarı (sıralama için önbellek). */
+  sortD?: number;
 };
 
 export type WeakPointId =
-  | "balonOn" | "balonArka" | "motorSol" | "motorSag" | "batarya" | "kopru" | "cekirdek"
-  | "kanatSol" | "kanatSag" | "radar" | "kalkan" | "yakit" | "komuta"
-  | "taretSol" | "taretSag" | "egzost" | "navigasyon" | "zirh";
+  | "balonOn"
+  | "balonArka"
+  | "motorSol"
+  | "motorSag"
+  | "batarya"
+  | "kopru"
+  | "cekirdek"
+  | "kanatSol"
+  | "kanatSag"
+  | "radar"
+  | "kalkan"
+  | "yakit"
+  | "komuta"
+  | "taretSol"
+  | "taretSag"
+  | "egzost"
+  | "navigasyon"
+  | "zirh";
 
 export type WeakPointEffect = "sink" | "disableGuns" | "disableEngine" | "phase";
 

@@ -71,7 +71,13 @@ const CATS: Record<SampleCategory, CategoryDef> = {
     tier: 1,
   },
   fireballImpact: {
-    files: ["big_boom.wav", "big_explosion.wav", "mech_explosion.wav", "blast_01.ogg", "blast_02.ogg"],
+    files: [
+      "big_boom.wav",
+      "big_explosion.wav",
+      "mech_explosion.wav",
+      "blast_01.ogg",
+      "blast_02.ogg",
+    ],
     gain: 0.9,
     tier: 1,
   },
@@ -89,7 +95,12 @@ const CATS: Record<SampleCategory, CategoryDef> = {
     tier: 1,
   },
   humanScreamF: {
-    files: ["scream_high_01.mp3", "scream_high_02.mp3", "scream_female_01.ogg", "scream_female_02.ogg"],
+    files: [
+      "scream_high_01.mp3",
+      "scream_high_02.mp3",
+      "scream_female_01.ogg",
+      "scream_female_02.ogg",
+    ],
     gain: 0.5,
     tier: 1,
   },

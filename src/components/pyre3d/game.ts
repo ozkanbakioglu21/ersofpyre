@@ -178,6 +178,10 @@ const FWD = new THREE.Vector3(0, 0, 1);
 const UP_Y = new THREE.Vector3(0, 1, 0);
 /** Zafer sinematiği süresi (sn) — ejderha şaha kalkıp kükrer. */
 const CINE_DUR = 5;
+/** Yanan zeplin gövde rengi — her kare yeni Color ayırmamak için sabit. */
+const BURN_TINT = new THREE.Color(0x1a0c06);
+/** Alev topu çarpışma sorgusu için tekrar kullanılan tampon. */
+const fbNear: Target[] = [];
 
 type Gate = { pos: THREE.Vector3; radius: number; passed: boolean; group: THREE.Group };
 type Zone = { id: string; pos: THREE.Vector3; r: number; entered: boolean };
@@ -205,6 +209,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   renderer.setSize(mount.clientWidth, mount.clientHeight);
   renderer.shadowMap.enabled = preset.shadows;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  // Gölge haritası her karede değil, kadanslı çizilir (aşağıda loop içinde):
+  // 2048²'lik haritaya tüm şehri 60 Hz yeniden çizmek en büyük GPU kalemiydi.
+  renderer.shadowMap.autoUpdate = false;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
   if (renderer.domElement.parentElement !== mount) mount.appendChild(renderer.domElement);
@@ -212,7 +219,10 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(chapter.world.skyColor ?? 0x3a2828);
   const fogScale = chapter.world.fogScale ?? 1;
-  const fog = new THREE.FogExp2(chapter.world.fogColor ?? 0x5a3838, preset.fogDensity * fogScale * FOG_SCALE);
+  const fog = new THREE.FogExp2(
+    chapter.world.fogColor ?? 0x5a3838,
+    preset.fogDensity * fogScale * FOG_SCALE,
+  );
   scene.fog = fog;
 
   const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.5, 2400);
@@ -733,6 +743,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     sun.shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
     sun.shadow.map?.dispose();
     sun.shadow.map = null as unknown as THREE.WebGLRenderTarget;
+    renderer.shadowMap.needsUpdate = true;
     setShadowsEnabled(preset.shadows);
     fog.density = preset.fogDensity * fogScale * FOG_SCALE;
     ash.geometry.setDrawRange(0, preset.ashCount);
@@ -757,7 +768,10 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   let fastSamples = 0;
   let burnT = 0;
   let markerT = 0;
-  let shadowsDropped = false;
+  /** Uyarlanabilir gölge ölçeği: 2 = tam boy, 1 = /2, 0 = /4 (min 512). */
+  let shadowMapScale = 2;
+  /** Gölge tazeleme kadansı sayacı. */
+  let shadowFrame = 3;
   let firedOnce = false;
   let flamePushT = 0;
   let screamT = 0;
@@ -767,11 +781,13 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   /** Dalış çığlığı histerezisi: 0.05 altına inince yeniden kurulur. */
   let diveArmed = true;
   let intensityT = 0;
+  /** Zemin ateşi dönen imleci — kare başına 6 kaynak işlenir. */
+  let gfCursor = 0;
   /** Zafer sinematiği geri sayımı ve kükreme bayrağı. */
   let cinematicT = 0;
   let cineRoared = false;
   let pendingResult: MissionResult | null = null;
-  let bestTime = o.save.chapters[chapter.id]?.bestTime ?? 0;
+  const bestTime = o.save.chapters[chapter.id]?.bestTime ?? 0;
   let lastPush: HudSnapshot | null = null;
 
   const markers = bridge.frame.markers;
@@ -782,6 +798,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
    */
   type MarkSrc = { pos: THREE.Vector3; kind: Marker["kind"]; hp01: number };
   const picks: MarkSrc[] = [];
+  const markerNear: Target[] = [];
 
   const selectMarkers = () => {
     picks.length = 0;
@@ -809,9 +826,12 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     for (const ob of chapter.objectives) {
       if (ob.type === "destroyKind") wanted.add(ob.kind);
     }
-    const near: Target[] = [];
-    grid.query(dp.x, dp.z, 420, near);
-    near.sort((a, b) => a.pos.distanceToSquared(dp) - b.pos.distanceToSquared(dp));
+    grid.query(dp.x, dp.z, 420, markerNear);
+    // Mesafe bir kez hesaplanır: comparator içinde distanceToSquared çağırmak
+    // ~800 aday × log n karşılaştırmada on binlerce kök alma demekti.
+    for (const t of markerNear) t.sortD = t.pos.distanceToSquared(dp);
+    markerNear.sort((a, b) => a.sortD! - b.sortD!);
+    const near = markerNear;
     let optional = 0;
     for (const t of near) {
       if (t.dead) continue;
@@ -915,9 +935,19 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         fastSamples = 0;
       }
       if (slowSamples >= 2) {
-        if (!shadowsDropped && renderer.shadowMap.enabled) {
-          shadowsDropped = true;
-          setShadowsEnabled(false);
+        // Gölgeyi KAPATMAK tüm sahnede shader derletir ve tam FPS düşükken
+        // yüzlerce ms'lik donma ekler. Bunun yerine önce gölge haritası
+        // küçültülür (program değişmez), sonra çözünürlük düşürülür.
+        if (shadowMapScale > 0 && renderer.shadowMap.enabled) {
+          shadowMapScale--;
+          const size = Math.max(512, preset.shadowMapSize >> (2 - shadowMapScale));
+          sun.shadow.mapSize.set(size, size);
+          sun.shadow.map?.dispose();
+          sun.shadow.map = null as unknown as THREE.WebGLRenderTarget;
+          // Harita hemen bu karede yeniden üretilsin; yoksa 1-2 kare boyunca
+          // dispose edilmiş dokuya örnekleme (GL_INVALID_OPERATION) oluşur.
+          renderer.shadowMap.needsUpdate = true;
+          shadowFrame = 0;
           slowSamples = 0;
         } else if (resScale > 0.6) {
           resScale = Math.max(0.6, resScale - 0.15);
@@ -1120,9 +1150,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         if (b.mesh.position.y <= terrainHeight(b.mesh.position.x, b.mesh.position.z) + 1)
           hit = true;
         if (!hit) {
-          const near: Target[] = [];
-          grid.query(b.mesh.position.x, b.mesh.position.z, 12, near);
-          for (const t of near) {
+          grid.query(b.mesh.position.x, b.mesh.position.z, 12, fbNear);
+          for (const t of fbNear) {
             if (t.dead) continue;
             const dx = t.pos.x - b.mesh.position.x;
             const dz = t.pos.z - b.mesh.position.z;
@@ -1319,25 +1348,32 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           }
         }
 
-        /* ---- yer ateş kaynakları — sürekli alev topu ---- */
-        for (const gf of city.groundFires) {
-          gf.cool -= dt;
-          const d = gf.pos.distanceTo(dp);
-          if (gf.cool <= 0 && d < 240) {
-            gf.cool = 0.18 + Math.random() * 0.15;
-            // Her atışta 1-3 mermi
-            const burst = 1 + Math.floor(Math.random() * 3);
-            for (let b = 0; b < burst; b++) {
-              tmp.copy(dp).sub(gf.pos).normalize();
-              tmp.x += (Math.random() - 0.5) * 0.28;
-              tmp.z += (Math.random() - 0.5) * 0.28;
-              const speed = 55 + Math.random() * 30;
-              tmp2.copy(gf.pos);
-              shots.spawn("firebolt", tmp2, tmp.normalize().multiplyScalar(speed), 5, 0);
+        /* ---- yer ateş kaynakları — sürekli alev topu ----
+         * Dönen imleç: kare başına en fazla 6 kaynak işlenir; soğuma süreleri
+         * korunur, sadece kontrol maliyeti karelere yayılır. */
+        const gfs = city.groundFires;
+        if (gfs.length) {
+          const scan = Math.min(6, gfs.length);
+          for (let k = 0; k < scan; k++) {
+            const gf = gfs[gfCursor % gfs.length]!;
+            gfCursor++;
+            gf.cool -= dt * (gfs.length / scan);
+            const d = gf.pos.distanceTo(dp);
+            if (gf.cool <= 0 && d < 240) {
+              gf.cool = 0.5 + Math.random() * 0.4;
+              // Her atışta 1-2 mermi
+              const burst = 1 + Math.floor(Math.random() * 2);
+              for (let b = 0; b < burst; b++) {
+                tmp.copy(dp).sub(gf.pos).normalize();
+                tmp.x += (Math.random() - 0.5) * 0.28;
+                tmp.z += (Math.random() - 0.5) * 0.28;
+                const speed = 55 + Math.random() * 30;
+                tmp2.copy(gf.pos);
+                shots.spawn("firebolt", tmp2, tmp.normalize().multiplyScalar(speed), 5, 0);
+              }
+              // Alev efekti — sesi battleLoop yatağı taşıyor
+              fx.flameJet(gf.pos, 7, UP_Y);
             }
-            // Alev efekti — sesi battleLoop yatağı taşıyor: 150 kaynağın her
-            // patlamasında ayrı ses düğümü kurmak eski takılmanın ana sebebiydi.
-            fx.flameJet(gf.pos, 7, UP_Y);
           }
         }
       }
@@ -1348,9 +1384,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         if (z.weakPoints.length && z.pos.distanceTo(dp) < 520) refreshWeakPoints(z);
         if (z.burn > 0) {
           z.hp -= z.burn * 30 * dt;
-          z.hullMat.color
-            .copy(z.hullColor)
-            .lerp(new THREE.Color(0x1a0c06), Math.min(1, z.burn * 1.4));
+          z.hullMat.color.copy(z.hullColor).lerp(BURN_TINT, Math.min(1, z.burn * 1.4));
           z.hullMat.emissive.set(0xff4000);
           z.hullMat.emissiveIntensity = z.burn * 1.8 + Math.random() * 0.5;
           if (Math.random() < z.burn * 0.55) {
@@ -1600,21 +1634,34 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     }
 
     /* ---- her durumda ---- */
-    fireLights.update(rawDt, now, g.burning, dragon.root.position);
-    fx.update(rawDt, now);
+    // dt (timeScale'li): slowmo anında partiküller ve ateş ışıkları da yavaşlasın.
+    fireLights.update(dt, now, g.burning, dragon.root.position);
+    fx.update(dt, now);
 
     ash.position.x = dragon.root.position.x;
     ash.position.z = dragon.root.position.z;
     ash.rotation.y += rawDt * 0.01;
 
-    sun.position.copy(dragon.root.position).add(SUN_OFFSET);
-    sun.target.position.copy(dragon.root.position);
+    // Gölge kadansı: harita 3 karede bir tazelenir; güneş konumu yalnız
+    // tazeleme karesinde oynar ki eski derinlik haritasıyla matris kaymasın.
+    shadowFrame++;
+    if (renderer.shadowMap.enabled && shadowFrame >= 3) {
+      shadowFrame = 0;
+      sun.position.copy(dragon.root.position).add(SUN_OFFSET);
+      sun.target.position.copy(dragon.root.position);
+      renderer.shadowMap.needsUpdate = true;
+    }
     sky.position.copy(dragon.root.position);
     fill.position.copy(camera.position);
 
     // NPC güncellemesi (siviller kaçışır, askerler ateş eder)
     if (city && playing) {
-      city.npcs.update(rawDt, dragon.root.position, g.fwd);
+      city.npcs.update(dt, dragon.root.position, g.fwd, (dmg) => {
+        if (state.invuln > 0) return;
+        state.hp -= dmg;
+        state.hitFlash = Math.max(state.hitFlash, 0.2);
+        audio.hit();
+      });
     }
 
     if (cinematicT > 0) {
@@ -1747,6 +1794,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
 
   await step(97, "Isınma karesi");
   if (cancelled) return null;
+  renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, camera);
   await step(100, "Hazır");
   if (cancelled) return null;
@@ -1801,7 +1849,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           g.mission.skipLine();
           break;
         case "applyQuality":
-          shadowsDropped = false;
+          shadowMapScale = 2;
           applyQuality();
           break;
         case "abort":

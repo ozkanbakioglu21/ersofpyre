@@ -365,7 +365,10 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime(opts.peak, t + Math.min(0.02, opts.dur * 0.2));
     gain.gain.exponentialRampToValueAtTime(0.0001, t + opts.dur);
-    src.connect(filter).connect(gain).connect(opts.dest ?? c.master);
+    src
+      .connect(filter)
+      .connect(gain)
+      .connect(opts.dest ?? c.master);
     src.start(t);
     track(src, t + opts.dur + 0.02);
   };
@@ -932,9 +935,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (battleCombat > 0.05) {
         if (Math.random() < battleCombat * 0.55) {
           // Uzak lazer — örnek varsa kayıttan, yoksa kısa tarama tonu
-          if (
-            !bank.play("laser", { dest: cc.bus.weapon, gain: 0.35 + Math.random() * 0.3 })
-          ) {
+          if (!bank.play("laser", { dest: cc.bus.weapon, gain: 0.35 + Math.random() * 0.3 })) {
             tone(cc, {
               type: "sawtooth",
               from: 1500,
@@ -948,7 +949,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         if (Math.random() < battleCombat * 0.14) {
           // Uzak patlama
           if (!bank.play("explosion", { dest: cc.bus.explosion, gain: 0.35 })) {
-            tone(cc, { type: "sine", from: 80, to: 26, dur: 0.8, peak: 0.1, dest: cc.bus.explosion });
+            tone(cc, {
+              type: "sine",
+              from: 80,
+              to: 26,
+              dur: 0.8,
+              peak: 0.1,
+              dest: cc.bus.explosion,
+            });
             noiseBurst(cc, {
               dur: 0.7,
               peak: 0.07,
@@ -1016,7 +1024,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     // Rastgele çığlık türü seç: derin (%50), orta (%25), tiz (%15), kalabalık (%10)
     const r = Math.random();
     const base = r < 0.5 ? 480 : r < 0.75 ? 640 : r < 0.9 ? 900 : 380;
-    tone(c, { type: "sawtooth", from: base, to: base * 1.6, dur: 0.5, peak: 0.18, dest: c.bus.voice });
+    tone(c, {
+      type: "sawtooth",
+      from: base,
+      to: base * 1.6,
+      dur: 0.5,
+      peak: 0.18,
+      dest: c.bus.voice,
+    });
     tone(c, {
       type: "square",
       from: base * 1.34,
@@ -1038,7 +1053,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   };
 
   const proceduralDiveScream = (c: Ctx, p: number) => {
-    tone(c, { type: "sawtooth", from: 500 * p, to: 130 * p, dur: 1.2, peak: 0.4, dest: c.bus.hero });
+    tone(c, {
+      type: "sawtooth",
+      from: 500 * p,
+      to: 130 * p,
+      dur: 1.2,
+      peak: 0.4,
+      dest: c.bus.hero,
+    });
     tone(c, {
       type: "sawtooth",
       from: 340 * p,
@@ -1151,8 +1173,17 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         if (!gate("explosion")) return;
         const s = Math.min(2, Math.max(0.5, size));
         // Örnek varsa: kayıt (2 düğüm) + prosedürel dip vuruş; yoksa tam prosedürel.
-        if (bank.play("explosion", { dest: c.bus.explosion, gain: 0.45 * s, rate: 1.05 - s * 0.1 })) {
-          tone(c, { type: "sine", from: 110 * s, to: 24, dur: 0.5 * s, peak: 0.3, dest: c.bus.explosion });
+        if (
+          bank.play("explosion", { dest: c.bus.explosion, gain: 0.45 * s, rate: 1.05 - s * 0.1 })
+        ) {
+          tone(c, {
+            type: "sine",
+            from: 110 * s,
+            to: 24,
+            dur: 0.5 * s,
+            peak: 0.3,
+            dest: c.bus.explosion,
+          });
           return;
         }
         noiseBurst(c, {
@@ -1164,7 +1195,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           q: 0.8,
           dest: c.bus.explosion,
         });
-        tone(c, { type: "sine", from: 130 * s, to: 26, dur: 0.55 * s, peak: 0.4, dest: c.bus.explosion });
+        tone(c, {
+          type: "sine",
+          from: 130 * s,
+          to: 26,
+          dur: 0.55 * s,
+          peak: 0.4,
+          dest: c.bus.explosion,
+        });
         noiseBurst(c, {
           dur: 0.1,
           peak: 0.26 * s,
@@ -1179,10 +1217,26 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     fireballLaunch() {
       withCtx((c) => {
         if (!bank.play("fireballLaunch", { dest: c.bus.hero, gain: 1 })) {
-          noiseBurst(c, { dur: 0.35, peak: 0.22, type: "bandpass", from: 1400, to: 300, q: 1.4, dest: c.bus.hero });
+          noiseBurst(c, {
+            dur: 0.35,
+            peak: 0.22,
+            type: "bandpass",
+            from: 1400,
+            to: 300,
+            q: 1.4,
+            dest: c.bus.hero,
+          });
         }
         tone(c, { type: "sawtooth", from: 380, to: 120, dur: 0.3, peak: 0.14, dest: c.bus.hero });
-        tone(c, { type: "sine", from: 90, to: 40, dur: 0.25, peak: 0.16, delay: 0.02, dest: c.bus.hero });
+        tone(c, {
+          type: "sine",
+          from: 90,
+          to: 40,
+          dur: 0.25,
+          peak: 0.16,
+          delay: 0.02,
+          dest: c.bus.hero,
+        });
       });
     },
     fireballTravel() {
@@ -1278,11 +1332,26 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         // Lazer: örnek varsa kayıttan (2 düğüm), yoksa tarama tonu.
         if (bank.play("laser", { dest: c.bus.weapon, gain: 1 })) return;
         if (Math.random() < 0.5) {
-          tone(c, { type: "sawtooth", from: 1100, to: 180, dur: 0.14, peak: 0.12, dest: c.bus.weapon });
+          tone(c, {
+            type: "sawtooth",
+            from: 1100,
+            to: 180,
+            dur: 0.14,
+            peak: 0.12,
+            dest: c.bus.weapon,
+          });
         } else {
           tone(c, { type: "square", from: 520, to: 90, dur: 0.09, peak: 0.13, dest: c.bus.weapon });
         }
-        noiseBurst(c, { dur: 0.06, peak: 0.14, type: "highpass", from: 3000, to: 1500, q: 1.5, dest: c.bus.weapon });
+        noiseBurst(c, {
+          dur: 0.06,
+          peak: 0.14,
+          type: "highpass",
+          from: 3000,
+          to: 1500,
+          q: 1.5,
+          dest: c.bus.weapon,
+        });
       });
     },
     roll() {
@@ -1294,7 +1363,15 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       withCtx((c) => {
         // Pirinç çan: iki uyumlu ton, kısa ve parlak — ödül sinyali.
         tone(c, { type: "sine", from: 1180, to: 1180, dur: 0.34, peak: 0.16, dest: c.bus.ui });
-        tone(c, { type: "sine", from: 1770, to: 1770, dur: 0.26, peak: 0.09, delay: 0.02, dest: c.bus.ui });
+        tone(c, {
+          type: "sine",
+          from: 1770,
+          to: 1770,
+          dur: 0.26,
+          peak: 0.09,
+          delay: 0.02,
+          dest: c.bus.ui,
+        });
       });
     },
     overheat() {
@@ -1307,20 +1384,43 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     lockOn() {
       withCtx((c) => {
         tone(c, { type: "square", from: 620, to: 620, dur: 0.08, peak: 0.08, dest: c.bus.ui });
-        tone(c, { type: "square", from: 620, to: 620, dur: 0.08, peak: 0.08, delay: 0.14, dest: c.bus.ui });
+        tone(c, {
+          type: "square",
+          from: 620,
+          to: 620,
+          dur: 0.08,
+          peak: 0.08,
+          delay: 0.14,
+          dest: c.bus.ui,
+        });
       });
     },
     rage() {
       withCtx((c) => {
         tone(c, { type: "sawtooth", from: 60, to: 180, dur: 1.1, peak: 0.3, dest: c.bus.hero });
-        noiseBurst(c, { dur: 1.2, peak: 0.2, type: "lowpass", from: 300, to: 1600, dest: c.bus.hero });
+        noiseBurst(c, {
+          dur: 1.2,
+          peak: 0.2,
+          type: "lowpass",
+          from: 300,
+          to: 1600,
+          dest: c.bus.hero,
+        });
       });
     },
     roar() {
       withCtx((c) => {
         if (bank.play("victoryRoar", { dest: c.bus.hero, gain: 0.7 })) return;
         tone(c, { type: "sawtooth", from: 150, to: 55, dur: 1.3, peak: 0.32, dest: c.bus.hero });
-        noiseBurst(c, { dur: 1.4, peak: 0.24, type: "bandpass", from: 420, to: 160, q: 1.6, dest: c.bus.hero });
+        noiseBurst(c, {
+          dur: 1.4,
+          peak: 0.24,
+          type: "bandpass",
+          from: 420,
+          to: 160,
+          q: 1.6,
+          dest: c.bus.hero,
+        });
         tone(c, { type: "sine", from: 70, to: 32, dur: 1.1, peak: 0.18, dest: c.bus.hero });
       });
     },
@@ -1342,23 +1442,62 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         if (!gate("growl")) return;
         tone(c, { type: "sawtooth", from: 40, to: 30, dur: 0.9, peak: 0.22, dest: c.bus.creature });
         tone(c, { type: "triangle", from: 120, to: 80, dur: 0.7, peak: 0.1, dest: c.bus.creature });
-        noiseBurst(c, { dur: 0.6, peak: 0.12, type: "lowpass", from: 180, to: 60, q: 1.0, dest: c.bus.creature });
+        noiseBurst(c, {
+          dur: 0.6,
+          peak: 0.12,
+          type: "lowpass",
+          from: 180,
+          to: 60,
+          q: 1.0,
+          dest: c.bus.creature,
+        });
       });
     },
     bellow() {
       withCtx((c) => {
         tone(c, { type: "sawtooth", from: 80, to: 200, dur: 0.3, peak: 0.35, dest: c.bus.hero });
-        tone(c, { type: "sawtooth", from: 200, to: 50, dur: 1.0, peak: 0.35, delay: 0.3, dest: c.bus.hero });
+        tone(c, {
+          type: "sawtooth",
+          from: 200,
+          to: 50,
+          dur: 1.0,
+          peak: 0.35,
+          delay: 0.3,
+          dest: c.bus.hero,
+        });
         tone(c, { type: "square", from: 160, to: 45, dur: 1.2, peak: 0.18, dest: c.bus.hero });
-        noiseBurst(c, { dur: 1.4, peak: 0.25, type: "lowpass", from: 400, to: 80, q: 1.2, dest: c.bus.hero });
+        noiseBurst(c, {
+          dur: 1.4,
+          peak: 0.25,
+          type: "lowpass",
+          from: 400,
+          to: 80,
+          q: 1.2,
+          dest: c.bus.hero,
+        });
         tone(c, { type: "sine", from: 35, to: 20, dur: 0.5, peak: 0.2, dest: c.bus.hero });
       });
     },
     snarl() {
       withCtx((c) => {
         if (!gate("snarl")) return;
-        tone(c, { type: "sawtooth", from: 300, to: 180, dur: 0.35, peak: 0.26, dest: c.bus.creature });
-        noiseBurst(c, { dur: 0.2, peak: 0.18, type: "bandpass", from: 900, to: 500, q: 1.5, dest: c.bus.creature });
+        tone(c, {
+          type: "sawtooth",
+          from: 300,
+          to: 180,
+          dur: 0.35,
+          peak: 0.26,
+          dest: c.bus.creature,
+        });
+        noiseBurst(c, {
+          dur: 0.2,
+          peak: 0.18,
+          type: "bandpass",
+          from: 900,
+          to: 500,
+          q: 1.5,
+          dest: c.bus.creature,
+        });
         tone(c, { type: "sine", from: 80, to: 40, dur: 0.15, peak: 0.14, dest: c.bus.creature });
       });
     },
@@ -1366,30 +1505,77 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       withCtx((c) => {
         if (!gate("wingFlap")) return;
         if (bank.play("wingFlap", { dest: c.bus.creature, gain: 1 })) return;
-        noiseBurst(c, { dur: 0.18, peak: 0.16, type: "bandpass", from: 800, to: 200, q: 0.8, dest: c.bus.creature });
+        noiseBurst(c, {
+          dur: 0.18,
+          peak: 0.16,
+          type: "bandpass",
+          from: 800,
+          to: 200,
+          q: 0.8,
+          dest: c.bus.creature,
+        });
         tone(c, { type: "sine", from: 60, to: 30, dur: 0.1, peak: 0.1, dest: c.bus.creature });
       });
     },
     creatureAttack() {
       withCtx((c) => {
         if (!gate("creatureAttack")) return;
-        tone(c, { type: "sawtooth", from: 700, to: 220, dur: 0.22, peak: 0.3, dest: c.bus.creature });
-        noiseBurst(c, { dur: 0.3, peak: 0.22, type: "bandpass", from: 1200, to: 400, q: 1.4, dest: c.bus.creature });
+        tone(c, {
+          type: "sawtooth",
+          from: 700,
+          to: 220,
+          dur: 0.22,
+          peak: 0.3,
+          dest: c.bus.creature,
+        });
+        noiseBurst(c, {
+          dur: 0.3,
+          peak: 0.22,
+          type: "bandpass",
+          from: 1200,
+          to: 400,
+          q: 1.4,
+          dest: c.bus.creature,
+        });
       });
     },
     creatureDeath() {
       withCtx((c) => {
         if (!gate("creatureDeath")) return;
         tone(c, { type: "sawtooth", from: 320, to: 45, dur: 1.4, peak: 0.3, dest: c.bus.creature });
-        noiseBurst(c, { dur: 1.2, peak: 0.18, type: "lowpass", from: 900, to: 100, q: 0.9, dest: c.bus.creature });
-        tone(c, { type: "sine", from: 90, to: 28, dur: 1.6, peak: 0.16, delay: 0.2, dest: c.bus.creature });
+        noiseBurst(c, {
+          dur: 1.2,
+          peak: 0.18,
+          type: "lowpass",
+          from: 900,
+          to: 100,
+          q: 0.9,
+          dest: c.bus.creature,
+        });
+        tone(c, {
+          type: "sine",
+          from: 90,
+          to: 28,
+          dur: 1.6,
+          peak: 0.16,
+          delay: 0.2,
+          dest: c.bus.creature,
+        });
       });
     },
     creatureAmbient() {
       withCtx((c) => {
         if (!gate("creatureAmbient")) return;
         tone(c, { type: "sawtooth", from: 65, to: 42, dur: 1.1, peak: 0.2, dest: c.bus.creature });
-        noiseBurst(c, { dur: 1.0, peak: 0.1, type: "lowpass", from: 240, to: 90, q: 1.1, dest: c.bus.creature });
+        noiseBurst(c, {
+          dur: 1.0,
+          peak: 0.1,
+          type: "lowpass",
+          from: 240,
+          to: 90,
+          q: 1.1,
+          dest: c.bus.creature,
+        });
       });
     },
     dragonDiveScream(i) {
@@ -1397,8 +1583,18 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         if (!gate("diveScream")) return;
         const p = 0.85 + Math.random() * 0.3;
         // Korkunç ejderha çığlığı: gerçek kayıt önde, prosedürel katman altta ağırlık verir.
-        if (bank.play("diveScream", { dest: c.bus.hero, gain: 0.7 + i * 0.3, rate: 0.92 + i * 0.12 })) {
-          tone(c, { type: "sawtooth", from: 340 * p, to: 95 * p, dur: 1.3, peak: 0.14, delay: 0.04, dest: c.bus.hero });
+        if (
+          bank.play("diveScream", { dest: c.bus.hero, gain: 0.7 + i * 0.3, rate: 0.92 + i * 0.12 })
+        ) {
+          tone(c, {
+            type: "sawtooth",
+            from: 340 * p,
+            to: 95 * p,
+            dur: 1.3,
+            peak: 0.14,
+            delay: 0.04,
+            dest: c.bus.hero,
+          });
           tone(c, { type: "sine", from: 90, to: 30, dur: 1.4, peak: 0.14, dest: c.bus.hero });
           return;
         }
@@ -1475,12 +1671,33 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     menuGrowl() {
       withCtx((c) => {
-        if (bank.play("menuGrowl", { dest: c.bus.creature, gain: 1, rate: 0.94 + Math.random() * 0.12 }))
+        if (
+          bank.play("menuGrowl", {
+            dest: c.bus.creature,
+            gain: 1,
+            rate: 0.94 + Math.random() * 0.12,
+          })
+        )
           return;
         // Yedek: derin prosedürel hırıltı
         tone(c, { type: "sawtooth", from: 44, to: 30, dur: 1.4, peak: 0.2, dest: c.bus.creature });
-        tone(c, { type: "triangle", from: 110, to: 70, dur: 1.1, peak: 0.09, dest: c.bus.creature });
-        noiseBurst(c, { dur: 1.0, peak: 0.1, type: "lowpass", from: 200, to: 70, q: 1.1, dest: c.bus.creature });
+        tone(c, {
+          type: "triangle",
+          from: 110,
+          to: 70,
+          dur: 1.1,
+          peak: 0.09,
+          dest: c.bus.creature,
+        });
+        noiseBurst(c, {
+          dur: 1.0,
+          peak: 0.1,
+          type: "lowpass",
+          from: 200,
+          to: 70,
+          q: 1.1,
+          dest: c.bus.creature,
+        });
       });
     },
     victoryRoar() {
@@ -1488,7 +1705,15 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         bank.play("victoryRoar", { dest: c.bus.hero, gain: 1, rate: 0.96 });
         // Prosedürel gövde her durumda altta: kükremeye göğüs veren dip katman.
         tone(c, { type: "sawtooth", from: 150, to: 50, dur: 2.0, peak: 0.3, dest: c.bus.hero });
-        noiseBurst(c, { dur: 2.2, peak: 0.22, type: "bandpass", from: 420, to: 140, q: 1.5, dest: c.bus.hero });
+        noiseBurst(c, {
+          dur: 2.2,
+          peak: 0.22,
+          type: "bandpass",
+          from: 420,
+          to: 140,
+          q: 1.5,
+          dest: c.bus.hero,
+        });
         tone(c, { type: "sine", from: 66, to: 28, dur: 1.8, peak: 0.2, dest: c.bus.hero });
       });
     },

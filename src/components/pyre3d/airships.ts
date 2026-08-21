@@ -13,8 +13,18 @@ import type { Airship, AirshipRole, WeakPoint, WeakPointEffect, WeakPointId } fr
  * birleştirmenin dışında tutuluyorlardı; modüller de aynı yolu izliyor.
  */
 
-const ROLE_SCALE: Record<AirshipRole, number> = { scout: 0.6, bomber: 0.95, frigate: 1.35, flagship: 2.2 };
-const ROLE_HP: Record<AirshipRole, number> = { scout: 190, bomber: 520, frigate: 900, flagship: 2400 };
+const ROLE_SCALE: Record<AirshipRole, number> = {
+  scout: 0.6,
+  bomber: 0.95,
+  frigate: 1.35,
+  flagship: 2.2,
+};
+const ROLE_HP: Record<AirshipRole, number> = {
+  scout: 190,
+  bomber: 520,
+  frigate: 900,
+  flagship: 2400,
+};
 
 const WP_LABEL: Record<WeakPointId, string> = {
   balonOn: "Ön Balon Hücresi",
@@ -129,7 +139,10 @@ function bridgeModule(s: number): THREE.Group {
 
 function wingStrut(s: number): THREE.Group {
   const g = new THREE.Group();
-  const strut = new THREE.Mesh(new THREE.BoxGeometry(4.8 * s, 0.6 * s, 1.4 * s), stone(0x3a3228, 0.5));
+  const strut = new THREE.Mesh(
+    new THREE.BoxGeometry(4.8 * s, 0.6 * s, 1.4 * s),
+    stone(0x3a3228, 0.5),
+  );
   g.add(strut);
   const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * s, 0.15 * s, 3.2 * s, 6), brass);
   brace.rotation.z = Math.PI / 4;
@@ -162,7 +175,10 @@ function shieldGen(s: number): THREE.Group {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1.8 * s, 0.18 * s, 6, 12), lanternMat);
   ring.rotation.x = Math.PI / 2;
   g.add(ring);
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.9 * s, 1.1 * s, 1.6 * s, 8), stone(0x2e2822, 0.6));
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.9 * s, 1.1 * s, 1.6 * s, 8),
+    stone(0x2e2822, 0.6),
+  );
   base.position.y = -1.6 * s;
   g.add(base);
   return g;
@@ -170,7 +186,10 @@ function shieldGen(s: number): THREE.Group {
 
 function fuelTank(s: number): THREE.Group {
   const g = new THREE.Group();
-  const tank = new THREE.Mesh(new THREE.CapsuleGeometry(1.1 * s, 3.6 * s, 6, 8), stone(0x3a2e22, 0.4));
+  const tank = new THREE.Mesh(
+    new THREE.CapsuleGeometry(1.1 * s, 3.6 * s, 6, 8),
+    stone(0x3a2e22, 0.4),
+  );
   tank.rotation.x = Math.PI / 2;
   g.add(tank);
   const band1 = new THREE.Mesh(new THREE.TorusGeometry(1.2 * s, 0.1 * s, 5, 10), brass);
@@ -184,9 +203,15 @@ function fuelTank(s: number): THREE.Group {
 
 function commandModule(s: number): THREE.Group {
   const g = new THREE.Group();
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(2 * s, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), stone(0x241f1a, 0.5));
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(2 * s, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    stone(0x241f1a, 0.5),
+  );
   g.add(dome);
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(2.2 * s, 2.4 * s, 1.6 * s, 10), stone(0x2e2822, 0.6));
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.2 * s, 2.4 * s, 1.6 * s, 10),
+    stone(0x2e2822, 0.6),
+  );
   base.position.y = -1.2 * s;
   g.add(base);
   const window1 = new THREE.Mesh(new THREE.BoxGeometry(0.8 * s, 0.6 * s, 2.6 * s), litWindow);
@@ -197,7 +222,10 @@ function commandModule(s: number): THREE.Group {
 
 function gunTurret(s: number): THREE.Group {
   const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.1 * s, 1.4 * s, 1.2 * s, 8), stone(0x2e2822, 0.6));
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.1 * s, 1.4 * s, 1.2 * s, 8),
+    stone(0x2e2822, 0.6),
+  );
   g.add(base);
   const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * s, 0.22 * s, 3.4 * s, 6), brass);
   barrel.rotation.x = -Math.PI / 2;
@@ -356,7 +384,14 @@ export function createAirship(
     parts.add(cabinGlow);
 
     // bomb racks inside gondola
-    for (const [bx, bz] of [[-1.2, -3.5], [-1.2, 0], [-1.2, 3.5], [1.2, -3.5], [1.2, 0], [1.2, 3.5]] as const) {
+    for (const [bx, bz] of [
+      [-1.2, -3.5],
+      [-1.2, 0],
+      [-1.2, 3.5],
+      [1.2, -3.5],
+      [1.2, 0],
+      [1.2, 3.5],
+    ] as const) {
       const bomb = new THREE.Mesh(new THREE.CapsuleGeometry(0.22 * s, 1.6 * s, 4, 6), dark);
       bomb.position.set(bx * s, -8.2 * s, bz * s);
       parts.add(bomb);
@@ -380,8 +415,16 @@ export function createAirship(
     }
 
     // keel cables
-    for (const [sx, sz] of [[-2, -4], [2, -4], [-2, 4], [2, 4]] as const) {
-      const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.07 * s, 0.07 * s, 2.8 * s, 4), dark);
+    for (const [sx, sz] of [
+      [-2, -4],
+      [2, -4],
+      [-2, 4],
+      [2, 4],
+    ] as const) {
+      const cable = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.07 * s, 0.07 * s, 2.8 * s, 4),
+        dark,
+      );
       cable.position.set(sx * s, -6.8 * s, sz * s);
       parts.add(cable);
     }
@@ -444,7 +487,10 @@ export function createAirship(
       [-1.6, 3.2],
       [1.6, 3.2],
     ] as const) {
-      const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * s, 0.06 * s, 2.2 * s, 4), dark);
+      const cable = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06 * s, 0.06 * s, 2.2 * s, 4),
+        dark,
+      );
       cable.position.set(sx * s, -6.2 * s, sz * s);
       parts.add(cable);
     }
@@ -527,7 +573,10 @@ export function createAirship(
         parts.add(nacelle);
       }
 
-      const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.13 * s, 0.13 * s, 3.4 * s, 5), dark);
+      const strut = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.13 * s, 0.13 * s, 3.4 * s, 5),
+        dark,
+      );
       strut.position.set(mx, my + 2.5 * s, mz - 0.6 * s);
       parts.add(strut);
 

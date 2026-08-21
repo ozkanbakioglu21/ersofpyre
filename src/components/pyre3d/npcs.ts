@@ -19,6 +19,10 @@ type Npc = {
   shootTimer: number;
   runTimer: number;
   alive: boolean;
+  /** Yürüme animasyonu fazı — Date.now() yerine dt ile birikir. */
+  walkPhase: number;
+  /** Tüfek geri tepme sayacı (setTimeout yerine). */
+  recoilT: number;
   /** Bacak animasyonu için referanslar */
   leftLeg: THREE.Mesh;
   rightLeg: THREE.Mesh;
@@ -30,9 +34,17 @@ type Npc = {
 export type NpcHandle = {
   npcs: Npc[];
   kill(npc: Npc): void;
-  emitDeathFx(pos: THREE.Vector3, fx: { ember(p: THREE.Vector3, count: number, spread: number): void }): void;
+  emitDeathFx(
+    pos: THREE.Vector3,
+    fx: { ember(p: THREE.Vector3, count: number, spread: number): void },
+  ): void;
   projectiles: THREE.Group;
-  update(dt: number, dragonPos: THREE.Vector3 | null, dragonFwd: THREE.Vector3): void;
+  update(
+    dt: number,
+    dragonPos: THREE.Vector3 | null,
+    dragonFwd: THREE.Vector3,
+    onHitDragon?: (damage: number) => void,
+  ): void;
   dispose(): void;
 };
 
@@ -48,7 +60,8 @@ function makeHumanoid(kind: NpcKind, rng: Rng): THREE.Group {
 
   // Renge göre ayrım
   const skinColor = kind === "soldier" ? 0x3a3028 : 0x5a4a38;
-  const clothColor = kind === "soldier" ? 0x2a2418 : rng.pick([0x4a3a28, 0x3a2a1e, 0x5a4030, 0x382818]);
+  const clothColor =
+    kind === "soldier" ? 0x2a2418 : rng.pick([0x4a3a28, 0x3a2a1e, 0x5a4030, 0x382818]);
   const clothMat = cityMat(clothColor);
   const skinMat = cityMat(skinColor);
 
@@ -103,13 +116,7 @@ function makeHumanoid(kind: NpcKind, rng: Rng): THREE.Group {
 }
 
 /** Yeni NPC oluştur. */
-function createNpc(
-  kind: NpcKind,
-  x: number,
-  z: number,
-  y: number,
-  rng: Rng,
-): Npc {
+function createNpc(kind: NpcKind, x: number, z: number, y: number, rng: Rng): Npc {
   const group = makeHumanoid(kind, rng);
   group.position.set(x, y, z);
   group.rotation.y = rng.range(0, Math.PI * 2);
@@ -122,6 +129,8 @@ function createNpc(
     shootTimer: rng.range(0, SOLDIER_SHOOT_INTERVAL),
     runTimer: rng.range(0, 4),
     alive: true,
+    walkPhase: rng.range(0, Math.PI * 2),
+    recoilT: 0,
     leftLeg: group.children[4] as THREE.Mesh,
     rightLeg: group.children[5] as THREE.Mesh,
     leftArm: group.children[2] as THREE.Mesh,
@@ -130,15 +139,21 @@ function createNpc(
   };
 }
 
-/** Mermi — askerlerin ateş ettiği kurşun. */
+/** Mermi — askerlerin ateş ettiği kurşun. Geometri/materyal modül ömürlü
+ *  ve TÜM mermiler tarafından paylaşılır; asla dispose edilmez. */
 const bulletGeo = new THREE.BoxGeometry(0.12, 0.12, 0.5);
 const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffd080 });
 
 type Bullet = {
+  active: boolean;
   mesh: THREE.Mesh;
   vel: THREE.Vector3;
   life: number;
 };
+
+/** Sabit mermi havuzu: atış başına mesh yaratmak + paylaşılan geometriyi
+ *  dispose etmek hem çöp üretiyor hem GPU tamponunu bozuyordu. */
+const BULLET_POOL = 48;
 
 export function createNpcSystem(
   parent: THREE.Object3D,
@@ -152,6 +167,13 @@ export function createNpcSystem(
   const npcGroup = new THREE.Group();
   const projectileGroup = new THREE.Group();
   const bullets: Bullet[] = [];
+  for (let i = 0; i < BULLET_POOL; i++) {
+    const mesh = new THREE.Mesh(bulletGeo, bulletMat);
+    mesh.visible = false;
+    projectileGroup.add(mesh);
+    bullets.push({ active: false, mesh, vel: new THREE.Vector3(), life: 0 });
+  }
+  let bulletIdx = 0;
 
   // Sokaklara NPC yerleştir
   const placeCount = Math.min(MAX_NPC, Math.floor(radius / 1.8));
@@ -175,7 +197,26 @@ export function createNpcSystem(
 
   const tmp = new THREE.Vector3();
 
-  const update = (dt: number, dragonPos: THREE.Vector3 | null, _dragonFwd: THREE.Vector3) => {
+  const spawnBullet = (from: THREE.Vector3, dir: THREE.Vector3) => {
+    // Havuzdan sıradaki yuva — doluysa en eskisinin üzerine yazılır.
+    const b = bullets[bulletIdx]!;
+    bulletIdx = (bulletIdx + 1) % BULLET_POOL;
+    b.active = true;
+    b.mesh.visible = true;
+    b.mesh.position.copy(from);
+    b.mesh.position.y = 2.0;
+    tmp.copy(b.mesh.position).add(dir);
+    b.mesh.lookAt(tmp);
+    b.vel.copy(dir).multiplyScalar(55);
+    b.life = 3;
+  };
+
+  const update = (
+    dt: number,
+    dragonPos: THREE.Vector3 | null,
+    _dragonFwd: THREE.Vector3,
+    onHitDragon?: (damage: number) => void,
+  ) => {
     for (const npc of npcs) {
       if (!npc.alive) continue;
 
@@ -210,9 +251,10 @@ export function createNpcSystem(
         npc.group.position.x += npc.vel.x * dt;
         npc.group.position.z += npc.vel.z * dt;
 
-        // Bacak animasyonı
+        // Bacak animasyonu — hıza bağlı faz birikimi
         const speed = Math.hypot(npc.vel.x, npc.vel.z);
-        const legSwing = Math.sin(Date.now() * 0.008 * speed) * 0.4;
+        npc.walkPhase += speed * 0.8 * dt;
+        const legSwing = Math.sin(npc.walkPhase) * 0.4;
         if (npc.leftLeg) npc.leftLeg.rotation.x = legSwing;
         if (npc.rightLeg) npc.rightLeg.rotation.x = -legSwing;
         if (npc.leftArm) npc.leftArm.rotation.x = -legSwing * 0.6;
@@ -229,36 +271,23 @@ export function createNpcSystem(
           npc.group.rotation.y += (angle - npc.group.rotation.y) * Math.min(1, dt * 5);
         }
 
-        // Ateş et
+        // Ateş et — yalnız menzildeyken (240 birim); tüm şehir ateş etmesin
         if (npc.shootTimer <= 0 && dragonPos) {
           npc.shootTimer = SOLDIER_SHOOT_INTERVAL + rng.range(-0.3, 0.3);
-
-          // Mermi yönü: ejderhaya doğru + yukarı
-          const dir = new THREE.Vector3()
-            .subVectors(dragonPos, npc.group.position)
-            .normalize();
-          dir.y = 0.6; // Yukarı eğim
-          dir.normalize();
-
-          const mesh = new THREE.Mesh(bulletGeo, bulletMat);
-          mesh.position.copy(npc.group.position);
-          mesh.position.y = 2.0;
-          mesh.lookAt(mesh.position.clone().add(dir));
-          projectileGroup.add(mesh);
-
-          bullets.push({
-            mesh,
-            vel: dir.multiplyScalar(55),
-            life: 3,
-          });
-
-          // Tüfek geri tepme
-          if (npc.rightArm) {
-            npc.rightArm.rotation.x = -0.5;
-            setTimeout(() => {
-              if (npc.rightArm) npc.rightArm.rotation.x = 0;
-            }, 150);
+          tmp.copy(dragonPos).sub(npc.group.position);
+          if (tmp.lengthSq() < 240 * 240) {
+            tmp.normalize();
+            tmp.y = 0.6;
+            tmp.normalize();
+            spawnBullet(npc.group.position, tmp);
+            npc.recoilT = 0.15;
           }
+        }
+
+        // Tüfek geri tepme animasyonu
+        if (npc.recoilT > 0) {
+          npc.recoilT -= dt;
+          if (npc.rightArm) npc.rightArm.rotation.x = npc.recoilT > 0 ? -0.5 : 0;
         }
 
         // Durma pozisyonu — bacaklar sabit
@@ -267,16 +296,21 @@ export function createNpcSystem(
       }
     }
 
-    // Mermileri güncelle
-    for (let i = bullets.length - 1; i >= 0; i--) {
-      const b = bullets[i]!;
+    // Mermileri güncelle — havuz; ejderhaya isabet küçük ama gerçek hasar verir
+    for (const b of bullets) {
+      if (!b.active) continue;
       b.life -= dt;
       b.mesh.position.addScaledVector(b.vel, dt);
       b.vel.y -= 9.8 * dt;
+      if (dragonPos && onHitDragon && b.mesh.position.distanceToSquared(dragonPos) < 3.5 * 3.5) {
+        onHitDragon(2);
+        b.active = false;
+        b.mesh.visible = false;
+        continue;
+      }
       if (b.life <= 0 || b.mesh.position.y < 0) {
-        projectileGroup.remove(b.mesh);
-        b.mesh.geometry.dispose();
-        bullets.splice(i, 1);
+        b.active = false;
+        b.mesh.visible = false;
       }
     }
   };
@@ -289,7 +323,10 @@ export function createNpcSystem(
   };
 
   /** Öldürülen NPC konumunda ember efekti — combat.ts'den çağrılır. */
-  const emitDeathFx = (pos: THREE.Vector3, fx: { ember(p: THREE.Vector3, count: number, spread: number): void }) => {
+  const emitDeathFx = (
+    pos: THREE.Vector3,
+    fx: { ember(p: THREE.Vector3, count: number, spread: number): void },
+  ) => {
     fx.ember(pos, 6, 3);
   };
 
@@ -306,10 +343,8 @@ export function createNpcSystem(
           if (m.geometry) m.geometry.dispose();
         }
       });
-      for (const b of bullets) {
-        projectileGroup.remove(b.mesh);
-        b.mesh.geometry.dispose();
-      }
+      // bulletGeo/bulletMat modül ömürlü ve paylaşılan — dispose edilmez.
+      for (const b of bullets) projectileGroup.remove(b.mesh);
       bullets.length = 0;
       npcs.length = 0;
     },
