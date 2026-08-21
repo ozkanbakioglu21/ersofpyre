@@ -24,7 +24,6 @@ export type AudioEngine = {
   rage(): void;
   roar(): void;
   scream(): void;
-  diveScreech(): void;
   growl(): void;
   bellow(): void;
   snarl(): void;
@@ -69,7 +68,6 @@ const NOOP: AudioEngine = {
   rage() {},
   roar() {},
   scream() {},
-  diveScreech() {},
   growl() {},
   bellow() {},
   snarl() {},
@@ -1086,18 +1084,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         } else {
           tone(c, { type: "sawtooth", from: 150, to: 55, dur: 1.3, peak: 0.32 });
           noiseBurst(c, { dur: 1.4, peak: 0.24, type: "bandpass", from: 420, to: 160, q: 1.6 });
-        }
-      });
-    },
-    diveScreech() {
-      withCtx((c) => {
-        if (sfxCache.has("dragon_roar_wild.wav")) {
-          playSample(c, "dragonScreech", { pitch: 1.1 + Math.random() * 0.3, vol: 0.55 });
-          playSample(c, "dragonRoar", { pitch: 1.3 + Math.random() * 0.2, vol: 0.3, delay: 0.05 });
-        } else {
-          tone(c, { type: "sawtooth", from: 520, to: 340, dur: 0.8, peak: 0.28 });
-          tone(c, { type: "square", from: 680, to: 440, dur: 0.6, peak: 0.12 });
-          noiseBurst(c, { dur: 0.5, peak: 0.15, type: "bandpass", from: 1200, to: 600, q: 2.0 });
         }
       });
     },

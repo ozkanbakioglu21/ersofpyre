@@ -19,7 +19,7 @@ import type {
 
 export type ChapterId = "c01" | "c02" | "c03" | "c04" | "c05" | "c06" | "c07" | "sandbox";
 
-export type Ability = "flame" | "fireball" | "roll" | "shock" | "rage" | "steepDive";
+export type Ability = "flame" | "fireball" | "roll" | "shock" | "rage";
 
 export type ScatterSpec = Partial<Record<TargetKind, number>>;
 

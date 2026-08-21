@@ -61,7 +61,6 @@ export function emptyFrame(): HudFrame {
     fireballCd: 0,
     shockCd: 0,
     rollCd: 0,
-    steepDiveCd: 0,
     pitch: 0,
     braking: 0,
     markers: emptyMarkers(),

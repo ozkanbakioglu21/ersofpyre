@@ -407,7 +407,6 @@ const KEYS: [string, string][] = [
   ["R", "Takla — 0.4 sn dokunulmazlık"],
   ["C", "Kanat şoku"],
   ["G", "Ejderha Öfkesi (bar doluyken)"],
-  ["V", "Dik iniş — burnu zorla aşağı, hızlı irtifa kaybı"],
   ["Esc", "Duraklat"],
 ];
 
@@ -422,7 +421,6 @@ const TOUCH: [string, string][] = [
   ["Takla", "Çubuk hangi yandaysa o yana kaçınma"],
   ["Şok", "Kanat şoku"],
   ["Öfke", "Bar dolunca belirir"],
-  ["Dik İniş", "Burnu zorla aşağı, hızlı irtifa kaybı"],
 ];
 
 export function ControlsOverlay({

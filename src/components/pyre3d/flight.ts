@@ -76,24 +76,6 @@ export const FLIGHT = {
   diveGain: 46,
   diveDecay: 0.75,
 
-  /* ---- dik iniş ---- */
-  steepDiveDuration: 2.0,
-  steepDiveSpeedBoost: 48,
-  steepDiveStaminaCost: 18,
-  steepDiveCooldown: 3,
-  /** Dik iniş hedef pitch açısı: 80° ≈ 1.396 radyan. */
-  steepDivePitch: 1.396,
-  /** Burnu aşağı itme hızı — yavaş, sinematik geçiş. */
-  steepDivePitchRate: 5,
-  /** Dalış sırasında ekstra dikey ivme (aşağı). */
-  steepDiveAltAccel: -150,
-  /** Korkscrew frekansı (rad/s) — yavaş, geniş sarmal. */
-  steepDiveSpiralRate: 2.0,
-  /** Korkscrew yaw genliği — geniş, elegant yol. */
-  steepDiveSpiralYaw: 0.55,
-  /** Dalışta otomatik bank açısı (rad) — zarif yatlama. */
-  steepDiveAutoBank: 0.5,
-
   /* ---- barrel roll (takla) ---- */
   rollDuration: 0.55,
   rollInvuln: 0.4,
@@ -121,10 +103,6 @@ export type FlightAxes = {
   altMomentum: number;
   /** Dalma ile biriken ekstra hız skoru (0..1). */
   diveAccum: number;
-  /** Dik iniş kalan süre (s). 0 = aktif değil. */
-  steepDiveT: number;
-  /** Korkscrew faz biriktiricisi. */
-  steepDivePhase: number;
   /** Kanat katlama durumu (0=açık, 0.4=katlı) — yumuşak geçiş. */
   wingFold: number;
   /** Ejderhanın yatay yön açısı (radyan). Yaw input'u bu açıya birikir. */
@@ -141,8 +119,6 @@ export function createFlightAxes(): FlightAxes {
     yawVel: 0,
     altMomentum: 0,
     diveAccum: 0,
-    steepDiveT: 0,
-    steepDivePhase: 0,
     wingFold: 0,
     heading: 0,
   };
@@ -184,19 +160,6 @@ export function tryRoll(g: Game, dir: -1 | 1): boolean {
   return true;
 }
 
-/** Dik iniş: burnu zorla aşağı iter, kısa süreli büyük hız ve irtifa kaybı. */
-export function trySteepDive(g: Game): boolean {
-  const s = g.state;
-  const a = g.flightAxes;
-  if (a.steepDiveT > 0 || s.steepDiveCd > 0 || s.stamina < FLIGHT.steepDiveStaminaCost) return false;
-  a.steepDiveT = FLIGHT.steepDiveDuration;
-  a.steepDivePhase = 0;
-  s.steepDiveCd = FLIGHT.steepDiveCooldown;
-  s.stamina -= FLIGHT.steepDiveStaminaCost;
-  g.audio.roll(); // mevcut sesi kullan — yaratılmadı henüz
-  return true;
-}
-
 /** Hedefe yumuşak yaklaşma (momentum damping). */
 function lerpDamp(
   current: number,
@@ -224,27 +187,11 @@ export function updateFlight(g: Game, dt: number): void {
   s.emberRush = Math.max(0, s.emberRush - dt);
   s.snared = Math.max(0, s.snared - dt);
   s.marked = Math.max(0, s.marked - dt);
-  s.steepDiveCd = Math.max(0, s.steepDiveCd - dt);
 
   /* ---- barrel roll (dodge) ---- */
   if (c.dodge !== 0) {
     tryRoll(g, c.dodge > 0 ? 1 : -1);
     c.dodge = 0;
-  }
-
-  /* ---- dik iniş timerı ---- */
-  if (a.steepDiveT > 0) {
-    a.steepDiveT = Math.max(0, a.steepDiveT - dt);
-  }
-
-  /* ---- dik iniş otomatik artistik (korkscrew + bank) ---- */
-  if (a.steepDiveT > 0) {
-    a.steepDivePhase += FLIGHT.steepDiveSpiralRate * dt;
-    // Korkscrew: otomatik yaw salınımı → sarmal dalış yolu
-    a.heading += Math.sin(a.steepDivePhase) * FLIGHT.steepDiveSpiralYaw * dt;
-    // Otomatik bank: gövde yatar → görsel dramatiklik
-    const autoBank = FLIGHT.steepDiveAutoBank * Math.cos(a.steepDivePhase * 0.7);
-    a.roll += (autoBank - a.roll) * Math.min(1, dt * 3);
   }
 
   /* ---- stamina ---- */
@@ -267,12 +214,6 @@ export function updateFlight(g: Game, dt: number): void {
     // Askıda kalırken burun düzleşiyor.
     a.pitch += (0 - a.pitch) * Math.min(1, dt * FLIGHT.pitchReturn);
     a.pitchVel = 0;
-  } else if (a.steepDiveT > 0) {
-    // Dik iniş: burnu zorla max aşağı eğ — pitch(Return)/trimRate'e dokunulmaz,
-    // oyuncu V'ye basınca burnun aniden kilitlenmesi hissedilir.
-    const before = a.pitch;
-    a.pitch += (-FLIGHT.steepDivePitch - a.pitch) * Math.min(1, dt * FLIGHT.steepDivePitchRate);
-    a.pitchVel = (a.pitch - before) / Math.max(dt, 1e-4);
   } else {
     const before = a.pitch;
     if (Math.abs(c.pitch) > 0.05) {
@@ -329,8 +270,7 @@ export function updateFlight(g: Game, dt: number): void {
 
   /* ---- hız hesapla ---- */
   const diveBoost = a.diveAccum * FLIGHT.diveGain;
-  const steepBoost = a.steepDiveT > 0 ? FLIGHT.steepDiveSpeedBoost * Math.min(1, a.steepDiveT / 0.25) : 0;
-  const targetSpeed = braking ? 0 : c.boost ? FLIGHT.boostSpeed : FLIGHT.baseSpeed + diveBoost + steepBoost;
+  const targetSpeed = braking ? 0 : c.boost ? FLIGHT.boostSpeed : FLIGHT.baseSpeed + diveBoost;
   s.speed +=
     (targetSpeed - s.speed) * Math.min(1, dt * (braking ? FLIGHT.brakeLerp : FLIGHT.speedLerp));
 
@@ -384,12 +324,9 @@ export function updateFlight(g: Game, dt: number): void {
       ? c.pitch * FLIGHT.altSpeed * 0.55
       : a.pitch * FLIGHT.altSpeed + c.throttle * FLIGHT.altSpeed * 0.15;
 
-  // Dik iniş: ekstra dikey ivme ekle (yere doğru çekim).
-  const steepAltBoost = a.steepDiveT > 0 ? FLIGHT.steepDiveAltAccel * Math.min(1, a.steepDiveT / 0.3) : 0;
-
   // Hover'da irtifa momentumu daha yumuşak.
   const altLerp = hover ? 2.5 : 6.5;
-  a.altMomentum += (altInput + steepAltBoost - a.altMomentum) * Math.min(1, dt * altLerp);
+  a.altMomentum += (altInput - a.altMomentum) * Math.min(1, dt * altLerp);
 
   const groundY = terrainHeight(d.root.position.x, d.root.position.z);
   const minY = groundY + FLIGHT.minClearance;
@@ -436,13 +373,12 @@ export function updateFlight(g: Game, dt: number): void {
   d.body.rotation.z += (bank - d.body.rotation.z) * lerpK;
 
   // Beden pitch eğimi — alçalırken tüm gövde aşağı doğru eğilir, yükselirken yukarı
-  const bodyPitch = -a.pitch * (a.steepDiveT > 0 ? 1.0 : 0.45);
+  const bodyPitch = -a.pitch * 0.45;
   d.body.rotation.x += (bodyPitch - d.body.rotation.x) * Math.min(1, dt * 5);
 
   // Kanat çırpma — kanat ucu gecikmesiyle; dik inişte kanatlar yavaşça katlanır
   s.flap += dt * (braking ? FLIGHT.brakeFlapRate : 2.2 + s.speed * 0.03);
-  const wingFoldTarget = a.steepDiveT > 0 ? 0.4 : 0;
-  a.wingFold += (wingFoldTarget - a.wingFold) * Math.min(1, dt * 3);
+  a.wingFold += (0 - a.wingFold) * Math.min(1, dt * 3);
   const flapAmt = Math.sin(s.flap) * (braking ? 0.9 : c.throttle ? 0.75 : 0.5);
   const flapSpeed = braking ? FLIGHT.brakeFlapRate : 2.2 + s.speed * 0.03;
   const tipLag = 0.35; // kanat ucu eklem gecikmesi (radyan)
@@ -507,15 +443,13 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
   // Kamera geri mesafesi: dalarken yakınlaşır, pitch yukarı çıktıkça uzar.
   const pitchBackOffset = Math.max(0, a.pitch) * 6;
   const diveClose = dive * 6;
-  const steepClose = a.steepDiveT > 0 ? 12 : 0;
-  const back = (playing ? 34 + s.speed * 0.16 : 40) + (s.rageT > 0 ? 8 : 0) + pitchBackOffset - diveClose - steepClose;
+  const back = (playing ? 34 + s.speed * 0.16 : 40) + (s.rageT > 0 ? 8 : 0) + pitchBackOffset - diveClose;
 
   // Kamera yüksekliği: pitch yukarı çıkınca biraz yukarı, dalarken biraz alçalır.
   const pitchHeightOffset = a.pitch * 8;
   const diveHeightDrop = dive * 5;
-  const steepDrop = a.steepDiveT > 0 ? 6 : 0;
 
-  camOff.set(0, 14 + pitchHeightOffset - diveHeightDrop - steepDrop, -back).applyAxisAngle(UP, ry);
+  camOff.set(0, 14 + pitchHeightOffset - diveHeightDrop, -back).applyAxisAngle(UP, ry);
   camGoal.copy(camOff).add(g.dragon.root.position);
   camPos.copy(g.camera.position).lerp(camGoal, Math.min(1, dt * 9));
 
@@ -534,25 +468,6 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
     camPos.y += (Math.random() - 0.5) * dAmp * 0.5;
   }
 
-  // Dik iniş: hareketli sinematik kamera
-  if (a.steepDiveT > 0) {
-    const progress = 1 - a.steepDiveT / FLIGHT.steepDiveDuration; // 0→1
-    const mid = Math.sin(progress * Math.PI); // 0→1→0 parabola
-
-    // Dinamik yan ofset: roll ile TERS yönde kay → dramatik kamera açısı
-    const sideShift = -a.roll * 8;
-    camPos.x += Math.cos(ry) * sideShift;
-    camPos.z -= Math.sin(ry) * sideShift;
-
-    // Dinamik yükseklik: ortada daha alçak (swooping hissi)
-    camPos.y -= mid * 6;
-
-    // Hafif sarsıntı
-    const shakeAmt = 0.6 * mid;
-    camPos.x += (Math.random() - 0.5) * shakeAmt;
-    camPos.y += (Math.random() - 0.5) * shakeAmt * 0.4;
-  }
-
   camPos.y = Math.max(terrainHeight(camPos.x, camPos.z) + 8, camPos.y);
   g.camera.position.copy(camPos);
 
@@ -565,18 +480,10 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
   tmpVec.set(a.yaw * 8, 0, 0).applyAxisAngle(UP, ry);
   lookGoal.add(tmpVec);
 
-  // Dik iniş: look-at aşağı ve ileri kaydır → dramatik bakış açısı
-  if (a.steepDiveT > 0) {
-    const mid = Math.sin((1 - a.steepDiveT / FLIGHT.steepDiveDuration) * Math.PI);
-    lookGoal.y -= mid * 5;
-  }
-
   g.camera.lookAt(lookGoal);
 
   // FOV: dalarken genişler (hız hissi), NORMAL'e dönüş yumuşak
-  const steepFov = a.steepDiveT > 0 ? 8 * Math.min(1, a.steepDiveT / 0.2) : 0;
-  const spiralPulse = a.steepDiveT > 0 ? Math.sin(a.steepDivePhase * 2) * 2 : 0;
-  const targetFov = BASE_FOV + dive * 10 + Math.max(0, a.pitch) * -3 + steepFov + spiralPulse;
+  const targetFov = BASE_FOV + dive * 10 + Math.max(0, a.pitch) * -3;
   g.camera.fov += (targetFov - g.camera.fov) * Math.min(1, dt * 4);
   g.camera.updateProjectionMatrix();
 }
