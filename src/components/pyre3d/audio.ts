@@ -1,5 +1,5 @@
 /**
- * Hibrit ses motoru — gerçek CC0 ses dosyaları (WAV/OGG) + prosedürel yedek.
+ * Tamamen prosedürel ses motoru — tüm efektler osilatör ve gürültü ile üretilir.
  * AudioContext ilk kullanıcı jestine kadar kurulmuyor.
  */
 
@@ -103,118 +103,6 @@ function makeNoise(ac: AudioContext): AudioBuffer {
   return buf;
 }
 
-/* ───── sample bazlı ses dosyası sistemi ───── */
-const SFX_BASE = "/sfx/";
-
-/** Her ses kategorisi için birden fazla dosya — rastgele seçim */
-const SFX_MANIFEST: Record<string, string[]> = {
-  explosion: [
-    "explosion_01.ogg", "explosion_02.ogg", "explosion_03.ogg",
-    "explosion_04.ogg", "explosion_05.ogg", "explosion_06.ogg",
-    "explosion_07.ogg", "dynamite.wav",
-    "blast_01.ogg", "blast_02.ogg", "blast_03.ogg", "blast_04.ogg",
-  ],
-  bigExplosion: [
-    "big_explosion.wav", "big_boom.wav", "dynamite.wav",
-    "explosion_04.ogg", "explosion_05.ogg", "explosion_06.ogg", "explosion_07.ogg",
-    "blast_01.ogg", "blast_03.ogg",
-  ],
-  bigBoom: [
-    "big_boom.wav", "big_explosion.wav",
-  ],
-  dynamite: [
-    "dynamite.wav", "blast_01.ogg", "blast_02.ogg",
-  ],
-  mechExplosion: [
-    "mech_explosion.wav",
-    "metal_hit_01.ogg", "metal_hit_02.ogg", "metal_hit_03.ogg",
-  ],
-  distantBoom: ["distant_boom.wav"],
-  glassBreak: [
-    "glass_break_01.ogg", "glass_break_02.ogg", "glass_break_03.ogg",
-    "glass_break_04.wav",
-  ],
-  metalHit: ["metal_hit_01.ogg", "metal_hit_02.ogg", "metal_hit_03.ogg"],
-  crack: ["crack_01.ogg", "crack_02.ogg"],
-  gunshot: [
-    "gunshot_01.ogg", "gunshot_02.ogg", "gunshot_03.ogg",
-    "crack_01.ogg", "crack_02.ogg",
-  ],
-  laser: [
-    "laser_01.wav", "laser_02.wav", "laser_03.wav",
-    "laser_rifle.ogg",
-  ],
-  rocket: ["rocket_01.wav"],
-  fireWhoosh: [
-    "fire_whoosh.wav", "flame_burst_01.ogg", "flame_burst_02.ogg",
-  ],
-  flameLoop: ["flame_loop.ogg"],
-  screamMale: [
-    "scream_male_01.flac", "scream_male_02.flac", "scream_male_03.flac",
-    "scream_male_04.flac", "scream_male_05.flac", "scream_male_06.flac",
-    "scream_male_07.flac", "scream_male_08.flac", "scream_male_09.flac",
-    "scream_male_10.flac", "scream_male_11.flac", "scream_male_12.flac",
-    "scream_male_13.flac", "scream_male_14.flac", "scream_male_15.flac",
-  ],
-  screamFemale: [
-    "scream_female_01.ogg", "scream_female_02.ogg",
-  ],
-  screamHigh: [
-    "scream_high_01.mp3", "scream_high_02.mp3",
-  ],
-  crowdScream: ["crowd_shout.ogg"],
-  dragonRoar: [
-    "dragon_roar_deep.wav", "dragon_roar_wild.wav", "dragon_roar_echo.wav",
-  ],
-  dragonGrowl: [
-    "dragon_growl_angry.wav", "creature_growl_01.wav",
-  ],
-  dragonSnarl: [
-    "creature_roar_01.wav", "dragon_growl_angry.wav", "creature_roar_02.wav",
-  ],
-  dragonBellow: [
-    "dragon_roar_deep.wav", "dragon_roar_echo.wav", "dragon_roar_wild.wav",
-  ],
-  dragonWingFlap: [
-    "dragon_flap.wav", "dragon_flap.mp3",
-  ],
-  dragonScreech: [
-    "dragon_roar_wild.wav", "dragon_roar_echo.wav",
-  ],
-  creatureAttack: [
-    "creature_attack_01.wav", "creature_attack_02.wav", "beast_growl_01.mp3",
-  ],
-  creatureDeath: [
-    "creature_death_01.wav", "creature_death_02.wav", "beast_growl_02.mp3",
-  ],
-  creatureAmbient: [
-    "creature_growl_01.wav", "creature_growl_02.wav", "creature_idle_01.wav",
-    "beast_growl_03.mp3", "beast_growl_04.mp3",
-  ],
-  creatureScream: [
-    "creature_scream_01.wav", "creature_scream_02.wav", "creature_scream_03.wav",
-    "creature_deep_roar.wav",
-  ],
-  diveScream: [
-    "dive_scream_01.ogg", "dive_scream_02.ogg", "dive_roar_01.ogg", "dive_roar_02.ogg",
-    "dive_roar_03.ogg", "dive_howl.ogg", "dive_monster_01.ogg", "dive_monster_02.ogg",
-    "dive_monster_06.ogg", "dive_troll_01.ogg", "dive_troll_02.ogg",
-  ],
-  dragonScream: [
-    "dragon_scream_01.ogg", "dragon_scream_02.ogg", "dragon_scream_03.ogg",
-    "dragon_scream_04.ogg", "dragon_scream_05.ogg", "dragon_scream_06.ogg",
-    "dragon_scream_07.ogg", "dragon_scream_08.ogg", "dragon_scream_09.ogg",
-    "dragon_scream_10.ogg", "dragon_scream_11.ogg", "dragon_scream_12.ogg",
-  ],
-  diveWindReal: [
-    "dive_wind_real.wav",
-  ],
-};
-
-function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)] as T;
-}
-
 export function createAudio(initial: { muted: boolean; volume: number }): AudioEngine {
   if (typeof window === "undefined") return NOOP;
   const AC: typeof AudioContext | undefined =
@@ -233,96 +121,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   const MAX_VOICES = 72;
   let lastExplosion = 0;
 
-  /* ── sample buffer önbellek ── */
-  const sfxCache = new Map<string, AudioBuffer>();
-  const sfxFailed = new Set<string>();
-  let sfxLoaded = 0;
-  const SFX_WARMUP = 12;
-  let sfxLoading = false;
-
-  /** Dosyayı indirip decode eder; hata olursa null döner. */
-  const loadSample = async (file: string): Promise<AudioBuffer | null> => {
-    const cached = sfxCache.get(file);
-    if (cached) return cached;
-    if (sfxFailed.has(file)) return null;
-    try {
-      const url = SFX_BASE + file;
-      const res = await fetch(url);
-      if (!res.ok) { sfxFailed.add(file); return null; }
-      const ab = await res.arrayBuffer();
-      const c = ctx;
-      if (!c) return null;
-      const buf = await c.ac.decodeAudioData(ab);
-      sfxCache.set(file, buf);
-      sfxLoaded++;
-      return buf;
-    } catch {
-      sfxFailed.add(file);
-      return null;
-    }
-  };
-
-  /** Kategorideki dosyalardan rastgele birini yükler (eş zamanlı). */
-  const preloadCategory = (cat: string) => {
-    const files = SFX_MANIFEST[cat];
-    if (!files) return;
-    for (const f of files) void loadSample(f);
-  };
-
-  /** Tüm ses dosyalarını arka planda yükle. */
-  const preloadAll = () => {
-    if (sfxLoading) return;
-    sfxLoading = true;
-    for (const cat of Object.keys(SFX_MANIFEST)) preloadCategory(cat);
-  };
-
-  /** Rastgele bir sample oynat; deterministik parameterentering ile. */
-  const playSample = (
-    c: Ctx,
-    cat: string,
-    opts?: { pitch?: number; vol?: number; delay?: number },
-  ) => {
-    const files = SFX_MANIFEST[cat];
-    if (!files) return;
-    const file = pickRandom(files);
-    const buf = sfxCache.get(file);
-    if (voices > MAX_VOICES) return;
-
-    const t = c.ac.currentTime + (opts?.delay ?? 0);
-    const vol = opts?.vol ?? 1;
-
-    if (buf) {
-      const src = c.ac.createBufferSource();
-      src.buffer = buf;
-      src.playbackRate.value = opts?.pitch ?? (0.9 + Math.random() * 0.2);
-      const gain = c.ac.createGain();
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.linearRampToValueAtTime(vol, t + 0.005);
-      const endFade = Math.max(t + 0.006, t + buf.duration - 0.05);
-      gain.gain.setValueAtTime(vol, endFade);
-      gain.gain.linearRampToValueAtTime(0, t + buf.duration);
-      src.connect(gain).connect(c.master);
-      src.start(t);
-      track(src, t + buf.duration + 0.02);
-    } else if (sfxLoaded < SFX_WARMUP) {
-      // Preload sırasında prosedürel yedek — sessiz kalmak yerine kısa brown-noise patlaması
-      const dur = 0.08 + Math.random() * 0.15;
-      const src = c.ac.createBufferSource();
-      src.buffer = c.noise;
-      const filt = c.ac.createBiquadFilter();
-      filt.type = cat.includes("explosion") || cat.includes("Explosion") || cat.includes("Boom") ? "lowpass" : "bandpass";
-      filt.frequency.value = cat.includes("metal") || cat.includes("crack") ? 3200 : 600;
-      filt.Q.value = 1;
-      const gain = c.ac.createGain();
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.linearRampToValueAtTime(vol * 0.5, t + 0.005);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      src.connect(filt).connect(gain).connect(c.master);
-      src.start(t);
-      track(src, t + dur + 0.02);
-    }
-  };
-
   let flameNodes: {
     src: AudioBufferSourceNode;
     gain: GainNode;
@@ -336,8 +134,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     band2: BiquadFilterNode;
     ws: WaveShaperNode;
     low: BiquadFilterNode;
-    loopSrc: AudioBufferSourceNode | null;
-    loopGain: GainNode | null;
   } | null = null;
   let ambientNodes: { src: AudioBufferSourceNode; gain: GainNode; lfo: OscillatorNode; low: BiquadFilterNode } | null = null;
   let sirenNodes: { osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null = null;
@@ -346,7 +142,12 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   let sirenWanted = false;
   let musicWanted = false;
   let diveWindNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
-  let diveScreamNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  let diveScreamNodes: {
+    osc: OscillatorNode;
+    osc2: OscillatorNode;
+    nsrc: AudioBufferSourceNode;
+    gain: GainNode;
+  } | null = null;
   let diveScreamLastStart = 0;
   let onVis: (() => void) | null = null;
   let musicNodes: {
@@ -557,32 +358,9 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     sub.start(t);
     subLfo.start(t);
 
-    // ── flame_loop sample katmanı — sürekli yanan ateş sesi ──
-    let loopSrc: AudioBufferSourceNode | null = null;
-    let loopGain: GainNode | null = null;
-    const flameBuf = sfxCache.get("flame_loop.ogg");
-    if (flameBuf) {
-      const lSrc = c.ac.createBufferSource();
-      lSrc.buffer = flameBuf;
-      lSrc.loop = true;
-      const lGain = c.ac.createGain();
-      lGain.gain.setValueAtTime(0.0001, t);
-      lGain.gain.exponentialRampToValueAtTime(0.3, t + 0.15);
-      const lBand = c.ac.createBiquadFilter();
-      lBand.type = "bandpass";
-      lBand.frequency.value = 520;
-      lBand.Q.value = 0.8;
-      lSrc.connect(lBand).connect(lGain).connect(c.master);
-      lSrc.start(t);
-      loopSrc = lSrc;
-      loopGain = lGain;
-    }
-
     flameNodes = {
       src, gain, lfo, lfo2, lfo3, sub, subGain, subLfo,
       band, band2, ws, low,
-      loopSrc,
-      loopGain,
     };
   };
 
@@ -598,11 +376,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     n.subGain.gain.cancelScheduledValues(t);
     n.subGain.gain.setValueAtTime(Math.max(0.0001, n.subGain.gain.value), t);
     n.subGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
-    if (n.loopGain) {
-      n.loopGain.gain.cancelScheduledValues(t);
-      n.loopGain.gain.setValueAtTime(Math.max(0.0001, n.loopGain.gain.value), t);
-      n.loopGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
-    }
     // Tüm oscillator'ları durdur
     n.src.stop(t + 0.18);
     n.lfo.stop(t + 0.18);
@@ -610,7 +383,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     n.lfo3.stop(t + 0.18);
     n.sub.stop(t + 0.18);
     n.subLfo.stop(t + 0.18);
-    if (n.loopSrc) n.loopSrc.stop(t + 0.25);
     // Tüm node'ları disconnect et
     n.src.onended = () => {
       try {
@@ -618,8 +390,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         n.lfo.disconnect(); n.lfo2.disconnect(); n.lfo3.disconnect();
         n.sub.disconnect(); n.subGain.disconnect(); n.subLfo.disconnect();
         n.band.disconnect(); n.band2.disconnect(); n.ws.disconnect(); n.low.disconnect();
-        if (n.loopSrc) n.loopSrc.disconnect();
-        if (n.loopGain) n.loopGain.disconnect();
       } catch {}
     };
   };
@@ -911,7 +681,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (ambientWanted) startAmbient(c);
       if (sirenWanted) startSiren(c);
       if (musicWanted) startMusic(c);
-      preloadAll();
     },
     setMuted(m) {
       muted = m;
@@ -972,130 +741,55 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         if (now - lastExplosion < 0.07) return;
         lastExplosion = now;
         const s = Math.min(2, Math.max(0.5, size));
-        // Büyük patlamalar için güçlü ses
-        if (s >= 1.2) {
-          playSample(c, "bigExplosion", { pitch: 0.75 + Math.random() * 0.3, vol: 0.8 * s });
-        } else {
-          playSample(c, "explosion", { pitch: 0.8 + Math.random() * 0.4, vol: 0.7 * s });
-        }
-        // Metal/mekanik patlama katmanı (orta-büyük)
-        if (s >= 0.8) {
-          playSample(c, "mechExplosion", {
-            pitch: 0.7 + Math.random() * 0.4,
-            vol: 0.45 * s,
-            delay: 0.015,
-          });
-        }
-        // Prosedürel katman
         noiseBurst(c, {
-          dur: 0.42 * s,
-          peak: 0.34 * s,
+          dur: 0.45 * s,
+          peak: 0.38 * s,
           type: "lowpass",
           from: 1800,
           to: 90,
           q: 0.8,
         });
-        tone(c, { type: "sine", from: 130 * s, to: 26, dur: 0.5 * s, peak: 0.36 });
+        tone(c, { type: "sine", from: 130 * s, to: 26, dur: 0.55 * s, peak: 0.4 });
         noiseBurst(c, {
           dur: 0.1,
-          peak: 0.3 * s,
+          peak: 0.26 * s,
           type: "highpass",
           from: 4200,
           to: 2000,
           q: 2.5,
         });
-        // Metal gıcırtısı
-        playSample(c, "metalHit", { pitch: 0.7 + Math.random() * 0.6, vol: 0.3, delay: 0.04 });
       });
     },
     fireball() {
       withCtx((c) => {
-        // Alev fırlatma — whoosh + rocket
-        playSample(c, "fireWhoosh", { pitch: 0.9 + Math.random() * 0.2, vol: 0.5 });
-        playSample(c, "rocket", { pitch: 0.85 + Math.random() * 0.3, vol: 0.35, delay: 0.02 });
-        noiseBurst(c, { dur: 0.18, peak: 0.18, type: "bandpass", from: 1100, to: 320, q: 1.6 });
-        tone(c, { type: "sawtooth", from: 380, to: 120, dur: 0.16, peak: 0.12 });
+        noiseBurst(c, { dur: 0.35, peak: 0.22, type: "bandpass", from: 1400, to: 300, q: 1.4 });
+        tone(c, { type: "sawtooth", from: 380, to: 120, dur: 0.3, peak: 0.14 });
+        tone(c, { type: "sine", from: 90, to: 40, dur: 0.25, peak: 0.16, delay: 0.02 });
       });
     },
     bombHit() {
       withCtx((c) => {
-        const compGain = c.ac.createGain();
-        compGain.gain.value = 1.0;
-        compGain.connect(c.master);
-
-        const p = (cat: string, v: number, pt: number, d: number) => {
-          const files = SFX_MANIFEST[cat];
-          if (!files) return;
-          const buf = sfxCache.get(pickRandom(files));
-          if (voices > MAX_VOICES) return;
-          const st = c.ac.currentTime + d;
-          if (buf) {
-            const src = c.ac.createBufferSource();
-            src.buffer = buf;
-            src.playbackRate.value = pt;
-            const g = c.ac.createGain();
-            g.gain.setValueAtTime(0.0001, st);
-            g.gain.linearRampToValueAtTime(v, st + 0.005);
-            const ef = Math.max(st + 0.006, st + buf.duration - 0.04);
-            g.gain.setValueAtTime(v, ef);
-            g.gain.linearRampToValueAtTime(0, st + buf.duration);
-            src.connect(g).connect(compGain);
-            src.start(st);
-            track(src, st + buf.duration + 0.02);
-          } else if (sfxLoaded < SFX_WARMUP) {
-            const dur = 0.1 + Math.random() * 0.2;
-            const src = c.ac.createBufferSource();
-            src.buffer = c.noise;
-            const filt = c.ac.createBiquadFilter();
-            filt.type = "lowpass";
-            filt.frequency.value = 400;
-            const g = c.ac.createGain();
-            g.gain.setValueAtTime(0.0001, st);
-            g.gain.linearRampToValueAtTime(v * 0.4, st + 0.005);
-            g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
-            src.connect(filt).connect(g).connect(compGain);
-            src.start(st);
-            track(src, st + dur + 0.02);
-          }
-        };
-
-        // ▌1 — Ana patlama (tek, güçlü)
-        p("bigExplosion", 1.0, 0.55 + Math.random() * 0.15, 0);
-        // ▌2 — Derin boom
-        p("bigBoom", 0.9, 0.48 + Math.random() * 0.15, 0.02);
-        // ▌3 — Alev + dinamit
-        p("fireWhoosh", 0.8, 0.55 + Math.random() * 0.2, 0);
-        p("dynamite", 0.6, 0.7 + Math.random() * 0.2, 0.01);
-        // ▌4 — Sub-bass yer sarsıntısı
         tone(c, { type: "sine", from: 65, to: 12, dur: 1.0, peak: 0.55 });
-        noiseBurst(c, { dur: 0.9, peak: 0.5, type: "lowpass", from: 350, to: 30, q: 0.4 });
-        // ▌5 — Cam + metal kırığı
-        p("glassBreak", 0.7, 0.6 + Math.random() * 0.35, 0.02);
-        p("metalHit", 0.5, 0.65 + Math.random() * 0.25, 0.04);
-        // ▌6 — Uzak yankı
-        p("distantBoom", 0.5, 0.48 + Math.random() * 0.12, 0.35 + Math.random() * 0.2);
-
-        setTimeout(() => { try { compGain.disconnect(); } catch {} }, 2500);
+        tone(c, { type: "sine", from: 110, to: 30, dur: 0.6, peak: 0.3, delay: 0.01 });
+        noiseBurst(c, { dur: 1.1, peak: 0.5, type: "lowpass", from: 900, to: 40, q: 0.5 });
+        noiseBurst(c, { dur: 0.5, peak: 0.24, type: "highpass", from: 3500, to: 900, q: 1.8, delay: 0.03 });
+        noiseBurst(c, { dur: 0.9, peak: 0.18, type: "lowpass", from: 400, to: 60, q: 0.6, delay: 0.35 });
       });
     },
     hit() {
       withCtx((c) => {
-        // Gerçek çarpm sesi
-        playSample(c, "metalHit", { pitch: 0.8 + Math.random() * 0.4, vol: 0.6 });
-        playSample(c, "crack", { pitch: 0.9 + Math.random() * 0.2, vol: 0.35, delay: 0.01 });
-        noiseBurst(c, { dur: 0.16, peak: 0.26, type: "lowpass", from: 1200, to: 160 });
+        noiseBurst(c, { dur: 0.12, peak: 0.28, type: "lowpass", from: 1600, to: 200 });
         tone(c, { type: "square", from: 190, to: 60, dur: 0.14, peak: 0.14 });
       });
     },
     enemyShot() {
       withCtx((c) => {
-        // Silah sesi — lazer veya tabanca
         if (Math.random() < 0.5) {
-          playSample(c, "laser", { pitch: 0.9 + Math.random() * 0.3, vol: 0.25 });
+          tone(c, { type: "sawtooth", from: 1100, to: 180, dur: 0.14, peak: 0.12 });
         } else {
-          playSample(c, "gunshot", { pitch: 0.8 + Math.random() * 0.4, vol: 0.3 });
+          tone(c, { type: "square", from: 520, to: 90, dur: 0.09, peak: 0.13 });
         }
-        tone(c, { type: "triangle", from: 880, to: 420, dur: 0.1, peak: 0.06 });
+        noiseBurst(c, { dur: 0.06, peak: 0.14, type: "highpass", from: 3000, to: 1500, q: 1.5 });
       });
     },
     roll() {
@@ -1131,147 +825,114 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     roar() {
       withCtx((c) => {
-        if (sfxLoaded >= SFX_WARMUP) {
-          playSample(c, "dragonRoar", { pitch: 0.8 + Math.random() * 0.4, vol: 0.6 });
-          playSample(c, "dragonRoar", { pitch: 0.7 + Math.random() * 0.3, vol: 0.25, delay: 0.08 });
-        } else {
-          tone(c, { type: "sawtooth", from: 150, to: 55, dur: 1.3, peak: 0.32 });
-          noiseBurst(c, { dur: 1.4, peak: 0.24, type: "bandpass", from: 420, to: 160, q: 1.6 });
-        }
+        tone(c, { type: "sawtooth", from: 150, to: 55, dur: 1.3, peak: 0.32 });
+        noiseBurst(c, { dur: 1.4, peak: 0.24, type: "bandpass", from: 420, to: 160, q: 1.6 });
+        tone(c, { type: "sine", from: 70, to: 32, dur: 1.1, peak: 0.18 });
       });
     },
     growl() {
       withCtx((c) => {
-        if (sfxLoaded >= SFX_WARMUP) {
-          playSample(c, "dragonGrowl", { pitch: 0.7 + Math.random() * 0.4, vol: 0.45 });
-        } else {
-          tone(c, { type: "sawtooth", from: 40, to: 30, dur: 0.9, peak: 0.22 });
-          tone(c, { type: "triangle", from: 120, to: 80, dur: 0.7, peak: 0.1 });
-          noiseBurst(c, { dur: 0.6, peak: 0.12, type: "lowpass", from: 180, to: 60, q: 1.0 });
-        }
+        tone(c, { type: "sawtooth", from: 40, to: 30, dur: 0.9, peak: 0.22 });
+        tone(c, { type: "triangle", from: 120, to: 80, dur: 0.7, peak: 0.1 });
+        noiseBurst(c, { dur: 0.6, peak: 0.12, type: "lowpass", from: 180, to: 60, q: 1.0 });
       });
     },
     bellow() {
       withCtx((c) => {
-        if (sfxLoaded >= SFX_WARMUP) {
-          playSample(c, "dragonBellow", { pitch: 0.6 + Math.random() * 0.3, vol: 0.6 });
-          playSample(c, "dragonRoar", { pitch: 0.5, vol: 0.35, delay: 0.15 });
-          playSample(c, "dragonScreech", { pitch: 1.0, vol: 0.2, delay: 0.3 });
-        } else {
-          tone(c, { type: "sawtooth", from: 80, to: 200, dur: 0.3, peak: 0.35 });
-          tone(c, { type: "sawtooth", from: 200, to: 50, dur: 1.0, peak: 0.35, delay: 0.3 });
-          tone(c, { type: "square", from: 160, to: 45, dur: 1.2, peak: 0.18 });
-          noiseBurst(c, { dur: 1.4, peak: 0.25, type: "lowpass", from: 400, to: 80, q: 1.2 });
-          tone(c, { type: "sine", from: 35, to: 20, dur: 0.5, peak: 0.2 });
-        }
+        tone(c, { type: "sawtooth", from: 80, to: 200, dur: 0.3, peak: 0.35 });
+        tone(c, { type: "sawtooth", from: 200, to: 50, dur: 1.0, peak: 0.35, delay: 0.3 });
+        tone(c, { type: "square", from: 160, to: 45, dur: 1.2, peak: 0.18 });
+        noiseBurst(c, { dur: 1.4, peak: 0.25, type: "lowpass", from: 400, to: 80, q: 1.2 });
+        tone(c, { type: "sine", from: 35, to: 20, dur: 0.5, peak: 0.2 });
       });
     },
     snarl() {
       withCtx((c) => {
-        if (sfxLoaded >= SFX_WARMUP) {
-          playSample(c, "dragonSnarl", { pitch: 0.9 + Math.random() * 0.4, vol: 0.5 });
-        } else {
-          tone(c, { type: "sawtooth", from: 300, to: 180, dur: 0.35, peak: 0.26 });
-          noiseBurst(c, { dur: 0.2, peak: 0.18, type: "bandpass", from: 900, to: 500, q: 1.5 });
-          tone(c, { type: "sine", from: 80, to: 40, dur: 0.15, peak: 0.14 });
-        }
+        tone(c, { type: "sawtooth", from: 300, to: 180, dur: 0.35, peak: 0.26 });
+        noiseBurst(c, { dur: 0.2, peak: 0.18, type: "bandpass", from: 900, to: 500, q: 1.5 });
+        tone(c, { type: "sine", from: 80, to: 40, dur: 0.15, peak: 0.14 });
       });
     },
     wingFlap() {
       withCtx((c) => {
-        if (sfxLoaded >= SFX_WARMUP) {
-          playSample(c, "dragonWingFlap", { pitch: 0.85 + Math.random() * 0.3, vol: 0.5 });
-        } else {
-          noiseBurst(c, { dur: 0.18, peak: 0.16, type: "bandpass", from: 800, to: 200, q: 0.8 });
-          tone(c, { type: "sine", from: 60, to: 30, dur: 0.1, peak: 0.1 });
-        }
+        noiseBurst(c, { dur: 0.18, peak: 0.16, type: "bandpass", from: 800, to: 200, q: 0.8 });
+        tone(c, { type: "sine", from: 60, to: 30, dur: 0.1, peak: 0.1 });
       });
     },
     creatureAttack() {
       withCtx((c) => {
-        playSample(c, "creatureAttack", { pitch: 0.8 + Math.random() * 0.3, vol: 0.6 });
+        tone(c, { type: "sawtooth", from: 700, to: 220, dur: 0.22, peak: 0.3 });
+        noiseBurst(c, { dur: 0.3, peak: 0.22, type: "bandpass", from: 1200, to: 400, q: 1.4 });
       });
     },
     creatureDeath() {
       withCtx((c) => {
-        playSample(c, "creatureDeath", { pitch: 0.75 + Math.random() * 0.3, vol: 0.6 });
-        playSample(c, "creatureDeath", { pitch: 0.6 + Math.random() * 0.2, vol: 0.35, delay: 0.06 });
+        tone(c, { type: "sawtooth", from: 320, to: 45, dur: 1.4, peak: 0.3 });
+        noiseBurst(c, { dur: 1.2, peak: 0.18, type: "lowpass", from: 900, to: 100, q: 0.9 });
+        tone(c, { type: "sine", from: 90, to: 28, dur: 1.6, peak: 0.16, delay: 0.2 });
       });
     },
     creatureAmbient() {
       withCtx((c) => {
-        playSample(c, "creatureAmbient", { pitch: 0.7 + Math.random() * 0.4, vol: 0.4 });
+        tone(c, { type: "sawtooth", from: 65, to: 42, dur: 1.1, peak: 0.2 });
+        noiseBurst(c, { dur: 1.0, peak: 0.1, type: "lowpass", from: 240, to: 90, q: 1.1 });
       });
     },
     diveCreatureScream() {
       withCtx((c) => {
-        playSample(c, "dragonScream", { pitch: 0.6 + Math.random() * 0.15, vol: 1.0 });
-        playSample(c, "dragonScream", { pitch: 0.5 + Math.random() * 0.1, vol: 0.85, delay: 0.05 });
-        playSample(c, "dragonSnarl", { pitch: 0.65 + Math.random() * 0.15, vol: 0.9, delay: 0.03 });
+        const p = 0.85 + Math.random() * 0.3;
+        tone(c, { type: "sawtooth", from: 500 * p, to: 130 * p, dur: 1.2, peak: 0.4 });
+        tone(c, { type: "sawtooth", from: 340 * p, to: 95 * p, dur: 1.3, peak: 0.32, delay: 0.04 });
+        noiseBurst(c, { dur: 1.2, peak: 0.3, type: "bandpass", from: 1400 * p, to: 300, q: 1.2 });
+        tone(c, { type: "sine", from: 90, to: 30, dur: 1.4, peak: 0.22 });
       });
     },
     scream() {
       withCtx((c) => {
-        // Rastgele çığlık türü seç: erkek (%50), kadın (%25), tiz (%15), kalabalık (%10)
+        // Rastgele çığlık türü seç: derin (%50), orta (%25), tiz (%15), kalabalık (%10)
         const r = Math.random();
-        if (r < 0.50) {
-          playSample(c, "screamMale", { pitch: 0.8 + Math.random() * 0.4, vol: 0.55 });
-          // İkinci çığlık — hafif gecikme ile çoğaltma efekti
-          playSample(c, "screamMale", { pitch: 0.7 + Math.random() * 0.5, vol: 0.3, delay: 0.06 + Math.random() * 0.12 });
-        } else if (r < 0.75) {
-          playSample(c, "screamFemale", { pitch: 0.85 + Math.random() * 0.3, vol: 0.5 });
-          playSample(c, "screamFemale", { pitch: 0.75 + Math.random() * 0.4, vol: 0.25, delay: 0.08 });
-        } else if (r < 0.90) {
-          playSample(c, "screamHigh", { pitch: 0.9 + Math.random() * 0.2, vol: 0.45 });
-          playSample(c, "screamMale", { pitch: 0.9 + Math.random() * 0.3, vol: 0.25, delay: 0.05 });
-        } else {
-          playSample(c, "crowdScream", { pitch: 0.9 + Math.random() * 0.2, vol: 0.4 });
-          playSample(c, "crowdScream", { pitch: 0.8 + Math.random() * 0.3, vol: 0.2, delay: 0.1 });
-        }
+        const base = r < 0.5 ? 480 : r < 0.75 ? 640 : r < 0.9 ? 900 : 380;
+        tone(c, { type: "sawtooth", from: base, to: base * 1.6, dur: 0.5, peak: 0.18 });
+        tone(c, { type: "square", from: base * 1.34, to: base * 1.9, dur: 0.42, peak: 0.08, delay: 0.05 });
+        tone(c, {
+          type: "sawtooth",
+          from: base * 1.12,
+          to: base * 0.7,
+          dur: 0.6,
+          peak: 0.12,
+          delay: 0.08 + Math.random() * 0.1,
+        });
+        noiseBurst(c, { dur: 0.5, peak: 0.1, type: "bandpass", from: base * 2, to: base * 2.6, q: 1.2 });
       });
     },
     diveWind(intensity: number) {
       const c = ctx;
       if (!c || muted || c.ac.state !== "running") {
         // Sessiz/askıya alındıysa mevcut wind'i durdur
+        const t = c?.ac.currentTime ?? 0;
         if (diveWindNodes) {
-          diveWindNodes.gain.gain.cancelScheduledValues(c?.ac.currentTime ?? 0);
-          diveWindNodes.gain.gain.setTargetAtTime(0, c?.ac.currentTime ?? 0, 0.08);
+          diveWindNodes.gain.gain.cancelScheduledValues(t);
+          diveWindNodes.gain.gain.setTargetAtTime(0, t, 0.08);
         }
         return;
       }
       if (!diveWindNodes) {
-        const buf = sfxCache.get("dive_wind_real.wav");
         const src = c.ac.createBufferSource();
-        src.buffer = buf || c.noise;
+        src.buffer = c.noise;
         src.loop = true;
-        // Gerçek rüzgar samplesa bandpass ekle
-        if (buf) {
-          const bp = c.ac.createBiquadFilter();
-          bp.type = "bandpass";
-          bp.frequency.value = 600;
-          bp.Q.value = 0.4;
-          const gain = c.ac.createGain();
-          gain.gain.value = 0.0001;
-          src.connect(bp).connect(gain).connect(c.master);
-          src.start();
-          diveWindNodes = { src, gain };
-        } else {
-          // Fallback: noise-based
-          const hp = c.ac.createBiquadFilter();
-          hp.type = "highpass";
-          hp.frequency.value = 200;
-          hp.Q.value = 0.3;
-          const bp = c.ac.createBiquadFilter();
-          bp.type = "bandpass";
-          bp.frequency.value = 800;
-          bp.Q.value = 0.6;
-          const gain = c.ac.createGain();
-          gain.gain.value = 0.0001;
-          src.connect(hp).connect(bp).connect(gain).connect(c.master);
-          src.start();
-          diveWindNodes = { src, gain };
-        }
+        const hp = c.ac.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = 200;
+        hp.Q.value = 0.3;
+        const bp = c.ac.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 800;
+        bp.Q.value = 0.6;
+        const gain = c.ac.createGain();
+        gain.gain.value = 0.0001;
+        src.connect(hp).connect(bp).connect(gain).connect(c.master);
+        src.start();
+        diveWindNodes = { src, gain };
       }
       const now = c.ac.currentTime;
       diveWindNodes.gain.gain.cancelScheduledValues(now);
@@ -1280,40 +941,65 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     diveScream(intensity: number) {
       const c = ctx;
-      if (!c) return;
+      if (!c || muted || c.ac.state !== "running") return;
       const now = c.ac.currentTime;
-      // Yeni sample tetikleme — 0.9s cooldown, sadece 0.15+ intensity
+      // Yeni çığlık tetikleme — 0.9s cooldown, sadece 0.15+ intensity
       if (intensity > 0.15 && now - diveScreamLastStart > 0.9) {
         diveScreamLastStart = now;
-        // Önceki sample'ı durdur
+        // Önceki çığlığı yumuşakça kes
         if (diveScreamNodes) {
-          diveScreamNodes.gain.gain.cancelScheduledValues(now);
-          diveScreamNodes.gain.gain.setTargetAtTime(0, now, 0.15);
           const old = diveScreamNodes;
-          setTimeout(() => { try { old.src.stop(); old.gain.disconnect(); } catch {} }, 200);
+          old.gain.gain.cancelScheduledValues(now);
+          old.gain.gain.setTargetAtTime(0, now, 0.06);
+          try {
+            old.osc.stop(now + 0.2);
+            old.osc2.stop(now + 0.2);
+            old.nsrc.stop(now + 0.2);
+          } catch {}
+          diveScreamNodes = null;
         }
-        // Rastgele dragon sample seç
-        const files = SFX_MANIFEST["diveScream"] ?? [];
-        if (!files.length) return;
-        const file = files[Math.floor(Math.random() * files.length)]!;
-        const buf = sfxCache.get(file);
-        if (!buf) return;
-        const src = c.ac.createBufferSource();
-        src.buffer = buf;
-        // Pitch — dalış derinliğine göre biraz alçalt
-        src.playbackRate.value = 0.85 + intensity * 0.3;
+        const vol = Math.min((intensity - 0.15) * 0.75, 0.7);
+        const pitch = 0.8 + intensity * 0.6;
         const gain = c.ac.createGain();
-        gain.gain.value = 0.0001;
-        src.connect(gain).connect(c.master);
-        src.start(now);
-        src.onended = () => { if (diveScreamNodes?.src === src) diveScreamNodes = null; };
-        diveScreamNodes = { src, gain };
-      }
-      // Mevcut sample'ın gain'ini ayarla
-      if (diveScreamNodes) {
-        diveScreamNodes.gain.gain.cancelScheduledValues(now);
-        const target = intensity > 0.15 ? Math.min((intensity - 0.15) * 0.75, 0.7) : 0;
-        diveScreamNodes.gain.gain.setTargetAtTime(target, now, 0.1);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(vol, now + 0.08);
+        gain.gain.setValueAtTime(vol, now + 0.85);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.25);
+
+        const osc = c.ac.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(620 * pitch, now);
+        osc.frequency.exponentialRampToValueAtTime(190 * pitch, now + 1.15);
+
+        const osc2 = c.ac.createOscillator();
+        osc2.type = "sawtooth";
+        osc2.frequency.setValueAtTime(430 * pitch, now);
+        osc2.frequency.exponentialRampToValueAtTime(140 * pitch, now + 1.2);
+
+        const nsrc = c.ac.createBufferSource();
+        nsrc.buffer = c.noise;
+        nsrc.loop = true;
+        const bp = c.ac.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.setValueAtTime(1500 * pitch, now);
+        bp.frequency.exponentialRampToValueAtTime(400, now + 1.15);
+        bp.Q.value = 1.2;
+        const ngain = c.ac.createGain();
+        ngain.gain.value = 0.5;
+
+        osc.connect(gain);
+        osc2.connect(gain);
+        nsrc.connect(bp).connect(ngain).connect(gain);
+        gain.connect(c.master);
+
+        const end = now + 1.3;
+        osc.addEventListener("ended", () => {
+          try { gain.disconnect(); bp.disconnect(); ngain.disconnect(); } catch {}
+        });
+        track(osc, end);
+        track(osc2, end);
+        track(nsrc, end);
+        diveScreamNodes = { osc, osc2, nsrc, gain };
       }
     },
     ui() {
@@ -1359,7 +1045,11 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         const t = c.ac.currentTime;
         diveScreamNodes.gain.gain.cancelScheduledValues(t);
         diveScreamNodes.gain.gain.setTargetAtTime(0, t, 0.05);
-        diveScreamNodes.src.stop(t + 0.15);
+        try {
+          diveScreamNodes.osc.stop(t + 0.15);
+          diveScreamNodes.osc2.stop(t + 0.15);
+          diveScreamNodes.nsrc.stop(t + 0.15);
+        } catch {}
         diveScreamNodes = null;
       }
     },
@@ -1376,7 +1066,12 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         diveWindNodes = null;
       }
       if (diveScreamNodes) {
-        try { diveScreamNodes.src.stop(); diveScreamNodes.gain.disconnect(); } catch {}
+        try {
+          diveScreamNodes.osc.stop();
+          diveScreamNodes.osc2.stop();
+          diveScreamNodes.nsrc.stop();
+          diveScreamNodes.gain.disconnect();
+        } catch {}
         diveScreamNodes = null;
       }
       ctx = null;
