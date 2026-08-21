@@ -36,6 +36,8 @@ export type MissionRuntime = {
   update(dt: number): void;
   skipLine(): void;
   fail(): void;
+  /** Görevi anında kazanılmış sayar (hata ayıklama / test). */
+  forceWin(): void;
 };
 
 type Slot = {
@@ -145,6 +147,12 @@ export function createMission(def: ChapterDef, hooks: MissionHooks): MissionRunt
       if (rt.status !== "playing") return;
       rt.status = "lost";
       hooks.onEnd("lost");
+    },
+
+    forceWin() {
+      if (rt.status !== "playing") return;
+      rt.status = "won";
+      hooks.onEnd("won");
     },
 
     update(dt) {

@@ -175,12 +175,17 @@ export type GameHandle = { cmd(c: GameCommand): void; dispose(): void };
 const FOG_SCALE = 0.8;
 const SUN_OFFSET = new THREE.Vector3(-180, 110, -140);
 const FWD = new THREE.Vector3(0, 0, 1);
+const UP_Y = new THREE.Vector3(0, 1, 0);
+/** Zafer sinematiği süresi (sn) — ejderha şaha kalkıp kükrer. */
+const CINE_DUR = 5;
 
 type Gate = { pos: THREE.Vector3; radius: number; passed: boolean; group: THREE.Group };
 type Zone = { id: string; pos: THREE.Vector3; r: number; entered: boolean };
 
 export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> {
   const { mount, renderer, chapter, ctrl, settings, bridge, audio } = o;
+  // Görevde kullanılan örnek sesler brifing ekranı görünürken çözülsün.
+  audio.preload(1);
   let cancelled = false;
   let raf = 0;
   const cleanups: Array<() => void> = [];
@@ -651,9 +656,34 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       audio.flame(false);
       audio.siren(false);
       audio.music(false);
-      if (outcome === "won") audio.win();
-      else audio.lose();
-      o.onResult(result());
+      audio.battleLoop(0, 0);
+      // Uçuştaki köz mermilerinin ıslığı sonuç ekranına taşmasın.
+      for (const b of fireballs.balls) {
+        b.sndStop?.();
+        b.sndStop = null;
+      }
+      if (outcome === "won") {
+        // Zafer sinematiği: 5 sn boyunca kamera ejderhaya döner, Pyra şaha
+        // kalkıp kükrer; sonuç ekranı sinematik bitince açılır.
+        pendingResult = result();
+        cinematicT = CINE_DUR;
+        cineRoared = false;
+        ctrl.current.fire = false;
+        ctrl.current.fireball = false;
+        ctrl.current.shock = false;
+        ctrl.current.rage = false;
+        ctrl.current.dodge = 0;
+        ctrl.current.brake = false;
+        ctrl.current.hover = false;
+        ctrl.current.throttle = 0;
+        ctrl.current.yaw = 0;
+        ctrl.current.pitch = 0;
+        ctrl.current.roll = 0;
+        ctrl.current.boost = false;
+      } else {
+        audio.lose();
+        o.onResult(result());
+      }
     },
     onLine: () => {},
   });
@@ -734,7 +764,13 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   let growlT = 0;
   let monsterT = 0;
   let prevFlapSin = 0;
-  let prevDive = 0;
+  /** Dalış çığlığı histerezisi: 0.05 altına inince yeniden kurulur. */
+  let diveArmed = true;
+  let intensityT = 0;
+  /** Zafer sinematiği geri sayımı ve kükreme bayrağı. */
+  let cinematicT = 0;
+  let cineRoared = false;
+  let pendingResult: MissionResult | null = null;
   let bestTime = o.save.chapters[chapter.id]?.bestTime ?? 0;
   let lastPush: HudSnapshot | null = null;
 
@@ -916,11 +952,15 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       if (prevFlapSin < 0 && curFlapSin >= 0) audio.wingFlap();
       prevFlapSin = curFlapSin;
       audio.diveWind(g.dive);
-      audio.diveScream(g.dive);
       fx.windStreak(dragon.root.position, g.flightAxes.heading, g.dive);
-      // Her dalışta yaratık çığlığı
-      if (prevDive < 0.1 && g.dive >= 0.1) audio.diveCreatureScream();
-      prevDive = g.dive;
+      // Her dalış girişinde TEK korkunç ejderha çığlığı — histerezisli tetik:
+      // 0.25'i geçince çal, 0.05 altına inince yeniden kurul.
+      if (diveArmed && g.dive >= 0.25) {
+        diveArmed = false;
+        audio.dragonDiveScream(g.dive);
+      } else if (!diveArmed && g.dive < 0.05) {
+        diveArmed = true;
+      }
       if (g.infinite) updateInfinitePath(g, g.infinite, dt);
       dragon.maw.getWorldPosition(headPos);
 
@@ -933,7 +973,6 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         g.mission.emit({ kind: "firstFlame" });
       }
       audio.flame(firing);
-      if (firing) audio.tickFlame(dt);
       dragon.jaw.rotation.x = firing ? 0.45 : 0.06;
       if (firing) {
         dragon.glow.intensity = 26 + Math.sin(now * 0.03) * 8;
@@ -1024,8 +1063,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           const sinH = Math.sin(h);
           const rvx = vx * cosH + vz * sinH;
           const rvz = -vx * sinH + vz * cosH;
-          fireballs.spawn(headPos, tmp.set(rvx, vy, rvz));
-          audio.fireball();
+          const ball = fireballs.spawn(headPos, tmp.set(rvx, vy, rvz));
+          audio.fireballLaunch();
+          if (ball) ball.sndStop = audio.fireballTravel()?.stop ?? null;
           fx.ember(headPos, 8, 6);
           flamePushT = 1;
           g.fireballKickT = 1;
@@ -1117,6 +1157,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           }
         }
         if (hit || b.life <= 0) {
+          b.sndStop?.();
+          b.sndStop = null;
           if (hit) {
             // Köz Mermisi yönü — oval yıkım için
             const fbDir = tmp.copy(b.vel).normalize();
@@ -1166,6 +1208,39 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         audio.creatureAmbient();
       }
 
+      /* ---- açılış sireni → müzik geçişi ----
+       * setTimeout yerine oyun saati: duraklatma sireni de durdurduğu için
+       * 10 sn'lik pencere gerçek oynanış süresinden sayılır. */
+      if (!musicStarted && state.time >= 10) {
+        musicStarted = true;
+        audio.siren(false);
+        audio.music(true);
+      }
+
+      /* ---- müzik gerginliği + savaş alanı yatağı (0.5 sn'de bir) ---- */
+      intensityT -= dt;
+      if (intensityT <= 0) {
+        intensityT = 0.5;
+        const burnCount = g.burning.length;
+        const tension = Math.min(
+          1,
+          0.15 +
+            burnCount / 45 +
+            state.destroyed / 120 +
+            (state.marked > 0 ? 0.15 : 0) +
+            (state.rageT > 0 ? 0.2 : 0) +
+            (state.hitFlash > 0 ? 0.1 : 0),
+        );
+        audio.setIntensity(tension);
+        let activeShots = 0;
+        for (const s2 of shots.shots) if (s2.active) activeShots++;
+        let liveEnemies = 0;
+        for (const e2 of g.enemies) if (!e2.dead) liveEnemies++;
+        const combatI = Math.min(1, activeShots / 18 + (liveEnemies > 0 ? 0.25 : 0));
+        const fireI = Math.min(1, burnCount / 40);
+        audio.battleLoop(combatI, fireI);
+      }
+
       state.comboT -= dt;
       if (state.comboT <= 0) state.combo = 1;
 
@@ -1186,7 +1261,6 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             // Fünye ejderhanın o anki irtifasına ayarlanır: yüksek uçmak cezalı.
             shots.spawn("flak", tmp2, tmp.normalize().multiplyScalar(95), 14, dp.y);
             audio.enemyShot();
-            audio.creatureAttack();
           }
         } else if (t.tower === "tesla") {
           if (d < TESLA_RANGE) {
@@ -1242,7 +1316,6 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             tmp2.copy(gt.pos);
             shots.spawn("bolt", tmp2, tmp.normalize().multiplyScalar(90), 7, 0);
             audio.enemyShot();
-            audio.creatureAttack();
           }
         }
 
@@ -1262,10 +1335,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
               tmp2.copy(gf.pos);
               shots.spawn("firebolt", tmp2, tmp.normalize().multiplyScalar(speed), 5, 0);
             }
-            // Alev efekti
-            fx.flameJet(gf.pos, 7, new THREE.Vector3(0, 1, 0));
-            audio.enemyShot();
-            audio.creatureAttack();
+            // Alev efekti — sesi battleLoop yatağı taşıyor: 150 kaynağın her
+            // patlamasında ayrı ses düğümü kurmak eski takılmanın ana sebebiydi.
+            fx.flameJet(gf.pos, 7, UP_Y);
           }
         }
       }
@@ -1481,11 +1553,50 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         state.hp = 0;
         g.mission.fail();
       }
+    } else if (cinematicT > 0) {
+      /* ---- zafer sinematiği: Pyra şaha kalkar ve kükrer ---- */
+      cinematicT -= rawDt;
+      const tc = CINE_DUR - cinematicT;
+      const rear = THREE.MathUtils.smoothstep(tc, 0.3, 1.1);
+      dragon.body.rotation.x += (-0.55 * rear - dragon.body.rotation.x) * Math.min(1, rawDt * 6);
+      dragon.jaw.rotation.x = 0.06 + rear * 0.55;
+      dragon.root.position.y += rear * 6 * rawDt;
+      flameRig.rotation.x = 0.2 - rear * 0.9;
+      // Görkemli, yavaş kanat çırpışı
+      const cineFlap = Math.sin(tc * 2.6) * 0.55;
+      dragon.wingR.rotation.z = -cineFlap - 0.15;
+      dragon.wingL.rotation.z = cineFlap + 0.15;
+      if (!cineRoared && tc >= 1.0) {
+        cineRoared = true;
+        audio.victoryRoar();
+        shake(g, 0.5);
+      }
+      dragon.maw.getWorldPosition(headPos);
+      if (cineRoared && tc < 3.6) {
+        fx.flameJet(headPos, 6, UP_Y);
+        fx.ember(headPos, 4, 8);
+        flameLight.intensity = 18 + Math.random() * 16;
+        flameOuter.mat.opacity = 0.35 + Math.random() * 0.2;
+        flameMid.mat.opacity = 0.5 + Math.random() * 0.2;
+        flameCore.mat.opacity = 0.6 + Math.random() * 0.2;
+      } else {
+        flameLight.intensity *= 0.92;
+        flameOuter.mat.opacity *= 0.9;
+        flameMid.mat.opacity *= 0.9;
+        flameCore.mat.opacity *= 0.9;
+      }
+      if (cinematicT <= 0 && pendingResult) {
+        audio.win();
+        const r = pendingResult;
+        pendingResult = null;
+        o.onResult(r);
+      }
     } else if (state.status === "playing") {
       // Duraklatıldı: sahne çizilmeye devam ediyor ama simülasyon durdu.
       audio.flame(false);
       audio.siren(false);
       audio.music(false);
+      audio.battleLoop(0, 0);
     }
 
     /* ---- her durumda ---- */
@@ -1506,7 +1617,20 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       city.npcs.update(rawDt, dragon.root.position, g.fwd);
     }
 
-    updateCamera(g, rawDt, playing);
+    if (cinematicT > 0) {
+      // Sinematik kamera: ejderhanın önüne döner, hafif yörüngede süzülür.
+      const tc = CINE_DUR - cinematicT;
+      const h = g.flightAxes.heading + Math.sin(tc * 0.4) * 0.25;
+      tmp.set(Math.sin(h) * 40, 9, Math.cos(h) * 40).add(dragon.root.position);
+      camera.position.lerp(tmp, Math.min(1, rawDt * 2.5));
+      tmp2.copy(dragon.root.position);
+      tmp2.y += 7;
+      camera.lookAt(tmp2);
+      camera.fov += (58 - camera.fov) * Math.min(1, rawDt * 2);
+      camera.updateProjectionMatrix();
+    } else {
+      updateCamera(g, rawDt, playing);
+    }
     renderer.render(scene, camera);
 
     /* ---- HUD ---- */
@@ -1569,6 +1693,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         chapterTitle: chapter.title,
         elapsed: Math.round(state.time),
         bestTime,
+        cinematic: cinematicT > 0,
       };
       const p = lastPush;
       if (
@@ -1582,6 +1707,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         p.combo !== snap.combo ||
         p.status !== snap.status ||
         p.marked !== snap.marked ||
+        p.cinematic !== snap.cinematic ||
         p.elapsed !== snap.elapsed ||
         p.subtitle?.text !== snap.subtitle?.text ||
         p.hint?.text !== snap.hint?.text ||
@@ -1626,17 +1752,18 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   if (cancelled) return null;
 
   audio.ambient(true);
-  if (chapter.id === "c01") {
-    musicStarted = true;
-    audio.music(true);
-  } else {
-    audio.siren(true);
-    setTimeout(() => {
-      if (finished) return;
-      musicStarted = true;
-      audio.siren(false);
-      audio.music(true);
-    }, 10000);
+  // Her bölüm hava saldırısı sireniyle açılır; 10 oynanış saniyesi sonra
+  // (döngü içinde, duraklatmaya dayanıklı) müzik devralır.
+  audio.siren(true);
+  audio.preload(2);
+  if (import.meta.env.DEV) {
+    // Tarayıcı konsolundan tanı: window.__pyre.fps() / calls() / audio() / win()
+    (window as unknown as { __pyre?: unknown }).__pyre = {
+      fps: () => measuredFps,
+      calls: () => renderer.info.render.calls,
+      audio: () => audio.debug(),
+      win: () => g.mission.forceWin(),
+    };
   }
   o.onReady();
   last = performance.now();

@@ -119,11 +119,13 @@ export type Fireball = {
   mesh: THREE.Mesh;
   vel: THREE.Vector3;
   life: number;
+  /** Uçuş ıslığını durdurur (mermi patlayınca/sönünce çağrılır). */
+  sndStop: (() => void) | null;
 };
 
 export type FireballPool = {
   balls: Fireball[];
-  spawn(from: THREE.Vector3, vel: THREE.Vector3): boolean;
+  spawn(from: THREE.Vector3, vel: THREE.Vector3): Fireball | null;
   dispose(): void;
 };
 
@@ -144,7 +146,7 @@ export function createFireballPool(scene: THREE.Scene): FireballPool {
     mesh.visible = false;
     mesh.frustumCulled = false;
     scene.add(mesh);
-    balls.push({ active: false, mesh, vel: new THREE.Vector3(), life: 0 });
+    balls.push({ active: false, mesh, vel: new THREE.Vector3(), life: 0, sndStop: null });
   }
   return {
     balls,
@@ -157,9 +159,10 @@ export function createFireballPool(scene: THREE.Scene): FireballPool {
         b.mesh.scale.setScalar(rand(0.85, 1.15));
         b.vel.copy(vel);
         b.life = 3;
-        return true;
+        b.sndStop = null;
+        return b;
       }
-      return false;
+      return null;
     },
     dispose() {
       geo.dispose();

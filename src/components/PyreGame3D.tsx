@@ -132,6 +132,31 @@ export default function PyreGame3D({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---------------- menü sesi: yalnız canavar hırıltısı ----------------
+   * Tarayıcı ilk kullanıcı jestine kadar sesi kilitli tutar; menüdeki ilk
+   * tıklama/tuş hem kilidi açar hem örnek yüklemeyi başlatır. Sonrasında
+   * menü/bölüm ekranlarında 6-12 sn arayla hırıltı duyulur — müzik yok. */
+  useEffect(() => {
+    if (screen !== "menu" && screen !== "chapters") return;
+    const unlock = () => {
+      audioRef.current?.unlock();
+      audioRef.current?.preload(0);
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const growl = () => {
+      audioRef.current?.menuGrowl();
+      timer = setTimeout(growl, 6000 + Math.random() * 6000);
+    };
+    timer = setTimeout(growl, 2500 + Math.random() * 2500);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      if (timer) clearTimeout(timer);
+    };
+  }, [screen]);
+
   /* ---------------- klavye ---------------- */
   useEffect(() => {
     const keys: Record<string, boolean> = {};
@@ -357,7 +382,7 @@ export default function PyreGame3D({
     <div className="relative h-[100dvh] w-full select-none overflow-hidden bg-background">
       <div ref={mountRef} className="absolute inset-0 touch-none" />
 
-      {(screen === "playing" || screen === "paused") && (
+      {(screen === "playing" || screen === "paused") && !snapshot.cinematic && (
         <>
           {/* Kontroller HUD'DAN ÖNCE: altyazı kutusu gibi tıklanabilir HUD
               parçaları çubuk alanının üstünde kalsın. */}

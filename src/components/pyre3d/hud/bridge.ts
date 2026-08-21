@@ -108,5 +108,6 @@ export function emptySnapshot(): HudSnapshot {
     chapterTitle: "",
     elapsed: 0,
     bestTime: 0,
+    cinematic: false,
   };
 }

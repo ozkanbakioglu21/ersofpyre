@@ -240,8 +240,8 @@ export type BlastOpts = {
 
 export function explode(g: Game, at: THREE.Vector3, o: BlastOpts): void {
   g.fx.explosion(at, o.radius / 26);
-  // Köz Mermisi: derin bomba sesi; diğerleri normal patlama
-  if (o.fireball) g.audio.bombHit();
+  // Köz Mermisi: şiddetli isabet patlaması; diğerleri normal patlama
+  if (o.fireball) g.audio.fireballImpact();
   else g.audio.explosion(o.radius / 26);
 
   /* ---- Köz Mermisi efektleri ---- */

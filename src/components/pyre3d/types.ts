@@ -286,6 +286,8 @@ export type HudSnapshot = {
   chapterTitle: string;
   elapsed: number;
   bestTime: number;
+  /** Zafer sinematiği oynuyor — HUD gizlenir. */
+  cinematic: boolean;
 };
 
 export type MarkerKind = "objective" | "threat" | "weakpoint" | "optional";
