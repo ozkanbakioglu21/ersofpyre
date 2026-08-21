@@ -202,6 +202,12 @@ const SFX_MANIFEST: Record<string, string[]> = {
     "dive_roar_03.ogg", "dive_howl.ogg", "dive_monster_01.ogg", "dive_monster_02.ogg",
     "dive_monster_06.ogg", "dive_troll_01.ogg", "dive_troll_02.ogg",
   ],
+  dragonScream: [
+    "dragon_scream_01.ogg", "dragon_scream_02.ogg", "dragon_scream_03.ogg",
+    "dragon_scream_04.ogg", "dragon_scream_05.ogg", "dragon_scream_06.ogg",
+    "dragon_scream_07.ogg", "dragon_scream_08.ogg", "dragon_scream_09.ogg",
+    "dragon_scream_10.ogg", "dragon_scream_11.ogg", "dragon_scream_12.ogg",
+  ],
   diveWindReal: [
     "dive_wind_real.wav",
   ],
@@ -1156,7 +1162,8 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     diveCreatureScream() {
       withCtx((c) => {
-        playSample(c, "creatureScream", { pitch: 0.6 + Math.random() * 0.15, vol: 0.95 });
+        playSample(c, "dragonScream", { pitch: 0.6 + Math.random() * 0.15, vol: 0.95 });
+        playSample(c, "dragonScream", { pitch: 0.5 + Math.random() * 0.1, vol: 0.6, delay: 0.05 });
         playSample(c, "dragonSnarl", { pitch: 0.65 + Math.random() * 0.15, vol: 0.7, delay: 0.03 });
       });
     },
@@ -1235,8 +1242,8 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           const old = diveScreamNodes;
           setTimeout(() => { try { old.src.stop(); } catch {} }, 200);
         }
-        // Rastgele creature sample seç
-        const files = SFX_MANIFEST["diveScream"] ?? [];
+        // Rastgele dragon sample seç
+        const files = SFX_MANIFEST["dragonScream"] ?? [];
         if (!files.length) return;
         const file = files[Math.floor(Math.random() * files.length)]!;
         const buf = sfxCache.get(file);
