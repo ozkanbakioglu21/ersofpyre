@@ -983,46 +983,62 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     bombHit() {
       withCtx((c) => {
-        // Büyük bomba sesi — çoklu patlama sample'ı
-        playSample(c, "bigExplosion", { pitch: 0.7 + Math.random() * 0.3, vol: 0.9 });
-        playSample(c, "bigBoom", { pitch: 0.6 + Math.random() * 0.3, vol: 0.7, delay: 0.04 });
-        // Prosedürel derin bass
+        // 1) Ana patlama — 2 big sample üst üste (0.02s gecikme ile)
+        playSample(c, "bigExplosion", { pitch: 0.6 + Math.random() * 0.2, vol: 1.0 });
+        playSample(c, "bigExplosion", { pitch: 0.55 + Math.random() * 0.15, vol: 0.7, delay: 0.02 });
+        // 2) İkincil boom — derinlik için
+        playSample(c, "bigBoom", { pitch: 0.5 + Math.random() * 0.2, vol: 0.85, delay: 0.04 });
+        playSample(c, "bigBoom", { pitch: 0.45 + Math.random() * 0.15, vol: 0.55, delay: 0.08 });
+        // 3) Alevli çarpmış — yanık kimyasal his
+        playSample(c, "fireWhoosh", { pitch: 0.6 + Math.random() * 0.2, vol: 0.7, delay: 0.01 });
+        playSample(c, "fireWhoosh", { pitch: 0.7 + Math.random() * 0.3, vol: 0.5, delay: 0.05 });
+        // 4) Prosedürel derin bass — yer sarsıntısı
         noiseBurst(c, {
-          dur: 0.7,
-          peak: 0.44,
+          dur: 0.9,
+          peak: 0.55,
           type: "lowpass",
-          from: 600,
-          to: 55,
-          q: 0.6,
+          from: 500,
+          to: 40,
+          q: 0.5,
         });
-        tone(c, { type: "sine", from: 85, to: 18, dur: 0.65, peak: 0.42 });
-        // Mekanik patlama katmanı
-        playSample(c, "mechExplosion", { pitch: 0.65 + Math.random() * 0.3, vol: 0.45, delay: 0.02 });
-        // Cam kırığı
-        playSample(c, "glassBreak", { pitch: 0.8 + Math.random() * 0.4, vol: 0.55, delay: 0.03 });
-        // Tiz crack
+        tone(c, { type: "sine", from: 75, to: 14, dur: 0.85, peak: 0.5 });
+        tone(c, { type: "sine", from: 55, to: 12, dur: 0.75, peak: 0.35, delay: 0.05 });
+        // 5) Mekanik parçalanma katmanı
+        playSample(c, "mechExplosion", { pitch: 0.6 + Math.random() * 0.3, vol: 0.6, delay: 0.02 });
+        playSample(c, "mechExplosion", { pitch: 0.5 + Math.random() * 0.2, vol: 0.35, delay: 0.06 });
+        // 6) Cam + metal kırılması
+        playSample(c, "glassBreak", { pitch: 0.7 + Math.random() * 0.4, vol: 0.65, delay: 0.03 });
+        playSample(c, "glassBreak", { pitch: 0.9 + Math.random() * 0.3, vol: 0.4, delay: 0.08 });
+        // 7) Tiz crack — havayı yırtan ses
         noiseBurst(c, {
-          dur: 0.12,
-          peak: 0.38,
+          dur: 0.15,
+          peak: 0.45,
           type: "highpass",
-          from: 4800,
-          to: 2200,
-          q: 3,
+          from: 5200,
+          to: 2400,
+          q: 3.5,
           delay: 0.01,
         });
-        // Enkaz düşmesi
-        playSample(c, "debris", { pitch: 0.8 + Math.random() * 0.4, vol: 0.4, delay: 0.1 });
+        // 8) Enkaz yağmuru — uzun taneli
+        playSample(c, "debris", { pitch: 0.7 + Math.random() * 0.3, vol: 0.5, delay: 0.1 });
+        playSample(c, "debris", { pitch: 0.9 + Math.random() * 0.3, vol: 0.35, delay: 0.18 });
+        playSample(c, "rockBreak", { pitch: 0.8 + Math.random() * 0.3, vol: 0.4, delay: 0.15 });
+        // 9) Metal gıcırtı — yapısal çökme
+        playSample(c, "metalFall", { pitch: 0.7 + Math.random() * 0.3, vol: 0.45, delay: 0.2 });
+        playSample(c, "metalHit", { pitch: 0.6 + Math.random() * 0.2, vol: 0.35, delay: 0.12 });
+        // 10) Sürekli toz/rumble — bandpass katman
         noiseBurst(c, {
-          dur: 0.55,
-          peak: 0.08,
+          dur: 0.65,
+          peak: 0.12,
           type: "bandpass",
-          from: 480,
-          to: 200,
-          q: 1.2,
+          from: 420,
+          to: 180,
+          q: 1.4,
           delay: 0.12,
         });
-        // Uzak yankı
-        playSample(c, "distantBoom", { pitch: 0.55 + Math.random() * 0.2, vol: 0.35, delay: 0.4 + Math.random() * 0.4 });
+        // 11) Uzak yankı — patlamanın Crest Dağları'na yansıması
+        playSample(c, "distantBoom", { pitch: 0.5 + Math.random() * 0.15, vol: 0.45, delay: 0.35 + Math.random() * 0.3 });
+        playSample(c, "distantBoom", { pitch: 0.42 + Math.random() * 0.12, vol: 0.3, delay: 0.6 + Math.random() * 0.3 });
       });
     },
     hit() {
