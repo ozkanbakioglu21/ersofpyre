@@ -187,6 +187,7 @@ export function updateFlight(g: Game, dt: number): void {
   s.emberRush = Math.max(0, s.emberRush - dt);
   s.snared = Math.max(0, s.snared - dt);
   s.marked = Math.max(0, s.marked - dt);
+  s.fireballKickT = Math.max(0, s.fireballKickT - dt * 2.5);
 
   /* ---- barrel roll (dodge) ---- */
   if (c.dodge !== 0) {
@@ -421,6 +422,14 @@ export function updateFlight(g: Game, dt: number): void {
     const wave = Math.sin(s.flap * 0.6 - i * 0.65) * 0.04 * (1 - norm * 0.3);
 
     n.rotation.x = pitchEffect + fireTilt + wave;
+    // Alev topu geri tepmesi: boyun da geriye eğilir, uç segment daha fazla
+    if (s.fireballKickT > 0) {
+      const k = 1 - s.fireballKickT;
+      const neckKick = k < 0.35
+        ? THREE.MathUtils.lerp(0, -0.35, k / 0.35)
+        : THREE.MathUtils.lerp(-0.35, 0, (k - 0.35) / 0.65);
+      n.rotation.x += neckKick * (0.3 + norm * 0.7);
+    }
     n.rotation.y = yawS - a.roll * 0.06 * (1 - norm * 0.3);
   });
 
@@ -428,7 +437,15 @@ export function updateFlight(g: Game, dt: number): void {
   const speedFactor = Math.min(1, s.speed * 0.02);
   const pitchLead = -a.pitch * 0.25 * speedFactor;
   const yawLead = -a.yaw * 0.18 * speedFactor;
-  d.headLook.rotation.x += (pitchLead - d.headLook.rotation.x) * Math.min(1, dt * 7);
+  // Alev topu geri tepmesi: baş先 geriye çekilir, sonra sert ileri fırlar
+  let kickPitch = 0;
+  if (s.fireballKickT > 0) {
+    const k = 1 - s.fireballKickT; // 0→1
+    kickPitch = k < 0.35
+      ? THREE.MathUtils.lerp(0, -0.7, k / 0.35)       // geri çek
+      : THREE.MathUtils.lerp(-0.7, 0.5, (k - 0.35) / 0.65); // ileri fırla → zero
+  }
+  d.headLook.rotation.x += (pitchLead + kickPitch - d.headLook.rotation.x) * Math.min(1, dt * 7);
   d.headLook.rotation.y += (yawLead - d.headLook.rotation.y) * Math.min(1, dt * 7);
 }
 

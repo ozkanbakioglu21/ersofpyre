@@ -214,6 +214,8 @@ export type RunState = {
   marked: number;
   /** En yakın merminin en-yakın-yaklaşma süresi; -1 = tehdit yok. */
   threatT: number;
+  /** Alev topu geri tepmesi (0..1 → 0, 0.4s decay). */
+  fireballKickT: number;
   flap: number;
   /** Kamera sarsıntısı: kalan süre ve genlik. */
   shakeT: number;

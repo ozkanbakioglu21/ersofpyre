@@ -139,6 +139,8 @@ export type Game = {
   infinite: InfinitePath | null;
   flightAxes: FlightAxes;
   fireT: number;
+  /** Alev topu fırlatma geri tepmesi: 0..1 → 0 (0.4s decay). */
+  fireballKickT: number;
 
   timeScale: number;
   paused: boolean;
@@ -488,6 +490,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     shockCd: 0,
     fireballCd: 0,
     rollCd: 0,
+    fireballKickT: 0,
     speed: FLIGHT.baseSpeed,
     combo: 1,
     comboT: 0,
@@ -556,6 +559,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     infinite: null,
     flightAxes: createFlightAxes(),
     fireT: 0,
+    fireballKickT: 0,
     timeScale: 1,
     paused: false,
   };
@@ -1019,6 +1023,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           audio.fireball();
           fx.ember(headPos, 8, 6);
           flamePushT = 1;
+          g.fireballKickT = 1;
         }
       }
 
