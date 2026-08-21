@@ -31,6 +31,7 @@ export type AudioEngine = {
   trollShot(): void;
   trollDeath(): void;
   monsterAmbient(): void;
+  diveCreatureScream(): void;
   /** Dalma rüzgarı: 0..1 yoğunluk. */
   diveWind(intensity: number): void;
   /** Dalma çığlığı: 0..1 yoğunluk. */
@@ -77,6 +78,7 @@ const NOOP: AudioEngine = {
   trollShot() {},
   trollDeath() {},
   monsterAmbient() {},
+  diveCreatureScream() {},
   diveWind() {},
   diveScream() {},
   ui() {},
@@ -1194,6 +1196,20 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           tone(c, { type: "sawtooth", from: 55, to: 35, dur: 0.7, peak: 0.15 });
           noiseBurst(c, { dur: 0.5, peak: 0.08, type: "lowpass", from: 200, to: 80, q: 1.0 });
         }
+      });
+    },
+    diveCreatureScream() {
+      withCtx((c) => {
+        // Yaratık çığlığı:monster_scream + alçaltılmış pitch + ikinci katman
+        if (sfxCache.has("monster_scream_01.ogg")) {
+          playSample(c, "monsterAmbient", { pitch: 0.55 + Math.random() * 0.15, vol: 0.9 });
+          playSample(c, "monsterAmbient", { pitch: 0.45 + Math.random() * 0.1, vol: 0.5, delay: 0.04 });
+        }
+        // Prosedürel yaratık: tiz sawtooth vibrato
+        tone(c, { type: "sawtooth", from: 900, to: 350, dur: 0.9, peak: 0.3 });
+        tone(c, { type: "square", from: 850, to: 320, dur: 0.85, peak: 0.18, delay: 0.02 });
+        // Hırıltı katmanı
+        noiseBurst(c, { dur: 0.6, peak: 0.2, type: "bandpass", from: 1200, to: 500, q: 3 });
       });
     },
     scream() {
