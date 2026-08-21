@@ -28,9 +28,9 @@ export type AudioEngine = {
   bellow(): void;
   snarl(): void;
   wingFlap(): void;
-  trollShot(): void;
-  trollDeath(): void;
-  monsterAmbient(): void;
+  creatureAttack(): void;
+  creatureDeath(): void;
+  creatureAmbient(): void;
   diveCreatureScream(): void;
   /** Dalma rüzgarı: 0..1 yoğunluk. */
   diveWind(intensity: number): void;
@@ -75,9 +75,9 @@ const NOOP: AudioEngine = {
   bellow() {},
   snarl() {},
   wingFlap() {},
-  trollShot() {},
-  trollDeath() {},
-  monsterAmbient() {},
+  creatureAttack() {},
+  creatureDeath() {},
+  creatureAmbient() {},
   diveCreatureScream() {},
   diveWind() {},
   diveScream() {},
@@ -166,10 +166,10 @@ const SFX_MANIFEST: Record<string, string[]> = {
     "dragon_roar_deep.wav", "dragon_roar_wild.wav", "dragon_roar_echo.wav",
   ],
   dragonGrowl: [
-    "dragon_growl_angry.wav", "troll_idle.ogg",
+    "dragon_growl_angry.wav", "creature_growl_01.wav",
   ],
   dragonSnarl: [
-    "troll_roars.ogg", "dragon_growl_angry.wav",
+    "creature_roar_01.wav", "dragon_growl_angry.wav", "creature_roar_02.wav",
   ],
   dragonBellow: [
     "dragon_roar_deep.wav", "dragon_roar_echo.wav", "dragon_roar_wild.wav",
@@ -183,15 +183,19 @@ const SFX_MANIFEST: Record<string, string[]> = {
   dragonFireBreath: [
     "dragon_fire_breath.wav",
   ],
-  trollShot: [
-    "troll_attack.ogg", "troll_roars.ogg",
+  creatureAttack: [
+    "creature_attack_01.wav", "creature_attack_02.wav", "beast_growl_01.mp3",
   ],
-  trollDeath: [
-    "troll_death.ogg", "troll_roars.ogg",
+  creatureDeath: [
+    "creature_death_01.wav", "creature_death_02.wav", "beast_growl_02.mp3",
   ],
-  monsterAmbient: [
-    "monster_growl_01.ogg", "monster_growl_02.ogg", "monster_scream_01.ogg",
-    "troll_idle.ogg",
+  creatureAmbient: [
+    "creature_growl_01.wav", "creature_growl_02.wav", "creature_idle_01.wav",
+    "beast_growl_03.mp3", "beast_growl_04.mp3",
+  ],
+  creatureScream: [
+    "creature_scream_01.wav", "creature_scream_02.wav", "creature_scream_03.wav",
+    "creature_deep_roar.wav",
   ],
 };
 
@@ -1149,7 +1153,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     snarl() {
       withCtx((c) => {
-        if (sfxCache.has("troll_roars.ogg")) {
+        if (sfxCache.has("creature_roar_01.wav")) {
           playSample(c, "dragonSnarl", { pitch: 0.9 + Math.random() * 0.4, vol: 0.5 });
         } else {
           tone(c, { type: "sawtooth", from: 300, to: 180, dur: 0.35, peak: 0.26 });
@@ -1168,42 +1172,27 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         }
       });
     },
-    trollShot() {
+    creatureAttack() {
       withCtx((c) => {
-        if (sfxCache.has("troll_attack.ogg")) {
-          playSample(c, "trollShot", { pitch: 0.85 + Math.random() * 0.3, vol: 0.5 });
-        } else {
-          tone(c, { type: "sawtooth", from: 120, to: 60, dur: 0.4, peak: 0.25 });
-          noiseBurst(c, { dur: 0.3, peak: 0.15, type: "bandpass", from: 500, to: 200, q: 1.2 });
-        }
+        playSample(c, "creatureAttack", { pitch: 0.8 + Math.random() * 0.3, vol: 0.6 });
       });
     },
-    trollDeath() {
+    creatureDeath() {
       withCtx((c) => {
-        if (sfxCache.has("troll_death.ogg")) {
-          playSample(c, "trollDeath", { pitch: 0.8 + Math.random() * 0.4, vol: 0.55 });
-        } else {
-          tone(c, { type: "sawtooth", from: 200, to: 40, dur: 1.0, peak: 0.3 });
-          noiseBurst(c, { dur: 0.8, peak: 0.2, type: "lowpass", from: 600, to: 120, q: 1.0 });
-        }
+        playSample(c, "creatureDeath", { pitch: 0.75 + Math.random() * 0.3, vol: 0.6 });
+        playSample(c, "creatureDeath", { pitch: 0.6 + Math.random() * 0.2, vol: 0.35, delay: 0.06 });
       });
     },
-    monsterAmbient() {
+    creatureAmbient() {
       withCtx((c) => {
-        if (sfxCache.has("monster_growl_01.ogg")) {
-          playSample(c, "monsterAmbient", { pitch: 0.7 + Math.random() * 0.5, vol: 0.35 });
-        } else {
-          tone(c, { type: "sawtooth", from: 55, to: 35, dur: 0.7, peak: 0.15 });
-          noiseBurst(c, { dur: 0.5, peak: 0.08, type: "lowpass", from: 200, to: 80, q: 1.0 });
-        }
+        playSample(c, "creatureAmbient", { pitch: 0.7 + Math.random() * 0.4, vol: 0.4 });
       });
     },
     diveCreatureScream() {
       withCtx((c) => {
-        // Sadece gerçek yaretik ses dosyaları — prosedürel yok
-        playSample(c, "monsterAmbient", { pitch: 0.6 + Math.random() * 0.15, vol: 0.95 });
+        playSample(c, "creatureScream", { pitch: 0.6 + Math.random() * 0.15, vol: 0.95 });
         playSample(c, "dragonSnarl", { pitch: 0.65 + Math.random() * 0.15, vol: 0.8, delay: 0.03 });
-        playSample(c, "trollDeath", { pitch: 0.7 + Math.random() * 0.1, vol: 0.5, delay: 0.08 });
+        playSample(c, "creatureAttack", { pitch: 0.7 + Math.random() * 0.1, vol: 0.5, delay: 0.08 });
       });
     },
     scream() {
