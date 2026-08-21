@@ -1195,16 +1195,8 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     diveCreatureScream() {
       withCtx((c) => {
-        // Ana çığlık — derin creature scream
-        playSample(c, "creatureScream", { pitch: 0.55 + Math.random() * 0.15, vol: 1.0 });
-        // Yüksek harmonik — tiz çığlık
-        playSample(c, "creatureScream", { pitch: 1.1 + Math.random() * 0.2, vol: 0.45, delay: 0.015 });
-        // Snarl — hırlama
-        playSample(c, "dragonSnarl", { pitch: 0.6 + Math.random() * 0.15, vol: 0.75, delay: 0.04 });
-        // Attack — vuruş
-        playSample(c, "creatureAttack", { pitch: 0.65 + Math.random() * 0.1, vol: 0.5, delay: 0.07 });
-        // Deep roar arka plan
-        playSample(c, "creatureScream", { pitch: 0.4 + Math.random() * 0.1, vol: 0.35, delay: 0.1 });
+        playSample(c, "creatureScream", { pitch: 0.6 + Math.random() * 0.15, vol: 0.95 });
+        playSample(c, "dragonSnarl", { pitch: 0.65 + Math.random() * 0.15, vol: 0.7, delay: 0.03 });
       });
     },
     scream() {
