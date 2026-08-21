@@ -1162,9 +1162,9 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     diveCreatureScream() {
       withCtx((c) => {
-        playSample(c, "dragonScream", { pitch: 0.6 + Math.random() * 0.15, vol: 0.95 });
-        playSample(c, "dragonScream", { pitch: 0.5 + Math.random() * 0.1, vol: 0.6, delay: 0.05 });
-        playSample(c, "dragonSnarl", { pitch: 0.65 + Math.random() * 0.15, vol: 0.7, delay: 0.03 });
+        playSample(c, "dragonScream", { pitch: 0.6 + Math.random() * 0.15, vol: 1.0 });
+        playSample(c, "dragonScream", { pitch: 0.5 + Math.random() * 0.1, vol: 0.85, delay: 0.05 });
+        playSample(c, "dragonSnarl", { pitch: 0.65 + Math.random() * 0.15, vol: 0.9, delay: 0.03 });
       });
     },
     scream() {
@@ -1262,7 +1262,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       // Mevcut sample'ın gain'ini ayarla
       if (diveScreamNodes) {
         diveScreamNodes.gain.gain.cancelScheduledValues(now);
-        const target = intensity > 0.15 ? Math.min((intensity - 0.15) * 0.7, 0.7) : 0;
+        const target = intensity > 0.15 ? Math.min((intensity - 0.15) * 1.0, 1.0) : 0;
         diveScreamNodes.gain.gain.setTargetAtTime(target, now, 0.1);
       }
     },
