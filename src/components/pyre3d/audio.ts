@@ -303,7 +303,12 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   let sirenWanted = false;
   let musicWanted = false;
   let diveWindNodes: { src: AudioBufferSourceNode; gain: GainNode; lfo: OscillatorNode } | null = null;
-  let diveScreamNodes: { osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode; lfo: OscillatorNode } | null = null;
+  let diveScreamNodes: {
+    osc1: OscillatorNode; osc2: OscillatorNode; osc3: OscillatorNode;
+    noise: AudioBufferSourceNode; master: GainNode;
+    lfoVib: OscillatorNode; lfoTrem: OscillatorNode;
+    bp: BiquadFilterNode; ws: WaveShaperNode;
+  } | null = null;
   let musicNodes: {
     pad1: OscillatorNode;
     pad2: OscillatorNode;
@@ -1190,9 +1195,16 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     diveCreatureScream() {
       withCtx((c) => {
-        playSample(c, "creatureScream", { pitch: 0.6 + Math.random() * 0.15, vol: 0.95 });
-        playSample(c, "dragonSnarl", { pitch: 0.65 + Math.random() * 0.15, vol: 0.8, delay: 0.03 });
-        playSample(c, "creatureAttack", { pitch: 0.7 + Math.random() * 0.1, vol: 0.5, delay: 0.08 });
+        // Ana çığlık — derin creature scream
+        playSample(c, "creatureScream", { pitch: 0.55 + Math.random() * 0.15, vol: 1.0 });
+        // Yüksek harmonik — tiz çığlık
+        playSample(c, "creatureScream", { pitch: 1.1 + Math.random() * 0.2, vol: 0.45, delay: 0.015 });
+        // Snarl — hırlama
+        playSample(c, "dragonSnarl", { pitch: 0.6 + Math.random() * 0.15, vol: 0.75, delay: 0.04 });
+        // Attack — vuruş
+        playSample(c, "creatureAttack", { pitch: 0.65 + Math.random() * 0.1, vol: 0.5, delay: 0.07 });
+        // Deep roar arka plan
+        playSample(c, "creatureScream", { pitch: 0.4 + Math.random() * 0.1, vol: 0.35, delay: 0.1 });
       });
     },
     scream() {
@@ -1259,41 +1271,90 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (!c) return;
       if (!diveScreamNodes) {
         const t = c.ac.currentTime;
-        // Ejderha çığlığı: iki osc + vibrato LFO — tiz, keskin, kesik
+        // --- LAYER 1: Primary screech (sawtooth 1100Hz + vibrato) ---
         const osc1 = c.ac.createOscillator();
         osc1.type = "sawtooth";
-        osc1.frequency.value = 1800;
+        osc1.frequency.value = 1100;
+        // Vibrato LFO — 5.5 Hz, ±140 Hz
+        const lfoVib = c.ac.createOscillator();
+        lfoVib.type = "sine";
+        lfoVib.frequency.value = 5.5;
+        const vibGain = c.ac.createGain();
+        vibGain.gain.value = 140;
+        lfoVib.connect(vibGain);
+        vibGain.connect(osc1.frequency);
+        // --- LAYER 2: Shriek harmonic (square 1650Hz) ---
         const osc2 = c.ac.createOscillator();
         osc2.type = "square";
-        osc2.frequency.value = 1820;
-        // Vibrato LFO
-        const lfo = c.ac.createOscillator();
-        lfo.type = "sine";
-        lfo.frequency.value = 6;
-        const lfoGain = c.ac.createGain();
-        lfoGain.gain.value = 120;
-        lfo.connect(lfoGain).connect(osc1.frequency);
-        lfo.connect(lfoGain).connect(osc2.frequency);
-        // Bandpass — ejderha ciyagher havası
+        osc2.frequency.value = 1650;
+        vibGain.connect(osc2.frequency);
+        // --- LAYER 3: Sub rumble (triangle 180Hz → 90Hz) ---
+        const osc3 = c.ac.createOscillator();
+        osc3.type = "triangle";
+        osc3.frequency.value = 180;
+        osc3.frequency.setTargetAtTime(90, t, 1.8);
+        // --- LAYER 4: Breath noise ---
+        const noiseBuf = c.ac.createBuffer(1, c.ac.sampleRate * 2, c.ac.sampleRate);
+        const nd = noiseBuf.getChannelData(0);
+        for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+        const noise = c.ac.createBufferSource();
+        noise.buffer = noiseBuf;
+        noise.loop = true;
+        // Bandpass sweep — starts high, drifts down
         const bp = c.ac.createBiquadFilter();
         bp.type = "bandpass";
-        bp.frequency.value = 1600;
-        bp.Q.value = 2.5;
-        const gain = c.ac.createGain();
-        gain.gain.value = 0.0001;
-        osc1.connect(bp);
-        osc2.connect(bp);
-        bp.connect(gain).connect(c.master);
-        osc1.start(t);
-        osc2.start(t);
-        lfo.start(t);
-        diveScreamNodes = { osc1, osc2, gain, lfo };
+        bp.frequency.value = 1800;
+        bp.Q.value = 2.8;
+        bp.frequency.setTargetAtTime(650, t, 2.2);
+        // --- Waveshaper — aggression ---
+        const ws = c.ac.createWaveShaper();
+        const curve = new Float32Array(256);
+        for (let i = 0; i < 256; i++) {
+          const x = (i / 128) - 1;
+          // Soft overdrive curve
+          curve[i] = Math.tanh(x * 2.8) * 0.85;
+        }
+        ws.curve = curve;
+        ws.oversample = "4x";
+        // Noise bandpass filter
+        const noiseBP = c.ac.createBiquadFilter();
+        noiseBP.type = "bandpass";
+        noiseBP.frequency.value = 1200;
+        noiseBP.Q.value = 0.8;
+        noise.connect(noiseBP);
+        // Mix gain — sum all layers
+        const mix = c.ac.createGain();
+        mix.gain.value = 0.45;
+        osc1.connect(mix);
+        osc2.connect(mix);
+        osc3.connect(mix);
+        noiseBP.connect(mix);
+        // Chain: mix → waveshaper → bandpass → master gain
+        const master = c.ac.createGain();
+        master.gain.value = 0.0001;
+        mix.connect(ws);
+        ws.connect(bp);
+        bp.connect(master);
+        master.connect(c.master);
+        // --- Tremolo LFO — pulsating intensity ---
+        const lfoTrem = c.ac.createOscillator();
+        lfoTrem.type = "sine";
+        lfoTrem.frequency.value = 3.2;
+        const tremGain = c.ac.createGain();
+        tremGain.gain.value = 0.35;
+        lfoTrem.connect(tremGain);
+        tremGain.connect(master.gain);
+        // Start all
+        osc1.start(t); osc2.start(t); osc3.start(t);
+        noise.start(t);
+        lfoVib.start(t); lfoTrem.start(t);
+        diveScreamNodes = { osc1, osc2, osc3, noise, master, lfoVib, lfoTrem, bp, ws };
       }
       const now = c.ac.currentTime;
-      diveScreamNodes.gain.gain.cancelScheduledValues(now);
-      // 0.15 eşik altında sustain yok, sadece dur
-      const target = intensity > 0.15 ? (intensity - 0.15) * 0.35 : 0;
-      diveScreamNodes.gain.gain.setTargetAtTime(target, now, 0.12);
+      diveScreamNodes.master.gain.cancelScheduledValues(now);
+      // Sustain sadece 0.18 eşik üstünde
+      const target = intensity > 0.18 ? (intensity - 0.18) * 0.55 : 0;
+      diveScreamNodes.master.gain.setTargetAtTime(target, now, 0.1);
     },
     ui() {
       withCtx((c) => {
@@ -1335,11 +1396,14 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         diveWindNodes = null;
       }
       if (diveScreamNodes) {
-        diveScreamNodes.gain.gain.cancelScheduledValues(c.ac.currentTime);
-        diveScreamNodes.gain.gain.setValueAtTime(0.0001, c.ac.currentTime);
+        diveScreamNodes.master.gain.cancelScheduledValues(c.ac.currentTime);
+        diveScreamNodes.master.gain.setValueAtTime(0.0001, c.ac.currentTime);
         diveScreamNodes.osc1.stop(c.ac.currentTime + 0.1);
         diveScreamNodes.osc2.stop(c.ac.currentTime + 0.1);
-        diveScreamNodes.lfo.stop(c.ac.currentTime + 0.1);
+        diveScreamNodes.osc3.stop(c.ac.currentTime + 0.1);
+        diveScreamNodes.noise.stop(c.ac.currentTime + 0.1);
+        diveScreamNodes.lfoVib.stop(c.ac.currentTime + 0.1);
+        diveScreamNodes.lfoTrem.stop(c.ac.currentTime + 0.1);
         diveScreamNodes = null;
       }
       flameWanted = false;
@@ -1362,7 +1426,10 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (diveScreamNodes) {
         diveScreamNodes.osc1.stop();
         diveScreamNodes.osc2.stop();
-        diveScreamNodes.lfo.stop();
+        diveScreamNodes.osc3.stop();
+        diveScreamNodes.noise.stop();
+        diveScreamNodes.lfoVib.stop();
+        diveScreamNodes.lfoTrem.stop();
         diveScreamNodes = null;
       }
       ctx = null;
