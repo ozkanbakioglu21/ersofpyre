@@ -243,6 +243,8 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
 
   /* ── sample buffer önbellek ── */
   const sfxCache = new Map<string, AudioBuffer>();
+  let sfxLoaded = 0;
+  const SFX_WARMUP = 12;
   let sfxLoading = false;
 
   /** Dosyayı indirip decode eder; hata olursa null döner. */
@@ -258,6 +260,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (!c) return null;
       const buf = await c.ac.decodeAudioData(ab);
       sfxCache.set(file, buf);
+      sfxLoaded++;
       return buf;
     } catch {
       return null;
@@ -288,22 +291,41 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     if (!files) return;
     const file = pickRandom(files);
     const buf = sfxCache.get(file);
-    if (!buf) return; // henüz yüklenmedi — prosedürel yedek çalışır
     if (voices > MAX_VOICES) return;
 
     const t = c.ac.currentTime + (opts?.delay ?? 0);
-    const src = c.ac.createBufferSource();
-    src.buffer = buf;
-    // Rastgele pitch varyasyonu: %10
-    src.playbackRate.value = opts?.pitch ?? (0.9 + Math.random() * 0.2);
-    const gain = c.ac.createGain();
     const vol = opts?.vol ?? 1;
-    gain.gain.setValueAtTime(vol, t);
-    gain.gain.setValueAtTime(vol, t + buf.duration - 0.05);
-    gain.gain.linearRampToValueAtTime(0, t + buf.duration);
-    src.connect(gain).connect(c.master);
-    src.start(t);
-    track(src, t + buf.duration + 0.02);
+
+    if (buf) {
+      const src = c.ac.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = opts?.pitch ?? (0.9 + Math.random() * 0.2);
+      const gain = c.ac.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.linearRampToValueAtTime(vol, t + 0.005);
+      const endFade = Math.max(t + 0.006, t + buf.duration - 0.05);
+      gain.gain.setValueAtTime(vol, endFade);
+      gain.gain.linearRampToValueAtTime(0, t + buf.duration);
+      src.connect(gain).connect(c.master);
+      src.start(t);
+      track(src, t + buf.duration + 0.02);
+    } else if (sfxLoaded < SFX_WARMUP) {
+      // Preload sırasında prosedürel yedek — sessiz kalmak yerine kısa brown-noise patlaması
+      const dur = 0.08 + Math.random() * 0.15;
+      const src = c.ac.createBufferSource();
+      src.buffer = c.noise;
+      const filt = c.ac.createBiquadFilter();
+      filt.type = cat.includes("explosion") || cat.includes("Explosion") || cat.includes("Boom") ? "lowpass" : "bandpass";
+      filt.frequency.value = cat.includes("metal") || cat.includes("crack") ? 3200 : 600;
+      filt.Q.value = 1;
+      const gain = c.ac.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.linearRampToValueAtTime(vol * 0.5, t + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(filt).connect(gain).connect(c.master);
+      src.start(t);
+      track(src, t + dur + 0.02);
+    }
   };
 
   let flameNodes: {
@@ -350,6 +372,15 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       limiter.release.value = 0.15;
       master.connect(limiter).connect(ac.destination);
       ctx = { ac, master, noise: makeNoise(ac) };
+      // Tab arka plana gittiğinde otomatik durdur/ön plana geldiğinde devam ettir
+      const onVis = () => {
+        if (document.hidden) {
+          if (ac.state === "running") void ac.suspend();
+        } else {
+          if (ac.state === "suspended") void ac.resume();
+        }
+      };
+      document.addEventListener("visibilitychange", onVis);
       return ctx;
     } catch {
       return null;
@@ -926,7 +957,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     explosion(size) {
       withCtx((c) => {
         const now = c.ac.currentTime;
-        if (now - lastExplosion < 0.045) return;
+        if (now - lastExplosion < 0.07) return;
         lastExplosion = now;
         const s = Math.min(2, Math.max(0.5, size));
         // Büyük patlamalar için güçlü ses
@@ -963,12 +994,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         });
         // Metal gıcırtısı
         playSample(c, "metalHit", { pitch: 0.7 + Math.random() * 0.6, vol: 0.3, delay: 0.04 });
-        // Uzak yankı — yankı gerçekçiliği için rastgele gecikme
-        playSample(c, "distantBoom", {
-          pitch: 0.6 + Math.random() * 0.2,
-          vol: 0.25 * s,
-          delay: 0.3 + Math.random() * 0.5,
-        });
       });
     },
     fireball() {
@@ -990,18 +1015,36 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           const files = SFX_MANIFEST[cat];
           if (!files) return;
           const buf = sfxCache.get(pickRandom(files));
-          if (!buf || voices > MAX_VOICES) return;
+          if (voices > MAX_VOICES) return;
           const st = c.ac.currentTime + d;
-          const src = c.ac.createBufferSource();
-          src.buffer = buf;
-          src.playbackRate.value = pt;
-          const g = c.ac.createGain();
-          g.gain.setValueAtTime(v, st);
-          g.gain.setValueAtTime(v, st + buf.duration - 0.04);
-          g.gain.linearRampToValueAtTime(0, st + buf.duration);
-          src.connect(g).connect(compGain);
-          src.start(st);
-          track(src, st + buf.duration + 0.02);
+          if (buf) {
+            const src = c.ac.createBufferSource();
+            src.buffer = buf;
+            src.playbackRate.value = pt;
+            const g = c.ac.createGain();
+            g.gain.setValueAtTime(0.0001, st);
+            g.gain.linearRampToValueAtTime(v, st + 0.005);
+            const ef = Math.max(st + 0.006, st + buf.duration - 0.04);
+            g.gain.setValueAtTime(v, ef);
+            g.gain.linearRampToValueAtTime(0, st + buf.duration);
+            src.connect(g).connect(compGain);
+            src.start(st);
+            track(src, st + buf.duration + 0.02);
+          } else if (sfxLoaded < SFX_WARMUP) {
+            const dur = 0.1 + Math.random() * 0.2;
+            const src = c.ac.createBufferSource();
+            src.buffer = c.noise;
+            const filt = c.ac.createBiquadFilter();
+            filt.type = "lowpass";
+            filt.frequency.value = 400;
+            const g = c.ac.createGain();
+            g.gain.setValueAtTime(0.0001, st);
+            g.gain.linearRampToValueAtTime(v * 0.4, st + 0.005);
+            g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
+            src.connect(filt).connect(g).connect(compGain);
+            src.start(st);
+            track(src, st + dur + 0.02);
+          }
         };
 
         // ▌1 — Ana patlama (tek, güçlü)
