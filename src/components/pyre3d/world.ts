@@ -176,7 +176,9 @@ export function createTerrain(size: number, segments = 72): THREE.Group {
   };
   for (let i = 0; i < 44; i++) {
     const a = (i / 44) * Math.PI * 2 + rand(-0.06, 0.06);
-    const ringK = i % 3 === 0 ? 0.52 : 0.45;
+    // Halka oyun alanının (size/2.4 = dünya yarıçapı) belirgin dışında kalsın:
+    // küçük bölümlerde dağlar sahanın içine taşıp dev piramit gibi görünüyordu.
+    const ringK = i % 3 === 0 ? 0.62 : 0.53;
     const r = size * ringK + rand(-50, 50);
     const px = Math.cos(a) * r;
     const pz = Math.sin(a) * r;

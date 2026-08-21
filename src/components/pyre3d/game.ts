@@ -1844,6 +1844,11 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         flameOuter.mat.opacity = 0.35 + Math.random() * 0.2;
         flameMid.mat.opacity = 0.5 + Math.random() * 0.2;
         flameCore.mat.opacity = 0.6 + Math.random() * 0.2;
+        // Kükreme alevi kısa ve gür: uçuştaki uzun jet ölçeği kalmasın
+        const cs = 0.45 + Math.random() * 0.1;
+        flameOuter.mesh.scale.set(1.3, cs, 1.3);
+        flameMid.mesh.scale.set(1.2, cs * 0.85, 1.2);
+        flameCore.mesh.scale.set(1.1, cs * 0.7, 1.1);
       } else {
         flameLight.intensity *= 0.92;
         flameOuter.mat.opacity *= 0.9;
