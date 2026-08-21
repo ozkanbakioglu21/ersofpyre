@@ -734,6 +734,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   let growlT = 0;
   let monsterT = 0;
   let prevFlapSin = 0;
+  let prevDive = 0;
   let bestTime = o.save.chapters[chapter.id]?.bestTime ?? 0;
   let lastPush: HudSnapshot | null = null;
 
@@ -916,6 +917,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       prevFlapSin = curFlapSin;
       audio.diveWind(g.dive);
       fx.windStreak(dragon.root.position, g.flightAxes.heading, g.dive);
+      // Dalış çığlığı: dive 0'dan 0.15'e çıkınca ses ver
+      if (prevDive < 0.15 && g.dive >= 0.15) audio.scream();
+      prevDive = g.dive;
       if (g.infinite) updateInfinitePath(g, g.infinite, dt);
       dragon.maw.getWorldPosition(headPos);
 
