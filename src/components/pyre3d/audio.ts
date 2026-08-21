@@ -314,17 +314,13 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   let diveScreamNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
   let diveScreamLastStart = 0;
   let musicNodes: {
-    pad1: OscillatorNode;
-    pad2: OscillatorNode;
     padGain: GainNode;
-    subPulse: OscillatorNode;
-    subPulseGain: GainNode;
-    tension: OscillatorNode;
-    tensionGain: GainNode;
-    metallic: AudioBufferSourceNode;
-    metallicGain: GainNode;
-    lfo: OscillatorNode;
-    lfoGain: GainNode;
+    drumGain: GainNode;
+    masterGain: GainNode;
+    _timer: ReturnType<typeof setInterval>;
+    _tensionTimer: ReturnType<typeof setTimeout>;
+    _tensionOsc: OscillatorNode;
+    _tensionFilter: BiquadFilterNode;
   } | null = null;
 
   const ensure = (): Ctx | null => {
@@ -692,160 +688,150 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     if (musicNodes) return;
     const t = c.ac.currentTime;
 
-    // Katman 1: Ana drone — iki detune sawtooth, orta frekans
-    const pad1 = c.ac.createOscillator();
-    pad1.type = "sawtooth";
-    pad1.frequency.value = 110;
-    const pad2 = c.ac.createOscillator();
-    pad2.type = "sawtooth";
-    pad2.frequency.value = 110.8;
+    // Master music gain
+    const masterGain = c.ac.createGain();
+    masterGain.gain.setValueAtTime(0.0001, t);
+    masterGain.gain.linearRampToValueAtTime(0.5, t + 1.5);
+    masterGain.connect(c.master);
+
+    // KATMAN 1: Dark pad — Dm chord drone (D3, F3, A3)
     const padGain = c.ac.createGain();
-    padGain.gain.setValueAtTime(0.0001, t);
-    padGain.gain.linearRampToValueAtTime(0.35, t + 1);
-    const padFilter = c.ac.createBiquadFilter();
-    padFilter.type = "lowpass";
-    padFilter.frequency.value = 600;
-    padFilter.Q.value = 0.7;
-    pad1.connect(padFilter);
-    pad2.connect(padFilter);
-    padFilter.connect(padGain);
-    padGain.connect(c.master);
+    padGain.gain.value = 0.25;
+    padGain.connect(masterGain);
 
-    // Katman 2: Dip nabız — kalp atışı
-    const subPulse = c.ac.createOscillator();
-    subPulse.type = "sine";
-    subPulse.frequency.value = 65;
-    const subPulseGain = c.ac.createGain();
-    subPulseGain.gain.setValueAtTime(0.0001, t);
-    subPulseGain.gain.linearRampToValueAtTime(0.4, t + 0.8);
-    const pulseLfo = c.ac.createOscillator();
-    pulseLfo.type = "sine";
-    pulseLfo.frequency.value = 0.4;
-    const pulseLfoGain = c.ac.createGain();
-    pulseLfoGain.gain.value = 0.35;
-    pulseLfo.connect(pulseLfoGain).connect(subPulseGain.gain);
-    subPulse.connect(subPulseGain);
-    subPulseGain.connect(c.master);
+    [146.8, 174.6, 220].forEach((f) => {
+      const osc = c.ac.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.value = f;
+      const osc2 = c.ac.createOscillator();
+      osc2.type = "sawtooth";
+      osc2.frequency.value = f * 1.003;
+      const g = c.ac.createGain();
+      g.gain.value = 0.12;
+      const filter = c.ac.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 500;
+      filter.Q.value = 0.6;
+      osc.connect(filter);
+      osc2.connect(filter);
+      filter.connect(g);
+      g.connect(padGain);
+      osc.start(t);
+      osc2.start(t);
+    });
 
-    // Katman 3: Gerilim — taramalı sawtooth
-    const tension = c.ac.createOscillator();
-    tension.type = "sawtooth";
-    tension.frequency.value = 220;
-    const tensionGain = c.ac.createGain();
-    tensionGain.gain.setValueAtTime(0.0001, t);
-    tensionGain.gain.linearRampToValueAtTime(0.15, t + 1.5);
-    tension.frequency.setValueAtTime(165, t);
-    tension.frequency.linearRampToValueAtTime(330, t + 8);
+    // KATMAN 2: War drums
+    const drumGain = c.ac.createGain();
+    drumGain.gain.value = 0.4;
+    drumGain.connect(masterGain);
+
+    const playDrum = (time: number, type: "kick" | "snare") => {
+      if (type === "kick") {
+        const osc = c.ac.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(150, time);
+        osc.frequency.exponentialRampToValueAtTime(40, time + 0.12);
+        const g = c.ac.createGain();
+        g.gain.setValueAtTime(0.7, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
+        osc.connect(g).connect(drumGain);
+        osc.start(time);
+        osc.stop(time + 0.3);
+      } else {
+        const noiseBuf = c.ac.createBuffer(1, c.ac.sampleRate * 0.15, c.ac.sampleRate);
+        const nd = noiseBuf.getChannelData(0);
+        for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+        const nSrc = c.ac.createBufferSource();
+        nSrc.buffer = noiseBuf;
+        const nFilter = c.ac.createBiquadFilter();
+        nFilter.type = "highpass";
+        nFilter.frequency.value = 2000;
+        const nGain = c.ac.createGain();
+        nGain.gain.setValueAtTime(0.5, time);
+        nGain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+        nSrc.connect(nFilter).connect(nGain).connect(drumGain);
+        nSrc.start(time);
+        const osc = c.ac.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(200, time);
+        osc.frequency.exponentialRampToValueAtTime(80, time + 0.08);
+        const oGain = c.ac.createGain();
+        oGain.gain.setValueAtTime(0.3, time);
+        oGain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+        osc.connect(oGain).connect(drumGain);
+        osc.start(time);
+        osc.stop(time + 0.15);
+      }
+    };
+
+    const scheduleDrums = () => {
+      if (!musicNodes) return;
+      const now = c.ac.currentTime;
+      [0, 0.5, 1.0, 1.5].forEach((offset, i) => {
+        const hitTime = now + offset;
+        playDrum(hitTime, i % 2 === 0 ? "kick" : "snare");
+      });
+    };
+    const drumTimer = setInterval(scheduleDrums, 2000);
+    scheduleDrums();
+
+    // KATMAN 3: Tension riser
+    const tensionOsc = c.ac.createOscillator();
+    tensionOsc.type = "sawtooth";
+    tensionOsc.frequency.value = 110;
     const tensionFilter = c.ac.createBiquadFilter();
     tensionFilter.type = "lowpass";
-    tensionFilter.frequency.value = 800;
-    tensionFilter.Q.value = 0.5;
-    tension.connect(tensionFilter);
-    tensionFilter.connect(tensionGain);
-    tensionGain.connect(c.master);
+    tensionFilter.frequency.value = 400;
+    tensionFilter.Q.value = 1.2;
+    const tensionGain = c.ac.createGain();
+    tensionGain.gain.value = 0.08;
+    tensionOsc.connect(tensionFilter).connect(tensionGain).connect(masterGain);
+    tensionOsc.start(t);
 
-    // Katman 4: Metalik doku — gürültü
-    const metallic = c.ac.createBufferSource();
-    metallic.buffer = c.noise;
-    metallic.loop = true;
-    const metalFilter = c.ac.createBiquadFilter();
-    metalFilter.type = "bandpass";
-    metalFilter.frequency.value = 2400;
-    metalFilter.Q.value = 3;
-    const metallicGain = c.ac.createGain();
-    metallicGain.gain.setValueAtTime(0.0001, t);
-    metallicGain.gain.linearRampToValueAtTime(0.08, t + 1);
-    const lfo = c.ac.createOscillator();
-    lfo.type = "sine";
-    lfo.frequency.value = 0.15;
-    const lfoGain = c.ac.createGain();
-    lfoGain.gain.value = 1200;
-    lfo.connect(lfoGain).connect(metalFilter.frequency);
-    metallic.connect(metalFilter);
-    metalFilter.connect(metallicGain);
-    metallicGain.connect(c.master);
-
-    // Gerilim periyodik tarama
     const scheduleTension = () => {
       if (!musicNodes) return;
       const now = c.ac.currentTime;
-      tension.frequency.setValueAtTime(165, now);
-      tension.frequency.linearRampToValueAtTime(330, now + 8);
-      tensionTimer = setTimeout(scheduleTension, 8000);
+      tensionOsc.frequency.setValueAtTime(110, now);
+      tensionOsc.frequency.linearRampToValueAtTime(220, now + 6);
+      tensionFilter.frequency.setValueAtTime(400, now);
+      tensionFilter.frequency.linearRampToValueAtTime(1200, now + 6);
+      tensionGain.gain.cancelScheduledValues(now);
+      tensionGain.gain.setValueAtTime(0.001, now);
+      tensionGain.gain.linearRampToValueAtTime(0.1, now + 3);
+      tensionGain.gain.linearRampToValueAtTime(0.001, now + 6);
+      tensionTimer = setTimeout(scheduleTension, 7000);
     };
-    let tensionTimer = setTimeout(scheduleTension, 8000);
-
-    pad1.start(t);
-    pad2.start(t);
-    subPulse.start(t);
-    pulseLfo.start(t);
-    tension.start(t);
-    metallic.start(t);
-    lfo.start(t);
+    let tensionTimer = setTimeout(scheduleTension, 3000);
 
     musicNodes = {
-      pad1, pad2, padGain,
-      subPulse, subPulseGain,
-      tension, tensionGain,
-      metallic, metallicGain,
-      lfo, lfoGain,
+      padGain, drumGain, masterGain,
+      _timer: drumTimer,
+      _tensionTimer: tensionTimer,
+      _tensionOsc: tensionOsc,
+      _tensionFilter: tensionFilter,
     };
-    (musicNodes as unknown as { _timer: ReturnType<typeof setTimeout> })._timer = tensionTimer;
-    (musicNodes as unknown as { _pulseLfo: OscillatorNode })._pulseLfo = pulseLfo;
-    (musicNodes as unknown as { _tensionFilter: BiquadFilterNode })._tensionFilter = tensionFilter;
-    (musicNodes as unknown as { _padFilter: BiquadFilterNode })._padFilter = padFilter;
-    (musicNodes as unknown as { _metalFilter: BiquadFilterNode })._metalFilter = metalFilter;
   };
 
   const stopMusic = (c: Ctx) => {
     if (!musicNodes) return;
-    const timerId = (musicNodes as unknown as { _timer: ReturnType<typeof setTimeout> })._timer;
-    const pulseLfo = (musicNodes as unknown as { _pulseLfo: OscillatorNode })._pulseLfo;
     const m = musicNodes;
+    clearInterval(m._timer);
+    clearTimeout(m._tensionTimer);
     musicNodes = null;
-    clearTimeout(timerId);
     const t = c.ac.currentTime;
 
-    // Tüm gain'leri kademeli olarak sustur
-    m.padGain.gain.cancelScheduledValues(t);
-    m.padGain.gain.setValueAtTime(Math.max(0.0001, m.padGain.gain.value), t);
-    m.padGain.gain.exponentialRampToValueAtTime(0.0001, t + 2);
-    m.subPulseGain.gain.cancelScheduledValues(t);
-    m.subPulseGain.gain.setValueAtTime(Math.max(0.0001, m.subPulseGain.gain.value), t);
-    m.subPulseGain.gain.exponentialRampToValueAtTime(0.0001, t + 2);
-    m.tensionGain.gain.cancelScheduledValues(t);
-    m.tensionGain.gain.setValueAtTime(Math.max(0.0001, m.tensionGain.gain.value), t);
-    m.tensionGain.gain.exponentialRampToValueAtTime(0.0001, t + 2.5);
-    m.metallicGain.gain.cancelScheduledValues(t);
-    m.metallicGain.gain.setValueAtTime(Math.max(0.0001, m.metallicGain.gain.value), t);
-    m.metallicGain.gain.exponentialRampToValueAtTime(0.0001, t + 2);
+    m.masterGain.gain.cancelScheduledValues(t);
+    m.masterGain.gain.setValueAtTime(Math.max(0.0001, m.masterGain.gain.value), t);
+    m.masterGain.gain.exponentialRampToValueAtTime(0.0001, t + 2);
 
-    // Tüm oscillator'ları durdur
-    const stopTime = t + 3;
-    m.pad1.stop(stopTime);
-    m.pad2.stop(stopTime);
-    m.subPulse.stop(stopTime);
-    pulseLfo.stop(stopTime);
-    m.tension.stop(stopTime);
-    m.metallic.stop(stopTime);
-    m.lfo.stop(stopTime);
+    m._tensionOsc.stop(t + 2.5);
 
-    m.pad1.onended = () => {
-      m.pad1.disconnect();
-      m.pad2.disconnect();
-      (m as unknown as { _padFilter: BiquadFilterNode })._padFilter.disconnect();
+    m._tensionOsc.onended = () => {
+      m.masterGain.disconnect();
       m.padGain.disconnect();
-      m.subPulse.disconnect();
-      pulseLfo.disconnect();
-      m.subPulseGain.disconnect();
-      m.tension.disconnect();
-      (m as unknown as { _tensionFilter: BiquadFilterNode })._tensionFilter.disconnect();
-      m.tensionGain.disconnect();
-      m.metallic.disconnect();
-      (m as unknown as { _metalFilter: BiquadFilterNode })._metalFilter?.disconnect();
-      m.metallicGain.disconnect();
-      m.lfo.disconnect();
-      m.lfoGain.disconnect();
+      m.drumGain.disconnect();
+      m._tensionOsc.disconnect();
+      m._tensionFilter.disconnect();
     };
   };
 
