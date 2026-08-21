@@ -119,6 +119,12 @@ const SFX_MANIFEST: Record<string, string[]> = {
     "explosion_04.ogg", "explosion_05.ogg", "explosion_06.ogg", "explosion_07.ogg",
     "blast_01.ogg", "blast_03.ogg",
   ],
+  bigBoom: [
+    "big_boom.wav", "big_explosion.wav",
+  ],
+  dynamite: [
+    "dynamite.wav", "blast_01.ogg", "blast_02.ogg",
+  ],
   mechExplosion: [
     "mech_explosion.wav",
     "metal_hit_01.ogg", "metal_hit_02.ogg", "metal_hit_03.ogg",
