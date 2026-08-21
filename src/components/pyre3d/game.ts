@@ -918,8 +918,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       audio.diveWind(g.dive);
       audio.diveScream(g.dive);
       fx.windStreak(dragon.root.position, g.flightAxes.heading, g.dive);
-      // Dalış çığlığı: dive 0'dan 0.15'e çıkınca ses ver
-      if (prevDive < 0.15 && g.dive >= 0.15) audio.scream();
+      // Her dalışta kükreme: dive 0.1 altından çıkınca
+      if (prevDive < 0.1 && g.dive >= 0.1) audio.roar();
       prevDive = g.dive;
       if (g.infinite) updateInfinitePath(g, g.infinite, dt);
       dragon.maw.getWorldPosition(headPos);
