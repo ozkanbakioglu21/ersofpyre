@@ -128,7 +128,8 @@ export type Target = Burnable & {
 };
 
 export type WeakPointId =
-  "balonOn" | "balonArka" | "motorSol" | "motorSag" | "batarya" | "kopru" | "cekirdek";
+  | "balonOn" | "balonArka" | "motorSol" | "motorSag" | "batarya" | "kopru" | "cekirdek"
+  | "kanatSol" | "kanatSag" | "radar" | "kalkan" | "yakit" | "komuta";
 
 export type WeakPointEffect = "sink" | "disableGuns" | "disableEngine" | "phase";
 

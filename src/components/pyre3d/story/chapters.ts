@@ -481,25 +481,34 @@ const c05: ChapterDef = {
     lore:
       "Lonca cevabını gönderdi: 'Bulwark' sınıfı bir toplu firkateyn. Gövdesi " +
       "konik aleve kapalı — kırılacak yeri modülleri. Balon hücreleri, motor " +
-      "podları, yan batarya ve köprü. Hangi sırayla imha ettiğin gemiyi değiştirir.",
-    objectives: ["Bulwark'ın modüllerini imha et", "Firkateyni düşür", "Yerleşimi yak"],
+      "podları, kanat konsolları, anten, kalkan, yakıt ve komuta merkezi. " +
+      "Modülleri imha ettikçe gemi zayıflıyor.",
+    objectives: [
+      "Bulwark'ın 12 modülünü imha et",
+      "Firkateyni düşür",
+      "Tüm eskortları temizle",
+    ],
     tips: [
       "Köz Mermisi modüllere 2.5 kat hasar verir",
       "Bataryayı alırsan top ateşi kesilir",
-      "Balon hücreleri giderse gemi alçalır",
+      "Modüller_boldukça gemi alçalır ve yavaşlar",
+      "Eskort wasplar modüllerden sonra hedeflenebilir",
     ],
   },
   world: {
-    radius: 760,
-    scatter: { tower: 8, factory: 6, house: 22 },
+    radius: 800,
+    scatter: {},
     airships: [
       { x: 0, y: 150, z: 260, role: "frigate", id: "bulwark", weakPoints: true },
       { x: 220, y: 130, z: 320, role: "scout" },
       { x: -240, y: 140, z: 300, role: "scout" },
+      { x: 340, y: 120, z: 200, role: "scout" },
+      { x: -320, y: 160, z: 180, role: "scout" },
     ],
     waves: {
-      eskort: { enemy: "wasp", count: 4, radius: 260, altitude: [110, 180] },
-      ikinci: { enemy: "wasp", count: 5, radius: 300, altitude: [100, 190] },
+      eskort: { enemy: "wasp", count: 5, radius: 280, altitude: [110, 180] },
+      ikinci: { enemy: "wasp", count: 6, radius: 320, altitude: [100, 190] },
+      ucuncu: { enemy: "wasp", count: 7, radius: 340, altitude: [90, 200] },
     },
     wind: { dir: 1.8, strength: 0.35 },
     start: { x: 0, y: 140, z: -80 },
@@ -509,28 +518,31 @@ const c05: ChapterDef = {
       id: "modul",
       type: "destroyWeakPoints",
       shipId: "bulwark",
-      modules: ["balonOn", "balonArka", "motorSol", "motorSag", "batarya", "kopru"],
+      modules: [
+        "balonOn", "balonArka", "motorSol", "motorSag", "batarya", "kopru",
+        "kanatSol", "kanatSag", "radar", "kalkan", "yakit", "komuta",
+      ],
       label: "Bulwark modülleri",
     },
     { id: "gemi", type: "killAirships", role: "frigate", count: 1, label: "Firkateyni düşür" },
-    { id: "yikim", type: "destroyPercent", pct: 0.4, label: "Yerleşimi yak" },
+    { id: "esort", type: "killEnemies", enemy: "wasp", count: 18, label: "Eskortları temizle" },
   ],
   fail: [{ type: "death" }],
   abilities: { ...ALL_OFF, flame: true, fireball: true, roll: true },
-  par: { time: 300, score: 14000 },
-  rewardEmbers: 1800,
-  bondXp: 180,
+  par: { time: 420, score: 22000 },
+  rewardEmbers: 2200,
+  bondXp: 200,
   unlocks: ["c06"],
   beats: [
     {
       id: "acilis",
       trigger: { at: "start" },
       lines: [
-        { who: "Ashkeep", text: "Bulwark angaje oluyor. Yan bataryalar açık.", dur: 3.4 },
-        { who: "Kayra", text: "Gövdesi kalın. Modüllerini kıracağız — Köz Mermisi.", dur: 3.8 },
+        { who: "Ashkeep", text: "Bulwark angaje oluyor. Tüm bataryalar açık.", dur: 3.4 },
+        { who: "Kayra", text: "12 modül var — hepsini kır, sonra gemiyi indir.", dur: 3.8 },
       ],
       actions: [
-        { do: "hint", text: "Modülleri hedefle", keys: ["M"], dur: 9 },
+        { do: "hint", text: "Modülleri hedefle — Köz Mermisiyle", keys: ["M"], dur: 9 },
         { do: "spawnWave", wave: "eskort" },
       ],
     },
@@ -550,10 +562,16 @@ const c05: ChapterDef = {
       actions: [{ do: "shake", amp: 0.8 }],
     },
     {
-      id: "yariCan",
-      trigger: { at: "objectiveProgress", id: "modul", pct: 0.5 },
-      lines: [{ who: "Ashkeep", text: "Balon basıncı düşüyor! İrtifa kaybediyoruz!", dur: 3.4 }],
+      id: "yariModul",
+      trigger: { at: "objectiveProgress", id: "modul", pct: 0.4 },
+      lines: [{ who: "Ashkeep", text: "Modüllerin yarısı gitti! Gemi alçalıyor!", dur: 3.4 }],
       actions: [{ do: "spawnWave", wave: "ikinci" }],
+    },
+    {
+      id: "cokModul",
+      trigger: { at: "objectiveProgress", id: "modul", pct: 0.75 },
+      lines: [{ who: "Kayra", text: "Neredeyse bitti! Son modülleri temizle!", dur: 3 }],
+      actions: [{ do: "spawnWave", wave: "ucuncu" }],
     },
     {
       id: "sonSaldiri",

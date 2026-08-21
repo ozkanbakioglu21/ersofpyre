@@ -24,6 +24,12 @@ const WP_LABEL: Record<WeakPointId, string> = {
   batarya: "Yan Batarya",
   kopru: "Köprü",
   cekirdek: "Çekirdek Kazanı",
+  kanatSol: "Sol Kanat Konsolu",
+  kanatSag: "Sağ Kanat Konsolu",
+  radar: "Anten Kulesi",
+  kalkan: "Kalkan Jeneratörü",
+  yakit: "Yakıt Deposu",
+  komuta: "Komuta Merkezi",
 };
 
 function makeWeakPoint(
@@ -113,6 +119,74 @@ function bridgeModule(s: number): THREE.Group {
   const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.6 * s, 0.8 * s, 2.4 * s, 8), brass);
   funnel.position.y = 2 * s;
   g.add(funnel);
+  return g;
+}
+
+function wingStrut(s: number): THREE.Group {
+  const g = new THREE.Group();
+  const strut = new THREE.Mesh(new THREE.BoxGeometry(4.8 * s, 0.6 * s, 1.4 * s), stone(0x3a3228, 0.5));
+  g.add(strut);
+  const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * s, 0.15 * s, 3.2 * s, 6), brass);
+  brace.rotation.z = Math.PI / 4;
+  brace.position.set(0, -1.2 * s, 0);
+  g.add(brace);
+  const light = new THREE.Mesh(new THREE.SphereGeometry(0.35 * s, 6, 6), lanternMat);
+  light.position.set(2.2 * s, 0.5 * s, 0);
+  g.add(light);
+  return g;
+}
+
+function antennaTower(s: number): THREE.Group {
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.18 * s, 4.5 * s, 6), brass);
+  g.add(pole);
+  const dish = new THREE.Mesh(new THREE.TorusGeometry(1.2 * s, 0.12 * s, 6, 10), lanternMat);
+  dish.rotation.x = Math.PI / 3;
+  dish.position.y = 2.2 * s;
+  g.add(dish);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.25 * s, 6, 6), lanternMat);
+  tip.position.y = 2.6 * s;
+  g.add(tip);
+  return g;
+}
+
+function shieldGen(s: number): THREE.Group {
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(new THREE.DodecahedronGeometry(1.4 * s, 0), brass);
+  g.add(core);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.8 * s, 0.18 * s, 6, 12), lanternMat);
+  ring.rotation.x = Math.PI / 2;
+  g.add(ring);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.9 * s, 1.1 * s, 1.6 * s, 8), stone(0x2e2822, 0.6));
+  base.position.y = -1.6 * s;
+  g.add(base);
+  return g;
+}
+
+function fuelTank(s: number): THREE.Group {
+  const g = new THREE.Group();
+  const tank = new THREE.Mesh(new THREE.CapsuleGeometry(1.1 * s, 3.6 * s, 6, 8), stone(0x3a2e22, 0.4));
+  tank.rotation.x = Math.PI / 2;
+  g.add(tank);
+  const band1 = new THREE.Mesh(new THREE.TorusGeometry(1.2 * s, 0.1 * s, 5, 10), brass);
+  band1.position.z = -1.2 * s;
+  g.add(band1);
+  const band2 = band1.clone();
+  band2.position.z = 1.2 * s;
+  g.add(band2);
+  return g;
+}
+
+function commandModule(s: number): THREE.Group {
+  const g = new THREE.Group();
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(2 * s, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), stone(0x241f1a, 0.5));
+  g.add(dome);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(2.2 * s, 2.4 * s, 1.6 * s, 10), stone(0x2e2822, 0.6));
+  base.position.y = -1.2 * s;
+  g.add(base);
+  const window1 = new THREE.Mesh(new THREE.BoxGeometry(0.8 * s, 0.6 * s, 2.6 * s), litWindow);
+  window1.position.set(0, -0.4 * s, 1.6 * s);
+  g.add(window1);
   return g;
 }
 
@@ -293,6 +367,59 @@ export function createAirship(
         "phase",
       ),
     );
+    // Ek modüller: firkateynler için ekstra zayıf noktalar
+    if (role === "frigate") {
+      weakPoints.push(
+        makeWeakPoint(
+          "kanatSol",
+          wingStrut(s),
+          new THREE.Vector3(-R * 0.8, 2 * s, -6 * s),
+          3 * s,
+          180,
+          "disableEngine",
+        ),
+        makeWeakPoint(
+          "kanatSag",
+          wingStrut(s),
+          new THREE.Vector3(R * 0.8, 2 * s, -6 * s),
+          3 * s,
+          180,
+          "disableEngine",
+        ),
+        makeWeakPoint(
+          "radar",
+          antennaTower(s),
+          new THREE.Vector3(0, R * 0.7, 2 * s),
+          2.5 * s,
+          160,
+          "disableGuns",
+        ),
+        makeWeakPoint(
+          "kalkan",
+          shieldGen(s),
+          new THREE.Vector3(-R * 0.6, -4 * s, 8 * s),
+          2.8 * s,
+          200,
+          "disableEngine",
+        ),
+        makeWeakPoint(
+          "yakit",
+          fuelTank(s),
+          new THREE.Vector3(R * 0.5, -5 * s, -8 * s),
+          2.6 * s,
+          150,
+          "sink",
+        ),
+        makeWeakPoint(
+          "komuta",
+          commandModule(s),
+          new THREE.Vector3(0, R * 0.35, -HALF * 0.3),
+          3.2 * s,
+          300,
+          "phase",
+        ),
+      );
+    }
     for (const wp of weakPoints) group.add(wp.group);
   }
 
