@@ -16,6 +16,7 @@ import {
 } from "./combat";
 import { createDragon } from "./dragon";
 import {
+  createDart,
   createSearchlightRig,
   createTeslaRig,
   createWasp,
@@ -129,6 +130,8 @@ export type Game = {
 
   fwd: THREE.Vector3;
   vel: THREE.Vector3;
+  /** Gecikmeli ikincil patlamalar (cephanelik zinciri). */
+  pendingBooms: { at: THREE.Vector3; delay: number }[];
   dive: number;
   /** Fren bu karede gerçekten uygulandı mı (stamina/takla kapısından geçti). */
   braking: boolean;
@@ -487,6 +490,9 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       teslas.push({ t, rig });
     }
   }
+  // Kule → donanım eşlemesi: her kare için teslas.find() taraması yerine O(1).
+  const teslaByTarget = new Map(teslas.map((x) => [x.t, x.rig]));
+  const searchlightByTarget = new Map(searchlights.map((x) => [x.t, x.rig]));
 
   /* ---------------- uzamsal ızgara ---------------- */
   const grid = createGrid<Target>(26);
@@ -513,7 +519,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     score: 0,
     embers: 0,
     destroyed: 0,
-    totalTargets: targets.length + airships.length,
+    // Yalnız yer hedefleri: zeplinler "şehrin %X'ini yık" paydasına karışmasın.
+    totalTargets: targets.length,
     rage: 0,
     rageT: 0,
     emberRush: 0,
@@ -565,6 +572,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
     abilities: { ...chapter.abilities },
     fwd: FWD.clone(),
     vel: new THREE.Vector3(),
+    pendingBooms: [],
     dive: 0,
     braking: false,
     roll: null,
@@ -595,7 +603,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       const x = dragon.root.position.x + Math.cos(a) * w.radius;
       const z = dragon.root.position.z + Math.sin(a) * w.radius;
       const y = rng.range(w.altitude[0], w.altitude[1]);
-      const e = createWasp(x, y, z, rng);
+      // Dalga tanımındaki düşman türü artık gerçekten kullanılıyor.
+      const e = w.enemy === "dart" ? createDart(x, y, z, rng) : createWasp(x, y, z, rng);
       g.enemies.push(e);
       scene.add(e.group);
     }
@@ -1208,6 +1217,18 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       updateBurning(g, dt);
       updateFireSpread(g, dt);
 
+      /* ---- gecikmeli zincir patlamaları (cephanelik) ---- */
+      for (let i = g.pendingBooms.length - 1; i >= 0; i--) {
+        const pb = g.pendingBooms[i]!;
+        pb.delay -= dt;
+        if (pb.delay <= 0) {
+          explode(g, pb.at, { radius: 26, damage: 60, ignite: 0.6 });
+          shake(g, 0.35);
+          g.pendingBooms[i] = g.pendingBooms[g.pendingBooms.length - 1]!;
+          g.pendingBooms.pop();
+        }
+      }
+
       /* ---- sürekli çığlık sesleri ---- */
       screamT -= dt;
       if (screamT <= 0) {
@@ -1291,33 +1312,77 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             shots.spawn("flak", tmp2, tmp.normalize().multiplyScalar(95), 14, dp.y);
             audio.enemyShot();
           }
+        } else if (t.tower === "aa") {
+          // Öngörülü uçaksavar: merminin varış süresi kadar İLERİDEKİ konuma
+          // nişan alır — düz ve sabit uçuş cezalandırılır, manevra ödüllenir.
+          if (t.cool <= 0 && d < 260) {
+            t.cool = 2.8 * rate;
+            const tof = d / 110;
+            tmp.copy(dp).addScaledVector(g.vel, tof);
+            const fuseAlt = tmp.y;
+            tmp2.set(t.pos.x, t.pos.y + t.height, t.pos.z);
+            tmp.sub(tmp2).normalize();
+            shots.spawn("flak", tmp2, tmp.multiplyScalar(110), 12, fuseAlt);
+            audio.enemyShot();
+          }
         } else if (t.tower === "tesla") {
+          // Faz makinesi: ŞARJ (2.2 sn telegraf, hasar yok) → ZAP (1.2 sn
+          // hasar) → SOĞUMA (2.5 sn). Eski hâli menzile girer girmez kesintisiz
+          // hasar veren kaçınılmaz bir auraydı.
+          const rig = teslaByTarget.get(t);
+          const phase = t.teslaPhase ?? 2;
           if (d < TESLA_RANGE) {
-            const rig = teslas.find((x) => x.t === t);
-            if (rig) {
-              rig.rig.mat.opacity = 0.75;
-              tmp.set(0, 0, 0);
-              tmp2.copy(dp).sub(rig.rig.group.position);
-              updateTeslaArc(rig.rig, tmp, tmp2);
-            }
-            if (state.invuln <= 0) {
-              state.hp -= 9 * dt;
-              state.hitFlash = Math.max(state.hitFlash, 0.25);
+            if (phase === 2) {
+              if (t.cool <= 0) {
+                t.teslaPhase = 0;
+                t.cool = 2.2;
+                audio.lockOn();
+              }
+              if (rig) rig.mat.opacity = Math.max(0, rig.mat.opacity - 3 * dt);
+            } else if (phase === 0) {
+              if (rig) {
+                rig.mat.opacity = 0.12 + 0.28 * Math.abs(Math.sin(now * 0.02));
+                tmp.set(0, 0, 0);
+                tmp2.copy(dp).sub(rig.group.position);
+                updateTeslaArc(rig, tmp, tmp2);
+              }
+              if (t.cool <= 0) {
+                t.teslaPhase = 1;
+                t.cool = 1.2;
+              }
+            } else {
+              if (rig) {
+                rig.mat.opacity = 0.85;
+                tmp.set(0, 0, 0);
+                tmp2.copy(dp).sub(rig.group.position);
+                updateTeslaArc(rig, tmp, tmp2);
+              }
+              if (state.invuln <= 0) {
+                state.hp -= 9 * dt;
+                state.hitFlash = Math.max(state.hitFlash, 0.25);
+              }
+              if (t.cool <= 0) {
+                t.teslaPhase = 2;
+                t.cool = 2.5;
+              }
             }
           } else {
-            const rig = teslas.find((x) => x.t === t);
-            if (rig) rig.rig.mat.opacity = Math.max(0, rig.rig.mat.opacity - 3 * dt);
+            if (rig) rig.mat.opacity = Math.max(0, rig.mat.opacity - 3 * dt);
+            if (phase !== 2) {
+              t.teslaPhase = 2;
+              t.cool = 1;
+            }
           }
         } else {
           // Işıldak: koni içinde kalırsan bölge ateşini üstüne çeker.
-          const rig = searchlights.find((x) => x.t === t);
+          const rig = searchlightByTarget.get(t);
           if (rig) {
-            rig.rig.phase += dt * 0.55;
-            rig.rig.group.rotation.z = Math.sin(rig.rig.phase) * 0.6;
-            rig.rig.group.rotation.x = Math.PI - 0.5 + Math.cos(rig.rig.phase * 0.7) * 0.25;
+            rig.phase += dt * 0.55;
+            rig.group.rotation.z = Math.sin(rig.phase) * 0.6;
+            rig.group.rotation.x = Math.PI - 0.5 + Math.cos(rig.phase * 0.7) * 0.25;
             if (d < SEARCHLIGHT_RANGE) {
-              tmp.copy(dp).sub(rig.rig.group.position).normalize();
-              rig.rig.group.getWorldDirection(tmp2);
+              tmp.copy(dp).sub(rig.group.position).normalize();
+              rig.group.getWorldDirection(tmp2);
               if (tmp.dot(tmp2.negate()) > Math.cos(SEARCHLIGHT_HALF_ANGLE * 1.6)) {
                 t.cool -= dt;
                 if (t.cool <= 0) {
@@ -1401,17 +1466,41 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
         }
         z.group.position.y += Math.sin(now * 0.0004 + z.group.position.x) * 4 * dt;
         if (z.burn < 0.3) {
-          z.group.position.addScaledVector(z.dir, 12 * dt);
-          if (g.autoForward) {
+          // Rol bazlı seyir hızı: keşif çevik, fırkateyn hantal.
+          const cruise =
+            z.role === "scout" ? 18 : z.role === "bomber" ? 14 : z.role === "frigate" ? 10 : 8;
+          z.group.position.addScaledVector(z.dir, cruise * dt);
+          const zd = z.pos.distanceTo(dp);
+          if (zd < 420) {
+            // Ejderhaya yumuşak yönelme — eski kod bunu ölü autoForward
+            // bayrağına kilitlemişti, zeplinler oyuncuya hiç tepki vermiyordu.
             tmp.copy(dp).sub(z.group.position);
             tmp.y = 0;
             tmp.normalize();
-            z.dir.lerp(tmp, Math.min(1, dt * 0.5));
+            z.dir.lerp(tmp, Math.min(1, dt * 0.25)).normalize();
           } else if (Math.hypot(z.group.position.x, z.group.position.z) > worldRadius * 0.85) {
             z.dir.set(-z.group.position.x, 0, -z.group.position.z).normalize();
           }
           z.group.lookAt(tmp2.copy(z.group.position).add(z.dir));
           z.group.rotateY(Math.PI);
+        }
+        /* ---- bombardıman: bomba kapağı gerçekten çalışsın ---- */
+        z.bombCool -= dt;
+        if (
+          z.role === "bomber" &&
+          !z.gunsDisabled &&
+          z.burn < 0.15 &&
+          z.bombCool <= 0 &&
+          z.pos.y > dp.y + 10
+        ) {
+          const hd = Math.hypot(z.pos.x - dp.x, z.pos.z - dp.z);
+          if (hd < 70) {
+            z.bombCool = 6;
+            tmp2.copy(z.pos).setY(z.pos.y - 10);
+            tmp.set((dp.x - z.pos.x) * 0.02, -26, (dp.z - z.pos.z) * 0.02);
+            shots.spawn("flak", tmp2, tmp, 16, dp.y);
+            audio.enemyShot();
+          }
         }
         for (const p of z.props) p.rotation.z += dt * 9;
         z.cool -= dt;
@@ -1446,9 +1535,69 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           state.score += 380 * state.combo;
           state.embers += 120;
           state.rage = Math.min(100, state.rage + 5);
-          g.mission.emit({ kind: "enemyKilled", enemy: "wasp" });
+          g.mission.emit({ kind: "enemyKilled", enemy: e.kind });
           continue;
         }
+
+        /* ---- Dart önleyici: tırman → pike → toparlan ---- */
+        if (e.kind === "dart") {
+          e.stateT -= dt;
+          if (e.state === "dive") {
+            // Düz pike — yönlendirme yok, kaçınılabilir ama hızlı.
+            if (e.pos.distanceTo(dp) < 7) {
+              if (state.invuln <= 0) {
+                state.hp -= 8;
+                state.invuln = 0.35;
+                state.hitFlash = 1;
+                shake(g, 0.5);
+                audio.hit();
+                audio.snarl();
+                g.mission.emit({ kind: "damaged", amount: 8 });
+              }
+              e.state = "recover";
+              e.stateT = 1.5;
+            } else if (e.stateT <= 0 || e.pos.y < terrainHeight(e.pos.x, e.pos.z) + 14) {
+              e.state = "recover";
+              e.stateT = 1.5;
+            }
+          } else if (e.state === "recover") {
+            tmp.set(e.vel.x, 34, e.vel.z).normalize().multiplyScalar(42);
+            e.vel.lerp(tmp, Math.min(1, dt * 1.5));
+            e.hullMat.emissiveIntensity = 0.6;
+            if (e.stateT <= 0) {
+              e.state = "climb";
+              e.stateT = 2 + Math.random() * 1.5;
+            }
+          } else {
+            // climb: ejderhanın üstünde pozisyon al
+            tmp.copy(dp);
+            tmp.y += 45;
+            tmp.sub(e.pos);
+            const dd = tmp.length() || 1;
+            tmp.divideScalar(dd).multiplyScalar(46);
+            e.vel.lerp(tmp, Math.min(1, dt * 2));
+            if (dd < 30 || e.stateT <= 0) {
+              // Pike başlangıcı: kırmızı burun parlar, hedefin önüne nişan.
+              e.state = "dive";
+              e.stateT = 1.6;
+              tmp.copy(dp).addScaledVector(g.vel, 0.4).sub(e.pos).normalize().multiplyScalar(95);
+              e.vel.copy(tmp);
+              e.hullMat.emissiveIntensity = 2.4;
+              audio.creatureAttack();
+            }
+          }
+          e.group.position.addScaledVector(e.vel, dt);
+          e.group.position.y = Math.max(
+            terrainHeight(e.pos.x, e.pos.z) + 10,
+            Math.min(310, e.group.position.y),
+          );
+          tmp2.copy(e.pos).add(e.vel);
+          e.group.lookAt(tmp2);
+          e.group.rotateY(Math.PI);
+          for (const p of e.props) p.rotation.z += dt * 30;
+          continue;
+        }
+
         if (e.hp < e.maxHp * 0.25) e.state = "flee";
 
         // Hedef: ejderhanın biraz arkası/üstü. Doğrudan üstüne gitmek
@@ -1490,6 +1639,14 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           shots.spawn("harpoon", e.pos, tmp2.normalize().multiplyScalar(120), 10);
           audio.enemyShot();
           audio.creatureAttack();
+        }
+      }
+      // Ölüleri diziden düşür: eski kod ölü wasp'ları sonsuza dek dizide
+      // tutuyor, O(n²) ayrışma döngüsü ve işaretçi taraması ölüleri geziyordu.
+      for (let ei = g.enemies.length - 1; ei >= 0; ei--) {
+        if (g.enemies[ei]!.dead) {
+          g.enemies[ei] = g.enemies[g.enemies.length - 1]!;
+          g.enemies.pop();
         }
       }
 
@@ -1835,6 +1992,12 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
           ctrl.current.pitch = 0;
           ctrl.current.roll = 0;
           ctrl.current.boost = false;
+          // Kenar tetikli girdiler de temizlenir: M+Esc ardışıklığı devamda
+          // kendiliğinden Köz Mermisi fırlatıyordu.
+          ctrl.current.fireball = false;
+          ctrl.current.shock = false;
+          ctrl.current.rage = false;
+          ctrl.current.dodge = 0;
           break;
         case "resume":
           g.paused = false;

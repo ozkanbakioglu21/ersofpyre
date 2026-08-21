@@ -76,6 +76,20 @@ export function killTarget(g: Game, t: Target): void {
   ) {
     g.audio.creatureDeath();
   }
+  // Cephanelik: sarı uyarı şeridi boşuna değil — gecikmeli zincir patlaması
+  if (t.kind === "ammo_depot") {
+    const n = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) {
+      g.pendingBooms.push({
+        at: new THREE.Vector3(
+          t.pos.x + (Math.random() - 0.5) * t.radius * 3,
+          t.pos.y + 2 + Math.random() * 4,
+          t.pos.z + (Math.random() - 0.5) * t.radius * 3,
+        ),
+        delay: 0.3 + i * (0.22 + Math.random() * 0.15),
+      });
+    }
+  }
   // İkincil patlama — daha yüksekte, daha küçük (çatı patlaması)
   tmp.y += t.height * 0.3;
   g.fx.explosion(tmp, eSize * 0.6);
@@ -95,7 +109,6 @@ export function killAirship(g: Game, z: Airship): void {
   if (z.dead) return;
   z.dead = true;
   z.group.visible = false;
-  g.state.destroyed++;
   addCombo(g);
   const worth = z.role === "frigate" ? 2400 : 700;
   g.state.score += worth * g.state.combo;

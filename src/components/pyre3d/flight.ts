@@ -509,6 +509,9 @@ export function updateCamera(g: Game, dt: number, playing: boolean): void {
 }
 
 export function shake(g: Game, amp: number): void {
+  // Önce test, sonra atama: eski sürüm shakeT'yi atadıktan sonra test ettiği
+  // için genlik hiç sıfırlanmıyor, koşu boyunca en yükseğe kilitleniyordu.
+  const active = g.state.shakeT > 0;
+  g.state.shakeAmp = Math.max(active ? g.state.shakeAmp : 0, amp);
   g.state.shakeT = 0.35;
-  g.state.shakeAmp = Math.max(g.state.shakeAmp * (g.state.shakeT > 0 ? 1 : 0), amp);
 }

@@ -789,6 +789,7 @@ export function createAirship(
     hp,
     maxHp: hp,
     cool: rng.range(0, 3),
+    bombCool: rng.range(2, 5),
     gunsDisabled: false,
     dead: false,
     burn: 0,

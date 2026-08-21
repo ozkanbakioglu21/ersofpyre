@@ -170,7 +170,11 @@ export default function PyreGame3D({
       // W = dive (pitch down), S = ascend (pitch up)
       c.pitch =
         (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0) - (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0);
-      c.throttle = keys["ShiftLeft"] || keys["ShiftRight"] ? 1 : 0;
+      const sprint = !!(keys["ShiftLeft"] || keys["ShiftRight"]);
+      c.throttle = sprint ? 1 : 0;
+      // Shift artık gerçek boost: boostSpeed(100) daha önce yalnız dokunmatik
+      // butondan erişilebiliyordu, klavyede hızın yarısı kilitliydi.
+      c.boost = sprint;
       // A/D = yaw (pure direction), Q/E = roll (bank)
       c.roll = (keys["KeyQ"] ? -1 : 0) + (keys["KeyE"] ? 1 : 0);
       c.yaw =

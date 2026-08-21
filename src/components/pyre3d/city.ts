@@ -1195,7 +1195,13 @@ export async function createCity(
 
     for (const t of blockBuildings) {
       const list: TagRange[] = ranges.get(t.id) ?? [];
-      t.apply = (self) => writeState(list, self.dead ? 1 : Math.min(1, self.burn));
+      t.apply = (self) => {
+        // Ölüm: 2.0 → vertex çökertme eşiği (>1.5) aşılır, bina GERÇEKTEN
+        // yıkılır (eskiden 1 yazılıyor, kömürleşip ayakta kalıyordu).
+        // splitDone=true: yıkıntıda alev/kor efektleri sürsün.
+        if (self.dead) self.splitDone = true;
+        writeState(list, self.dead ? 2 : Math.min(1, self.burn));
+      };
     }
 
     const center = new THREE.Vector3();
@@ -1302,7 +1308,13 @@ export async function createCity(
     for (const m of meshes) group.add(m);
     for (const t of lmTargets) {
       const list: TagRange[] = ranges.get(t.id) ?? [];
-      t.apply = (self) => writeState(list, self.dead ? 1 : Math.min(1, self.burn));
+      t.apply = (self) => {
+        // Ölüm: 2.0 → vertex çökertme eşiği (>1.5) aşılır, bina GERÇEKTEN
+        // yıkılır (eskiden 1 yazılıyor, kömürleşip ayakta kalıyordu).
+        // splitDone=true: yıkıntıda alev/kor efektleri sürsün.
+        if (self.dead) self.splitDone = true;
+        writeState(list, self.dead ? 2 : Math.min(1, self.burn));
+      };
     }
   }
 
@@ -1359,6 +1371,35 @@ export async function createCity(
     const gx = spec.cx + Math.cos(a) * d;
     const gz = spec.cz + Math.sin(a) * d;
     groundFires.push({ pos: new THREE.Vector3(gx, baseY + 2, gz), cool: rng.range(0, 2) });
+  }
+  // Görünür mangal gövdeleri: oyuncu daha önce "hiçbir şeyden" ateş yiyordu.
+  // Tek InstancedMesh çifti — kase + közlü ağız, ışık bütçesine dokunmaz.
+  if (groundFires.length) {
+    const bowlGeo = new THREE.CylinderGeometry(1.2, 0.7, 1.4, 8);
+    const bowlMat = new THREE.MeshStandardMaterial({
+      color: 0x2b241e,
+      roughness: 0.8,
+      metalness: 0.4,
+    });
+    const coalGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.3, 8);
+    const coalMat = new THREE.MeshStandardMaterial({
+      color: 0xff8830,
+      emissive: 0xff5a10,
+      emissiveIntensity: 2.2,
+      roughness: 1,
+    });
+    const bowls = new THREE.InstancedMesh(bowlGeo, bowlMat, groundFires.length);
+    const coals = new THREE.InstancedMesh(coalGeo, coalMat, groundFires.length);
+    const im = new THREE.Matrix4();
+    groundFires.forEach((gf, i) => {
+      im.makeTranslation(gf.pos.x, gf.pos.y - 1.2, gf.pos.z);
+      bowls.setMatrixAt(i, im);
+      im.makeTranslation(gf.pos.x, gf.pos.y - 0.4, gf.pos.z);
+      coals.setMatrixAt(i, im);
+    });
+    bowls.instanceMatrix.needsUpdate = true;
+    coals.instanceMatrix.needsUpdate = true;
+    group.add(bowls, coals);
   }
 
   return {

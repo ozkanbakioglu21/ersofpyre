@@ -380,7 +380,7 @@ const c04: ChapterDef = {
     waves: {
       ilk: { enemy: "wasp", count: 3, radius: 260, altitude: [100, 160] },
       kule: { enemy: "wasp", count: 4, radius: 300, altitude: [90, 170] },
-      son: { enemy: "wasp", count: 6, radius: 340, altitude: [80, 180] },
+      son: { enemy: "dart", count: 4, radius: 340, altitude: [80, 180] },
     },
     wind: { dir: 0.3, strength: 0.8 },
     start: { x: 0, y: 130, z: -500 },
@@ -639,7 +639,7 @@ const c06: ChapterDef = {
     props: [{ t: "flagship", x: 0, y: 380, z: 900, hidden: true }],
     waves: {
       baski: { enemy: "wasp", count: 5, radius: 280, altitude: [110, 190] },
-      son: { enemy: "wasp", count: 6, radius: 320, altitude: [100, 200] },
+      son: { enemy: "dart", count: 4, radius: 320, altitude: [100, 200] },
     },
     zones: [{ id: "kacis", x: 0, z: -720, r: 110, label: "Kül Vadisi" }],
     wind: { dir: 3.4, strength: 0.7 },
@@ -755,7 +755,7 @@ const c07: ChapterDef = {
     ],
     waves: {
       ilk: { enemy: "wasp", count: 5, radius: 300, altitude: [100, 170] },
-      ikinci: { enemy: "wasp", count: 6, radius: 340, altitude: [90, 180] },
+      ikinci: { enemy: "dart", count: 5, radius: 340, altitude: [90, 180] },
       son: { enemy: "wasp", count: 8, radius: 380, altitude: [80, 200] },
     },
     wind: { dir: 2.0, strength: 0.65 },

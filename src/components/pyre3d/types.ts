@@ -85,7 +85,7 @@ export type TargetKind =
   | "ammo_depot"
   | "watchtower";
 
-export type TowerKind = "tesla" | "flak" | "isildak";
+export type TowerKind = "tesla" | "flak" | "isildak" | "aa";
 
 /** Ateş ışığı havuzunun ve yangın yayılmanın ortak arayüzü. */
 export type Burnable = {
@@ -127,6 +127,8 @@ export type Target = Burnable & {
   splitDone: boolean;
   /** İşaretçi seçiminde geçici mesafe anahtarı (sıralama için önbellek). */
   sortD?: number;
+  /** Tesla kulesi fazı: 0 = şarj (telegraf), 1 = zap (hasar), 2 = soğuma. */
+  teslaPhase?: number;
 };
 
 export type WeakPointId =
@@ -174,6 +176,8 @@ export type Airship = Burnable & {
   hp: number;
   maxHp: number;
   cool: number;
+  /** Bombardıman zeplini: sıradaki bomba bırakma soğuması. */
+  bombCool: number;
   /** Top yuvası imha edilince Infinity olur. */
   gunsDisabled: boolean;
   props: THREE.Object3D[];
@@ -182,7 +186,7 @@ export type Airship = Burnable & {
   weakPoints: WeakPoint[];
 };
 
-export type EnemyKind = "wasp";
+export type EnemyKind = "wasp" | "dart";
 
 export type Enemy = Burnable & {
   id: number;
@@ -195,7 +199,10 @@ export type Enemy = Burnable & {
   cool: number;
   props: THREE.Object3D[];
   hullMat: THREE.MeshStandardMaterial;
-  state: "chase" | "flee";
+  /** Wasp: chase/flee. Dart: climb → dive → recover döngüsü. */
+  state: "chase" | "flee" | "climb" | "dive" | "recover";
+  /** Durum zamanlayıcısı (dart dalış süresi vb.). */
+  stateT: number;
 };
 
 /* ------------------------------------------------------------------ *

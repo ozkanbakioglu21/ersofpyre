@@ -104,6 +104,88 @@ export function createWasp(x: number, y: number, z: number, rng: Rng): Enemy {
     props,
     hullMat,
     state: "chase",
+    stateT: 0,
+  };
+}
+
+/**
+ * Dart önleyici — ejderha hızına yakın, dalış saldırısı yapan avcı.
+ *
+ * Wasp mesafeden harpun atarken Dart yukarı tırmanır, sonra ejderhanın
+ * ÜZERİNDEN pike yapar; temas hasarı verir. Sesli/görsel telegrafı dalış
+ * öncesi kırmızı burun parlamasıdır.
+ */
+export function createDart(x: number, y: number, z: number, rng: Rng): Enemy {
+  const group = new THREE.Group();
+  group.position.set(x, y, z);
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: 0x5a4438,
+    roughness: 0.5,
+    metalness: 0.5,
+    emissive: 0x661111,
+    emissiveIntensity: 0.6,
+  });
+  const parts = new THREE.Group();
+
+  // İnce, ok gibi gövde — wasp'ın şişkin balonundan bir bakışta ayrılır.
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.4, 6.4, 8), hullMat);
+  body.rotation.x = Math.PI / 2;
+  parts.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.9, 2.8, 8), bandMat);
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.z = -4.6;
+  parts.add(nose);
+  // Kırmızı burun feneri — dalış telegrafı
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), lanternMat);
+  eye.position.z = -3.4;
+  parts.add(eye);
+  // Ok kanatları
+  for (const s of [-1, 1]) {
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.14, 1.4), hullMat);
+    wing.position.set(s * 2.0, 0, 1.2);
+    wing.rotation.z = s * 0.18;
+    parts.add(wing);
+  }
+  const finV = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.0, 1.4), hullMat);
+  finV.position.set(0, 1.0, 2.6);
+  parts.add(finV);
+
+  // Tek itici pervane — kuyrukta
+  const props: THREE.Object3D[] = [];
+  const blade = new THREE.BoxGeometry(0.14, 2.0, 0.26);
+  const bladeParts = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const b = new THREE.Mesh(blade, stone(0x1d1a16, 0.5));
+    b.rotation.z = (i * Math.PI * 2) / 3;
+    b.position.set(Math.sin((i * Math.PI * 2) / 3) * 0.9, Math.cos((i * Math.PI * 2) / 3) * 0.9, 0);
+    bladeParts.add(b);
+  }
+  const prop = new THREE.Group();
+  for (const m of bake(bladeParts, { castShadow: false, receiveShadow: false })) prop.add(m);
+  prop.position.set(0, 0, 3.6);
+  props.push(prop);
+  group.add(prop);
+
+  for (const m of bake(parts, { castShadow: true, receiveShadow: false })) group.add(m);
+
+  return {
+    id: nextId++,
+    kind: "dart",
+    group,
+    pos: group.position,
+    vel: new THREE.Vector3(rng.range(-10, 10), 0, rng.range(-10, 10)),
+    hp: 60,
+    maxHp: 60,
+    radius: 3.4,
+    cool: rng.range(1, 3),
+    burn: 0,
+    dead: false,
+    lightY: 0,
+    splitDone: false,
+    props,
+    hullMat,
+    state: "climb",
+    stateT: rng.range(1, 2.5),
   };
 }
 

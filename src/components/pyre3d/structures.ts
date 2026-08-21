@@ -855,8 +855,10 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
     radius = len * 0.5;
     height = 11;
     hp = 220;
-  } else {
+  } else if (kind === "tower" || kind === "gate") {
     // tower — savunma kulesi; alt tür atışın karakterini belirliyor.
+    // Eskiden bu dal düz `else` idi: beş askeri yapı türü de buraya düşüp
+    // gövdesine kaynaklı hayalet bir kule (ve tesla/flak donanımı) alıyordu.
     const h = rng.range(14, 22) * scale;
 
     // Silindirik gövde — dibinde genişletme
@@ -920,7 +922,12 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
       parts.add(lintel);
     }
 
-    tower = rng.weighted({ tesla: 0.45, flak: 0.35, isildak: 0.2 } as Record<TowerKind, number>);
+    tower = rng.weighted({
+      tesla: 0.35,
+      flak: 0.28,
+      isildak: 0.17,
+      aa: 0.2,
+    } as Record<TowerKind, number>);
     if (tower === "tesla") {
       const coil = new THREE.Mesh(new THREE.SphereGeometry(1.2, 10, 8), coilMat);
       coil.position.y = h + 2.5;
@@ -958,6 +965,25 @@ export function buildStructure(kind: TargetKind, rng: Rng, scale = 1): BuildSpec
       const ammoBox = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.8), cityMat(0x2b241e));
       ammoBox.position.set(1.4, h + 1.6, 0);
       parts.add(ammoBox);
+    } else if (tower === "aa") {
+      // Öngörülü uçaksavar: tek uzun namlu + menzil radarı çanağı
+      const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.26, 0.42, 7.2, 6),
+        cityMat(0x2b241e),
+      );
+      barrel.position.set(0, h + 3.4, 1.0);
+      barrel.rotation.x = -1.1;
+      parts.add(barrel);
+      const cradle = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 2.6), cityMat(0x3a3028));
+      cradle.position.y = h + 1.9;
+      parts.add(cradle);
+      const dish = new THREE.Mesh(
+        new THREE.SphereGeometry(1.1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+        cityMat(0x8a6b32, 0.35, 0.9),
+      );
+      dish.rotation.x = Math.PI / 3;
+      dish.position.set(1.6, h + 2.6, -0.8);
+      parts.add(dish);
     } else {
       const drum = new THREE.Mesh(
         new THREE.CylinderGeometry(1.5, 1.5, 1.8, 10),
@@ -1266,12 +1292,19 @@ export function createStructure(
       if (t.dead) {
         if (!t.splitDone) {
           t.splitDone = true;
-          // Binaların yarısını ayır — sol ve sağ
           const halfX = spec.radius * 0.6;
           group.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const m = child as THREE.Mesh;
-              const mat = m.material as THREE.MeshStandardMaterial;
+              let mat = m.material as THREE.MeshStandardMaterial;
+              // Önbellekli materyal PAYLAŞILAN: mutasyondan önce klonlanmazsa
+              // aynı materyali kullanan tüm şehir kararıp közleniyor ve hasar
+              // modül önbelleği yüzünden sonraki bölümlere taşınıyordu.
+              if (mat.userData["shared"]) {
+                mat = mat.clone();
+                mat.userData["shared"] = false;
+                m.material = mat;
+              }
               if (mat.color) {
                 mat.color.multiplyScalar(0.65);
                 // Rengi sarıya kaydır
@@ -1284,17 +1317,14 @@ export function createStructure(
               }
             }
           });
-          // Yarıları ayır
-          for (const child of group.children) {
-            if (child.position.x < 0) {
-              child.position.x -= halfX;
-              child.rotation.z = -0.08 - Math.random() * 0.12;
-            } else {
-              child.position.x += halfX;
-              child.rotation.z = 0.08 + Math.random() * 0.12;
-            }
+          // Yarıları ayır — bakeTagged çocukları orijine topladığı için
+          // konuma göre değil sırayla iki yana dağıtılır.
+          group.children.forEach((child, i) => {
+            const side = i % 2 === 0 ? -1 : 1;
+            child.position.x += side * halfX;
+            child.rotation.z = side * (0.08 + Math.random() * 0.12);
             child.position.y -= 0.5 + Math.random() * 1.5;
-          }
+          });
         }
         return;
       }
