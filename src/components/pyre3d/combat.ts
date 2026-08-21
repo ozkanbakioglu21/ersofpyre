@@ -96,6 +96,15 @@ export function killAirship(g: Game, z: Airship): void {
   g.state.rage = Math.min(100, g.state.rage + 10);
   g.fx.explosion(z.group.position, z.role === "frigate" ? 2 : 1.4);
   g.audio.explosion(2);
+  // Gemi ölürken kalan zayıf noktaları da tamamla — destroyWeakPoints
+  // hedefleri gemi yıkıldığında takılı kalmasın.
+  for (const wp of z.weakPoints) {
+    if (!wp.dead) {
+      wp.dead = true;
+      wp.group.visible = false;
+      g.mission.emit({ kind: "weakPointDown", shipId: z.id, module: wp.id });
+    }
+  }
   g.mission.emit({ kind: "airshipKilled", role: z.role });
 }
 
