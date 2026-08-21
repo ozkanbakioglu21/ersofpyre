@@ -71,12 +71,24 @@ export const lanternMat = shared(
   }),
 );
 
+// Arazi ve dağlar paletlerini vertex renginden alır (world.ts yazar);
+// materyal rengi beyaz kalır ki vertex rengi olduğu gibi geçsin.
 export const groundMat = shared(
-  new THREE.MeshStandardMaterial({ color: 0x2a1a13, roughness: 1, flatShading: true }),
+  new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 1,
+    flatShading: true,
+    vertexColors: true,
+  }),
 );
 
 export const peakMat = shared(
-  new THREE.MeshStandardMaterial({ color: 0x150e0b, roughness: 1, flatShading: true }),
+  new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 1,
+    flatShading: true,
+    vertexColors: true,
+  }),
 );
 
 export const woodMat = shared(
@@ -307,17 +319,30 @@ function patchChar<T extends THREE.Material>(m: T): T {
 
 const cityCache = new Map<string, THREE.MeshStandardMaterial>();
 
+/** Kanal başına 0x20 adıma kuantalama — ~85 farklı şehir materyalini ~20
+ *  kovaya indirir. bake() materyal örneğine göre birleştirdiği için bu sayı
+ *  doğrudan blok başına draw call tabanıdır. */
+function quantizeCityColor(color: number): number {
+  const r = Math.min(255, Math.round(((color >> 16) & 0xff) / 32) * 32);
+  const g = Math.min(255, Math.round(((color >> 8) & 0xff) / 32) * 32);
+  const b = Math.min(255, Math.round((color & 0xff) / 32) * 32);
+  return (r << 16) | (g << 8) | b;
+}
+
 /** Kömürleşebilen şehir yüzeyi. */
 export function cityMat(color: number, roughness = 0.9, metalness = 0.1) {
-  const key = `${color}:${roughness}:${metalness}`;
+  const qc = quantizeCityColor(color);
+  const qr = Math.round(roughness * 4) / 4;
+  const qm = Math.round(metalness * 4) / 4;
+  const key = `${qc}:${qr}:${qm}`;
   let m = cityCache.get(key);
   if (!m) {
     m = patchChar(
       shared(
         new THREE.MeshStandardMaterial({
-          color,
-          roughness,
-          metalness,
+          color: qc,
+          roughness: qr,
+          metalness: qm,
           flatShading: false,
         }),
       ),

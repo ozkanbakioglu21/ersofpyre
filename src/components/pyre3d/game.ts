@@ -87,7 +87,15 @@ import type {
   Target,
 } from "./types";
 import { MARKER_POOL } from "./types";
-import { createAsh, createTerrain, setTerrainMods, terrainHeight } from "./world";
+import {
+  createAsh,
+  createScatter,
+  createTerrain,
+  createWater,
+  setTerrainMods,
+  terrainHeight,
+  type WaterHandle,
+} from "./world";
 
 /**
  * Oyun çekirdeği.
@@ -259,11 +267,15 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   if (cancelled) return null;
 
   /* ---------------- gökyüzü ---------------- */
+  const skyUniforms = {
+    uT: { value: 0 },
+    uSun: { value: SUN_OFFSET.clone().normalize() },
+  };
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(1600, 24, 16),
     new THREE.ShaderMaterial({
       side: THREE.BackSide,
-      uniforms: {},
+      uniforms: skyUniforms,
       vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);} `,
       // Renkler SAHNE-LİNEER uzayda; sahnenin geri kalanıyla aynı işlemden
       // geçmeleri için tonemapping ve çıkış renk uzayı yamalarını dahil
@@ -271,13 +283,37 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       // lineer değerle sRGB tampona yazılıyor: yeşil/mavi kanal ezilip
       // ufuk kıpkırmızı bir perdeye dönüşüyordu.
       fragmentShader: `varying vec3 vP;
+      uniform float uT;
+      uniform vec3 uSun;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vnz(vec2 p){
+        vec2 i = floor(p); vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+                   mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+      }
+      float fbm(vec2 p){
+        float v = 0.0; float a = 0.5;
+        for(int k = 0; k < 3; k++){ v += a * vnz(p); p *= 2.1; a *= 0.5; }
+        return v;
+      }
       void main(){
-        float h = normalize(vP).y;
+        vec3 dir = normalize(vP);
+        float h = dir.y;
         vec3 low = vec3(0.46,0.16,0.06);
         vec3 mid = vec3(0.13,0.09,0.09);
         vec3 top = vec3(0.035,0.035,0.055);
         vec3 c = mix(low, mid, smoothstep(-0.15,0.25,h));
         c = mix(c, top, smoothstep(0.2,0.85,h));
+        // Kül perdesi ardından sızan güneş: keskin disk + geniş turuncu hale
+        float sd = max(dot(dir, uSun), 0.0);
+        c += vec3(1.0, 0.55, 0.25) * pow(sd, 260.0) * 1.6;
+        c += vec3(0.8, 0.35, 0.12) * pow(sd, 24.0) * 0.35;
+        // Kayan kül bulutları — yalnız ufkun üstünde
+        vec2 cuv = dir.xz / max(0.12, dir.y + 0.28);
+        float cl = fbm(cuv * 1.4 + vec2(uT * 0.006, uT * 0.002));
+        float cover = smoothstep(0.44, 0.78, cl) * smoothstep(0.02, 0.2, h);
+        c = mix(c, vec3(0.10, 0.075, 0.065), cover * 0.75);
         gl_FragColor = vec4(c,1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -290,11 +326,49 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
   const worldRadius = chapter.world.radius;
   const terrainMods = [...(chapter.world.terrain ?? [])];
   if (chapter.world.city) terrainMods.push(cityFlattenMod(chapter.world.city));
+
+  // Liman: docks bölgesinin baktığı yönde arazi çukurlaştırılıp su serilir —
+  // "rıhtım" mahallesi artık gerçekten suya bakıyor.
+  const isInfinite = chapter.world.mode === "infinite";
+  let water: WaterHandle | null = null;
+  let harborPos: { x: number; z: number; r: number } | null = null;
+  if (!isInfinite && chapter.world.city) {
+    const cspec = chapter.world.city;
+    const wa = (7 / 8) * Math.PI * 2;
+    const wx = cspec.cx + Math.cos(wa) * cspec.radius * 1.6;
+    const wz = cspec.cz + Math.sin(wa) * cspec.radius * 1.6;
+    harborPos = { x: wx, z: wz, r: cspec.radius * 0.72 };
+    terrainMods.push({
+      t: "flatten",
+      x: wx,
+      z: wz,
+      radius: cspec.radius * 0.55,
+      feather: cspec.radius * 0.35,
+      height: -8,
+    });
+  }
   setTerrainMods(terrainMods);
   cleanups.push(() => setTerrainMods([]));
 
-  const isInfinite = chapter.world.mode === "infinite";
-  scene.add(createTerrain(isInfinite ? 20000 : worldRadius * 2.4, isInfinite ? 140 : 72));
+  scene.add(createTerrain(isInfinite ? 20000 : worldRadius * 2.4, isInfinite ? 140 : 144));
+  if (harborPos) {
+    water = createWater(harborPos.r);
+    water.mesh.position.set(harborPos.x, -2.4, harborPos.z);
+    scene.add(water.mesh);
+  }
+  // Sur dışı doğa örtüsü: instanced kaya + kuru ağaç (2 draw call)
+  if (!isInfinite) {
+    const avoid: { x: number; z: number; r: number }[] = [];
+    if (chapter.world.city) {
+      avoid.push({
+        x: chapter.world.city.cx,
+        z: chapter.world.city.cz,
+        r: chapter.world.city.radius * 1.12,
+      });
+    }
+    if (harborPos) avoid.push(harborPos);
+    scene.add(createScatter(worldRadius, avoid));
+  }
   const ash = createAsh(ASH_MAX, worldRadius);
   ash.geometry.setDrawRange(0, preset.ashCount);
   scene.add(ash);
@@ -1425,7 +1499,7 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
             gf.cool -= dt * (gfs.length / scan);
             const d = gf.pos.distanceTo(dp);
             if (gf.cool <= 0 && d < 240) {
-              gf.cool = 0.5 + Math.random() * 0.4;
+              gf.cool = 0.8 + Math.random() * 0.6;
               // Her atışta 1-2 mermi
               const burst = 1 + Math.floor(Math.random() * 2);
               for (let b = 0; b < burst; b++) {
@@ -1809,6 +1883,8 @@ export async function createGame(o: CreateGameOpts): Promise<GameHandle | null> 
       renderer.shadowMap.needsUpdate = true;
     }
     sky.position.copy(dragon.root.position);
+    skyUniforms.uT.value = now * 0.001;
+    water?.update(now * 0.001);
     fill.position.copy(camera.position);
 
     // NPC güncellemesi (siviller kaçışır, askerler ateş eder)
