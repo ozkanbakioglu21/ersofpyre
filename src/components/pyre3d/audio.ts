@@ -197,6 +197,14 @@ const SFX_MANIFEST: Record<string, string[]> = {
     "creature_scream_01.wav", "creature_scream_02.wav", "creature_scream_03.wav",
     "creature_deep_roar.wav",
   ],
+  diveScream: [
+    "dive_scream_01.ogg", "dive_scream_02.ogg", "dive_roar_01.ogg", "dive_roar_02.ogg",
+    "dive_roar_03.ogg", "dive_howl.ogg", "dive_monster_01.ogg", "dive_monster_02.ogg",
+    "dive_monster_06.ogg", "dive_troll_01.ogg", "dive_troll_02.ogg",
+  ],
+  diveWindReal: [
+    "dive_wind_real.wav",
+  ],
 };
 
 function pickRandom<T>(arr: T[]): T {
@@ -302,13 +310,9 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   let ambientWanted = false;
   let sirenWanted = false;
   let musicWanted = false;
-  let diveWindNodes: { src: AudioBufferSourceNode; gain: GainNode; lfo: OscillatorNode } | null = null;
-  let diveScreamNodes: {
-    osc1: OscillatorNode; osc2: OscillatorNode; osc3: OscillatorNode;
-    noise: AudioBufferSourceNode; master: GainNode;
-    lfoVib: OscillatorNode; lfoTrem: OscillatorNode;
-    bp: BiquadFilterNode; ws: WaveShaperNode;
-  } | null = null;
+  let diveWindNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  let diveScreamNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  let diveScreamLastStart = 0;
   let musicNodes: {
     pad1: OscillatorNode;
     pad2: OscillatorNode;
@@ -998,9 +1002,8 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     bombHit() {
       withCtx((c) => {
-        // Patlama için özel gain chain — distortion yok, max ses
         const compGain = c.ac.createGain();
-        compGain.gain.value = 1.5;
+        compGain.gain.value = 1.4;
         compGain.connect(c.master);
 
         const p = (cat: string, v: number, pt: number, d: number) => {
@@ -1021,50 +1024,22 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
           track(src, st + buf.duration + 0.02);
         };
 
-        // ▌1 — Çift ana patlama: max vol, düşük pitch
+        // ▌1 — Ana patlama (tek, güçlü)
         p("bigExplosion", 1.0, 0.55 + Math.random() * 0.15, 0);
-        p("bigExplosion", 0.85, 0.5 + Math.random() * 0.12, 0.015);
-        // ▌2 — Derin boom katmanı
-        p("bigBoom", 0.95, 0.48 + Math.random() * 0.15, 0.03);
-        p("bigBoom", 0.7, 0.42 + Math.random() * 0.1, 0.07);
-        // ▌3 — Ek patlama bedeni
-        p("explosion", 0.75, 0.6 + Math.random() * 0.3, 0.01);
-        p("explosion", 0.55, 0.7 + Math.random() * 0.2, 0.05);
-        // ▌4 — Alev + dinamit katmanı
-        p("fireWhoosh", 0.85, 0.55 + Math.random() * 0.2, 0);
-        p("fireWhoosh", 0.6, 0.65 + Math.random() * 0.25, 0.04);
-        p("dynamite", 0.7, 0.7 + Math.random() * 0.2, 0.01);
-        // ▌5 — Prosedürel ultra-bass: yer sarsıntısı
-        noiseBurst(c, { dur: 1.2, peak: 0.7, type: "lowpass", from: 400, to: 30, q: 0.4 });
-        tone(c, { type: "sine", from: 70, to: 12, dur: 1.0, peak: 0.6 });
-        tone(c, { type: "sine", from: 50, to: 10, dur: 0.9, peak: 0.45, delay: 0.03 });
-        tone(c, { type: "triangle", from: 38, to: 18, dur: 1.1, peak: 0.3, delay: 0.02 });
-        // ▌6 — Mekanik yıkım
-        p("mechExplosion", 0.7, 0.55 + Math.random() * 0.25, 0.01);
-        p("mechExplosion", 0.5, 0.6 + Math.random() * 0.2, 0.05);
-        // ▌7 — Cam + metal kırığı
-        p("glassBreak", 0.8, 0.6 + Math.random() * 0.35, 0.02);
-        p("glassBreak", 0.55, 0.8 + Math.random() * 0.3, 0.07);
-        p("metalHit", 0.6, 0.65 + Math.random() * 0.25, 0.04);
-        // ▌8 — Tiz crack: havayı yırtan
-        noiseBurst(c, { dur: 0.18, peak: 0.55, type: "highpass", from: 5500, to: 2800, q: 4, delay: 0.005 });
-        // ▌9 — Enkaz yağmuru
-        p("debris", 0.65, 0.65 + Math.random() * 0.3, 0.08);
-        p("debris", 0.5, 0.8 + Math.random() * 0.3, 0.16);
-        p("rockBreak", 0.55, 0.7 + Math.random() * 0.3, 0.12);
-        p("rockBreak", 0.4, 0.85 + Math.random() * 0.25, 0.22);
-        // ▌10 — Metal çökme + yapısal gıcırtı
-        p("metalFall", 0.6, 0.65 + Math.random() * 0.3, 0.15);
-        p("metalFall", 0.4, 0.8 + Math.random() * 0.2, 0.25);
-        p("metalHit", 0.45, 0.7 + Math.random() * 0.2, 0.1);
-        // ▌11 — Bandpass toz/rumble
-        noiseBurst(c, { dur: 0.8, peak: 0.18, type: "bandpass", from: 380, to: 150, q: 1.6, delay: 0.1 });
-        // ▌12 — Uzak yankı (çift echo)
-        p("distantBoom", 0.6, 0.48 + Math.random() * 0.12, 0.3 + Math.random() * 0.2);
-        p("distantBoom", 0.4, 0.42 + Math.random() * 0.1, 0.55 + Math.random() * 0.25);
-        // ▌13 — Ek sub-bass smash
-        noiseBurst(c, { dur: 0.4, peak: 0.4, type: "lowpass", from: 250, to: 25, q: 0.8, delay: 0.01 });
-        // Comp gain'i 2.5s sonra temizle
+        // ▌2 — Derin boom
+        p("bigBoom", 0.9, 0.48 + Math.random() * 0.15, 0.02);
+        // ▌3 — Alev + dinamit
+        p("fireWhoosh", 0.8, 0.55 + Math.random() * 0.2, 0);
+        p("dynamite", 0.6, 0.7 + Math.random() * 0.2, 0.01);
+        // ▌4 — Sub-bass yer sarsıntısı
+        tone(c, { type: "sine", from: 65, to: 12, dur: 1.0, peak: 0.55 });
+        noiseBurst(c, { dur: 0.9, peak: 0.5, type: "lowpass", from: 350, to: 30, q: 0.4 });
+        // ▌5 — Cam + metal kırığı
+        p("glassBreak", 0.7, 0.6 + Math.random() * 0.35, 0.02);
+        p("metalHit", 0.5, 0.65 + Math.random() * 0.25, 0.04);
+        // ▌6 — Uzak yankı
+        p("distantBoom", 0.5, 0.48 + Math.random() * 0.12, 0.35 + Math.random() * 0.2);
+
         setTimeout(() => { try { compGain.disconnect(); } catch {} }, 2500);
       });
     },
@@ -1222,131 +1197,81 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     diveWind(intensity: number) {
       const c = ctx;
       if (!c) return;
-      // İlk çağrıda sürekli dalma rüzgarı düğümü kur
       if (!diveWindNodes) {
-        const t = c.ac.currentTime;
+        const buf = sfxCache.get("dive_wind_real.wav");
         const src = c.ac.createBufferSource();
-        src.buffer = c.noise;
+        src.buffer = buf || c.noise;
         src.loop = true;
-        // Bandpass: rüzgar uğultusu — orta frekans
-        const bp = c.ac.createBiquadFilter();
-        bp.type = "bandpass";
-        bp.frequency.value = 800;
-        bp.Q.value = 0.6;
-        // Yüksek kesim — çok tiz olmasın
-        const hp = c.ac.createBiquadFilter();
-        hp.type = "highpass";
-        hp.frequency.value = 200;
-        hp.Q.value = 0.3;
-        const gain = c.ac.createGain();
-        gain.gain.value = 0.0001;
-        // LFO ile frekans dalgalanması
-        const lfo = c.ac.createOscillator();
-        lfo.type = "sine";
-        lfo.frequency.value = 0.3;
-        const lfoGain = c.ac.createGain();
-        lfoGain.gain.value = 300;
-        lfo.connect(lfoGain).connect(bp.frequency);
-        src.connect(hp).connect(bp).connect(gain).connect(c.master);
-        src.start(t);
-        lfo.start(t);
-        diveWindNodes = { src, gain, lfo };
+        // Gerçek rüzgar samplesa bandpass ekle
+        if (buf) {
+          const bp = c.ac.createBiquadFilter();
+          bp.type = "bandpass";
+          bp.frequency.value = 600;
+          bp.Q.value = 0.4;
+          const gain = c.ac.createGain();
+          gain.gain.value = 0.0001;
+          src.connect(bp).connect(gain).connect(c.master);
+          src.start();
+          diveWindNodes = { src, gain };
+        } else {
+          // Fallback: noise-based
+          const hp = c.ac.createBiquadFilter();
+          hp.type = "highpass";
+          hp.frequency.value = 200;
+          hp.Q.value = 0.3;
+          const bp = c.ac.createBiquadFilter();
+          bp.type = "bandpass";
+          bp.frequency.value = 800;
+          bp.Q.value = 0.6;
+          const gain = c.ac.createGain();
+          gain.gain.value = 0.0001;
+          src.connect(hp).connect(bp).connect(gain).connect(c.master);
+          src.start();
+          diveWindNodes = { src, gain };
+        }
       }
-      // Gain'i yoğunluğa göre ayarla
       const now = c.ac.currentTime;
       diveWindNodes.gain.gain.cancelScheduledValues(now);
-      const target = intensity * 0.18;
+      const target = intensity * 0.22;
       diveWindNodes.gain.gain.setTargetAtTime(target, now, 0.08);
     },
     diveScream(intensity: number) {
       const c = ctx;
       if (!c) return;
-      if (!diveScreamNodes) {
-        const t = c.ac.currentTime;
-        // --- LAYER 1: Primary screech (sawtooth 1100Hz + vibrato) ---
-        const osc1 = c.ac.createOscillator();
-        osc1.type = "sawtooth";
-        osc1.frequency.value = 1100;
-        // Vibrato LFO — 5.5 Hz, ±140 Hz
-        const lfoVib = c.ac.createOscillator();
-        lfoVib.type = "sine";
-        lfoVib.frequency.value = 5.5;
-        const vibGain = c.ac.createGain();
-        vibGain.gain.value = 140;
-        lfoVib.connect(vibGain);
-        vibGain.connect(osc1.frequency);
-        // --- LAYER 2: Shriek harmonic (square 1650Hz) ---
-        const osc2 = c.ac.createOscillator();
-        osc2.type = "square";
-        osc2.frequency.value = 1650;
-        vibGain.connect(osc2.frequency);
-        // --- LAYER 3: Sub rumble (triangle 180Hz → 90Hz) ---
-        const osc3 = c.ac.createOscillator();
-        osc3.type = "triangle";
-        osc3.frequency.value = 180;
-        osc3.frequency.setTargetAtTime(90, t, 1.8);
-        // --- LAYER 4: Breath noise ---
-        const noiseBuf = c.ac.createBuffer(1, c.ac.sampleRate * 2, c.ac.sampleRate);
-        const nd = noiseBuf.getChannelData(0);
-        for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-        const noise = c.ac.createBufferSource();
-        noise.buffer = noiseBuf;
-        noise.loop = true;
-        // Bandpass sweep — starts high, drifts down
-        const bp = c.ac.createBiquadFilter();
-        bp.type = "bandpass";
-        bp.frequency.value = 1800;
-        bp.Q.value = 2.8;
-        bp.frequency.setTargetAtTime(650, t, 2.2);
-        // --- Waveshaper — aggression ---
-        const ws = c.ac.createWaveShaper();
-        const curve = new Float32Array(256);
-        for (let i = 0; i < 256; i++) {
-          const x = (i / 128) - 1;
-          // Soft overdrive curve
-          curve[i] = Math.tanh(x * 2.8) * 0.85;
-        }
-        ws.curve = curve;
-        ws.oversample = "4x";
-        // Noise bandpass filter
-        const noiseBP = c.ac.createBiquadFilter();
-        noiseBP.type = "bandpass";
-        noiseBP.frequency.value = 1200;
-        noiseBP.Q.value = 0.8;
-        noise.connect(noiseBP);
-        // Mix gain — sum all layers
-        const mix = c.ac.createGain();
-        mix.gain.value = 0.45;
-        osc1.connect(mix);
-        osc2.connect(mix);
-        osc3.connect(mix);
-        noiseBP.connect(mix);
-        // Chain: mix → waveshaper → bandpass → master gain
-        const master = c.ac.createGain();
-        master.gain.value = 0.0001;
-        mix.connect(ws);
-        ws.connect(bp);
-        bp.connect(master);
-        master.connect(c.master);
-        // --- Tremolo LFO — pulsating intensity ---
-        const lfoTrem = c.ac.createOscillator();
-        lfoTrem.type = "sine";
-        lfoTrem.frequency.value = 3.2;
-        const tremGain = c.ac.createGain();
-        tremGain.gain.value = 0.35;
-        lfoTrem.connect(tremGain);
-        tremGain.connect(master.gain);
-        // Start all
-        osc1.start(t); osc2.start(t); osc3.start(t);
-        noise.start(t);
-        lfoVib.start(t); lfoTrem.start(t);
-        diveScreamNodes = { osc1, osc2, osc3, noise, master, lfoVib, lfoTrem, bp, ws };
-      }
       const now = c.ac.currentTime;
-      diveScreamNodes.master.gain.cancelScheduledValues(now);
-      // Sustain sadece 0.18 eşik üstünde
-      const target = intensity > 0.18 ? (intensity - 0.18) * 0.55 : 0;
-      diveScreamNodes.master.gain.setTargetAtTime(target, now, 0.1);
+      // Yeni sample tetikleme — 0.9s cooldown, sadece 0.15+ intensity
+      if (intensity > 0.15 && now - diveScreamLastStart > 0.9) {
+        diveScreamLastStart = now;
+        // Önceki sample'ı durdur
+        if (diveScreamNodes) {
+          diveScreamNodes.gain.gain.cancelScheduledValues(now);
+          diveScreamNodes.gain.gain.setTargetAtTime(0, now, 0.15);
+          const old = diveScreamNodes;
+          setTimeout(() => { try { old.src.stop(); } catch {} }, 200);
+        }
+        // Rastgele creature sample seç
+        const files = SFX_MANIFEST["diveScream"] ?? [];
+        if (!files.length) return;
+        const file = files[Math.floor(Math.random() * files.length)]!;
+        const buf = sfxCache.get(file);
+        if (!buf) return;
+        const src = c.ac.createBufferSource();
+        src.buffer = buf;
+        // Pitch — dalış derinliğine göre biraz alçalt
+        src.playbackRate.value = 0.85 + intensity * 0.3;
+        const gain = c.ac.createGain();
+        gain.gain.value = 0.0001;
+        src.connect(gain).connect(c.master);
+        src.start(now);
+        src.onended = () => { if (diveScreamNodes?.src === src) diveScreamNodes = null; };
+        diveScreamNodes = { src, gain };
+      }
+      // Mevcut sample'ın gain'ini ayarla
+      if (diveScreamNodes) {
+        diveScreamNodes.gain.gain.cancelScheduledValues(now);
+        const target = intensity > 0.15 ? Math.min((intensity - 0.15) * 0.7, 0.7) : 0;
+        diveScreamNodes.gain.gain.setTargetAtTime(target, now, 0.1);
+      }
     },
     ui() {
       withCtx((c) => {
@@ -1384,18 +1309,12 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
         diveWindNodes.gain.gain.cancelScheduledValues(c.ac.currentTime);
         diveWindNodes.gain.gain.setValueAtTime(0.0001, c.ac.currentTime);
         diveWindNodes.src.stop(c.ac.currentTime + 0.1);
-        diveWindNodes.lfo.stop(c.ac.currentTime + 0.1);
         diveWindNodes = null;
       }
       if (diveScreamNodes) {
-        diveScreamNodes.master.gain.cancelScheduledValues(c.ac.currentTime);
-        diveScreamNodes.master.gain.setValueAtTime(0.0001, c.ac.currentTime);
-        diveScreamNodes.osc1.stop(c.ac.currentTime + 0.1);
-        diveScreamNodes.osc2.stop(c.ac.currentTime + 0.1);
-        diveScreamNodes.osc3.stop(c.ac.currentTime + 0.1);
-        diveScreamNodes.noise.stop(c.ac.currentTime + 0.1);
-        diveScreamNodes.lfoVib.stop(c.ac.currentTime + 0.1);
-        diveScreamNodes.lfoTrem.stop(c.ac.currentTime + 0.1);
+        diveScreamNodes.gain.gain.cancelScheduledValues(c.ac.currentTime);
+        diveScreamNodes.gain.gain.setValueAtTime(0.0001, c.ac.currentTime);
+        diveScreamNodes.src.stop(c.ac.currentTime + 0.1);
         diveScreamNodes = null;
       }
       flameWanted = false;
@@ -1412,16 +1331,10 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       stopMusic(c);
       if (diveWindNodes) {
         diveWindNodes.src.stop();
-        diveWindNodes.lfo.stop();
         diveWindNodes = null;
       }
       if (diveScreamNodes) {
-        diveScreamNodes.osc1.stop();
-        diveScreamNodes.osc2.stop();
-        diveScreamNodes.osc3.stop();
-        diveScreamNodes.noise.stop();
-        diveScreamNodes.lfoVib.stop();
-        diveScreamNodes.lfoTrem.stop();
+        diveScreamNodes.src.stop();
         diveScreamNodes = null;
       }
       ctx = null;
