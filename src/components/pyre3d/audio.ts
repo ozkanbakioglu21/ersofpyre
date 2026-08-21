@@ -311,7 +311,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     crackleTimer: number;
   } | null = null;
   let ambientNodes: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
-  let growlLoopNodes: { src: AudioBufferSourceNode; gain: GainNode; lfo: OscillatorNode } | null = null;
   let sirenNodes: { osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null = null;
   let flameWanted = false;
   let ambientWanted = false;
@@ -614,56 +613,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     };
   };
 
-  /* ---- sürekli ejderha hırıltısı ---- */
-  const startGrowlLoop = (c: Ctx) => {
-    if (growlLoopNodes) return;
-    const t = c.ac.currentTime;
-    // Gerçek creature growl sample'ını loop olarak çal
-    const buf = sfxCache.get("creature_idle_01.wav") || sfxCache.get("creature_growl_01.wav");
-    if (!buf) return;
-    const src = c.ac.createBufferSource();
-    src.buffer = buf;
-    src.loop = true;
-    src.playbackRate.value = 0.7 + Math.random() * 0.15;
-    // Lowpass — derin, karanlık hırıltı
-    const lp = c.ac.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 450;
-    lp.Q.value = 1.2;
-    // Gain
-    const gain = c.ac.createGain();
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.2, t + 2);
-    // Yavaş LFO — "nefes alma" efekti
-    const lfo = c.ac.createOscillator();
-    lfo.type = "sine";
-    lfo.frequency.value = 0.12;
-    const lfoGain = c.ac.createGain();
-    lfoGain.gain.value = 0.08;
-    lfo.connect(lfoGain).connect(gain.gain);
-    src.connect(lp).connect(gain).connect(c.master);
-    src.start(t);
-    lfo.start(t);
-    growlLoopNodes = { src, gain, lfo };
-  };
-
-  const stopGrowlLoop = (c: Ctx) => {
-    if (!growlLoopNodes) return;
-    const { src, gain, lfo } = growlLoopNodes;
-    growlLoopNodes = null;
-    const t = c.ac.currentTime;
-    gain.gain.cancelScheduledValues(t);
-    gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 1);
-    src.stop(t + 1.2);
-    lfo.stop(t + 1.2);
-    src.onended = () => {
-      src.disconnect();
-      gain.disconnect();
-      lfo.disconnect();
-    };
-  };
-
   /* ---- hava saldırısı siren ---- */
   const SIREN周期 = 3.5; /* frekans tarama süresi (saniye) */
 
@@ -905,7 +854,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (!c) return;
       if (c.ac.state === "suspended") void c.ac.resume();
       if (flameWanted) startFlame(c);
-      if (ambientWanted) { startAmbient(c); startGrowlLoop(c); }
+      if (ambientWanted) startAmbient(c);
       if (sirenWanted) startSiren(c);
       if (musicWanted) startMusic(c);
       preloadAll();
@@ -969,8 +918,8 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       ambientWanted = on;
       const c = ctx;
       if (!c || muted) return;
-      if (on) { startAmbient(c); startGrowlLoop(c); }
-      else { stopAmbient(c); stopGrowlLoop(c); }
+      if (on) startAmbient(c);
+      else stopAmbient(c);
     },
     siren(on) {
       sirenWanted = on;
@@ -1347,7 +1296,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (!c) return;
       stopFlame(c);
       stopAmbient(c);
-      stopGrowlLoop(c);
       stopSiren(c);
       stopMusic(c);
       if (diveWindNodes) {
@@ -1372,7 +1320,6 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (!c) return;
       stopFlame(c);
       stopAmbient(c);
-      stopGrowlLoop(c);
       stopSiren(c);
       stopMusic(c);
       if (diveWindNodes) {
