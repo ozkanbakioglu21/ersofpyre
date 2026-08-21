@@ -887,32 +887,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
       if (on) startFlame(c);
       else stopFlame(c);
     },
-    tickFlame(dt) {
-      if (!flameNodes) return;
-      const c = ctx;
-      if (!c || muted || c.ac.state !== "running") return;
-      flameNodes.crackleTimer -= dt;
-      if (flameNodes.crackleTimer <= 0) {
-        flameNodes.crackleTimer = 0.06 + Math.random() * 0.14;
-        const t = c.ac.currentTime;
-        // Kısa tiz gürültü patlaması — çıtırtı
-        if (voices < MAX_VOICES) {
-          const crSrc = c.ac.createBufferSource();
-          crSrc.buffer = c.noise;
-          const crFilt = c.ac.createBiquadFilter();
-          crFilt.type = "highpass";
-          crFilt.frequency.value = 3200 + Math.random() * 4800;
-          crFilt.Q.value = 1.5;
-          const crGain = c.ac.createGain();
-          const dur = 0.02 + Math.random() * 0.04;
-          crGain.gain.setValueAtTime(0.0001, t);
-          crGain.gain.exponentialRampToValueAtTime(0.12 + Math.random() * 0.18, t + 0.005);
-          crGain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-          crSrc.connect(crFilt).connect(crGain).connect(c.master);
-          crSrc.start(t);
-          track(crSrc, t + dur + 0.01);
-        }
-      }
+    tickFlame(_dt: number) {
     },
     ambient(on) {
       ambientWanted = on;
