@@ -209,7 +209,7 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
   // yaratma maliyeti kare süresine yansıyor: yangın zinciri onlarca binayı
   // aynı saniyede yıkabiliyor.
   let voices = 0;
-  const MAX_VOICES = 24;
+  const MAX_VOICES = 48;
   let lastExplosion = 0;
 
   /* ── sample buffer önbellek ── */
@@ -983,62 +983,74 @@ export function createAudio(initial: { muted: boolean; volume: number }): AudioE
     },
     bombHit() {
       withCtx((c) => {
-        // 1) Ana patlama — 2 big sample üst üste (0.02s gecikme ile)
-        playSample(c, "bigExplosion", { pitch: 0.6 + Math.random() * 0.2, vol: 1.0 });
-        playSample(c, "bigExplosion", { pitch: 0.55 + Math.random() * 0.15, vol: 0.7, delay: 0.02 });
-        // 2) İkincil boom — derinlik için
-        playSample(c, "bigBoom", { pitch: 0.5 + Math.random() * 0.2, vol: 0.85, delay: 0.04 });
-        playSample(c, "bigBoom", { pitch: 0.45 + Math.random() * 0.15, vol: 0.55, delay: 0.08 });
-        // 3) Alevli çarpmış — yanık kimyasal his
-        playSample(c, "fireWhoosh", { pitch: 0.6 + Math.random() * 0.2, vol: 0.7, delay: 0.01 });
-        playSample(c, "fireWhoosh", { pitch: 0.7 + Math.random() * 0.3, vol: 0.5, delay: 0.05 });
-        // 4) Prosedürel derin bass — yer sarsıntısı
-        noiseBurst(c, {
-          dur: 0.9,
-          peak: 0.55,
-          type: "lowpass",
-          from: 500,
-          to: 40,
-          q: 0.5,
-        });
-        tone(c, { type: "sine", from: 75, to: 14, dur: 0.85, peak: 0.5 });
-        tone(c, { type: "sine", from: 55, to: 12, dur: 0.75, peak: 0.35, delay: 0.05 });
-        // 5) Mekanik parçalanma katmanı
-        playSample(c, "mechExplosion", { pitch: 0.6 + Math.random() * 0.3, vol: 0.6, delay: 0.02 });
-        playSample(c, "mechExplosion", { pitch: 0.5 + Math.random() * 0.2, vol: 0.35, delay: 0.06 });
-        // 6) Cam + metal kırılması
-        playSample(c, "glassBreak", { pitch: 0.7 + Math.random() * 0.4, vol: 0.65, delay: 0.03 });
-        playSample(c, "glassBreak", { pitch: 0.9 + Math.random() * 0.3, vol: 0.4, delay: 0.08 });
-        // 7) Tiz crack — havayı yırtan ses
-        noiseBurst(c, {
-          dur: 0.15,
-          peak: 0.45,
-          type: "highpass",
-          from: 5200,
-          to: 2400,
-          q: 3.5,
-          delay: 0.01,
-        });
-        // 8) Enkaz yağmuru — uzun taneli
-        playSample(c, "debris", { pitch: 0.7 + Math.random() * 0.3, vol: 0.5, delay: 0.1 });
-        playSample(c, "debris", { pitch: 0.9 + Math.random() * 0.3, vol: 0.35, delay: 0.18 });
-        playSample(c, "rockBreak", { pitch: 0.8 + Math.random() * 0.3, vol: 0.4, delay: 0.15 });
-        // 9) Metal gıcırtı — yapısal çökme
-        playSample(c, "metalFall", { pitch: 0.7 + Math.random() * 0.3, vol: 0.45, delay: 0.2 });
-        playSample(c, "metalHit", { pitch: 0.6 + Math.random() * 0.2, vol: 0.35, delay: 0.12 });
-        // 10) Sürekli toz/rumble — bandpass katman
-        noiseBurst(c, {
-          dur: 0.65,
-          peak: 0.12,
-          type: "bandpass",
-          from: 420,
-          to: 180,
-          q: 1.4,
-          delay: 0.12,
-        });
-        // 11) Uzak yankı — patlamanın Crest Dağları'na yansıması
-        playSample(c, "distantBoom", { pitch: 0.5 + Math.random() * 0.15, vol: 0.45, delay: 0.35 + Math.random() * 0.3 });
-        playSample(c, "distantBoom", { pitch: 0.42 + Math.random() * 0.12, vol: 0.3, delay: 0.6 + Math.random() * 0.3 });
+        // Patlama için özel gain chain — distortion yok, max ses
+        const compGain = c.ac.createGain();
+        compGain.gain.value = 1.5;
+        compGain.connect(c.master);
+
+        const p = (cat: string, v: number, pt: number, d: number) => {
+          const files = SFX_MANIFEST[cat];
+          if (!files) return;
+          const buf = sfxCache.get(pickRandom(files));
+          if (!buf || voices > MAX_VOICES) return;
+          const st = c.ac.currentTime + d;
+          const src = c.ac.createBufferSource();
+          src.buffer = buf;
+          src.playbackRate.value = pt;
+          const g = c.ac.createGain();
+          g.gain.setValueAtTime(v, st);
+          g.gain.setValueAtTime(v, st + buf.duration - 0.04);
+          g.gain.linearRampToValueAtTime(0, st + buf.duration);
+          src.connect(g).connect(compGain);
+          src.start(st);
+          track(src, st + buf.duration + 0.02);
+        };
+
+        // ▌1 — Çift ana patlama: max vol, düşük pitch
+        p("bigExplosion", 1.0, 0.55 + Math.random() * 0.15, 0);
+        p("bigExplosion", 0.85, 0.5 + Math.random() * 0.12, 0.015);
+        // ▌2 — Derin boom katmanı
+        p("bigBoom", 0.95, 0.48 + Math.random() * 0.15, 0.03);
+        p("bigBoom", 0.7, 0.42 + Math.random() * 0.1, 0.07);
+        // ▌3 — Ek patlama bedeni
+        p("explosion", 0.75, 0.6 + Math.random() * 0.3, 0.01);
+        p("explosion", 0.55, 0.7 + Math.random() * 0.2, 0.05);
+        // ▌4 — Alev + dinamit katmanı
+        p("fireWhoosh", 0.85, 0.55 + Math.random() * 0.2, 0);
+        p("fireWhoosh", 0.6, 0.65 + Math.random() * 0.25, 0.04);
+        p("dynamite", 0.7, 0.7 + Math.random() * 0.2, 0.01);
+        // ▌5 — Prosedürel ultra-bass: yer sarsıntısı
+        noiseBurst(c, { dur: 1.2, peak: 0.7, type: "lowpass", from: 400, to: 30, q: 0.4 });
+        tone(c, { type: "sine", from: 70, to: 12, dur: 1.0, peak: 0.6 });
+        tone(c, { type: "sine", from: 50, to: 10, dur: 0.9, peak: 0.45, delay: 0.03 });
+        tone(c, { type: "triangle", from: 38, to: 18, dur: 1.1, peak: 0.3, delay: 0.02 });
+        // ▌6 — Mekanik yıkım
+        p("mechExplosion", 0.7, 0.55 + Math.random() * 0.25, 0.01);
+        p("mechExplosion", 0.5, 0.6 + Math.random() * 0.2, 0.05);
+        // ▌7 — Cam + metal kırığı
+        p("glassBreak", 0.8, 0.6 + Math.random() * 0.35, 0.02);
+        p("glassBreak", 0.55, 0.8 + Math.random() * 0.3, 0.07);
+        p("metalHit", 0.6, 0.65 + Math.random() * 0.25, 0.04);
+        // ▌8 — Tiz crack: havayı yırtan
+        noiseBurst(c, { dur: 0.18, peak: 0.55, type: "highpass", from: 5500, to: 2800, q: 4, delay: 0.005 });
+        // ▌9 — Enkaz yağmuru
+        p("debris", 0.65, 0.65 + Math.random() * 0.3, 0.08);
+        p("debris", 0.5, 0.8 + Math.random() * 0.3, 0.16);
+        p("rockBreak", 0.55, 0.7 + Math.random() * 0.3, 0.12);
+        p("rockBreak", 0.4, 0.85 + Math.random() * 0.25, 0.22);
+        // ▌10 — Metal çökme + yapısal gıcırtı
+        p("metalFall", 0.6, 0.65 + Math.random() * 0.3, 0.15);
+        p("metalFall", 0.4, 0.8 + Math.random() * 0.2, 0.25);
+        p("metalHit", 0.45, 0.7 + Math.random() * 0.2, 0.1);
+        // ▌11 — Bandpass toz/rumble
+        noiseBurst(c, { dur: 0.8, peak: 0.18, type: "bandpass", from: 380, to: 150, q: 1.6, delay: 0.1 });
+        // ▌12 — Uzak yankı (çift echo)
+        p("distantBoom", 0.6, 0.48 + Math.random() * 0.12, 0.3 + Math.random() * 0.2);
+        p("distantBoom", 0.4, 0.42 + Math.random() * 0.1, 0.55 + Math.random() * 0.25);
+        // ▌13 — Ek sub-bass smash
+        noiseBurst(c, { dur: 0.4, peak: 0.4, type: "lowpass", from: 250, to: 25, q: 0.8, delay: 0.01 });
+        // Comp gain'i 2.5s sonra temizle
+        setTimeout(() => { try { compGain.disconnect(); } catch {} }, 2500);
       });
     },
     hit() {
