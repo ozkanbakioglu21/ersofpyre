@@ -25,6 +25,15 @@ interface BoardHandle {
   celebrate: () => void;
   refill: () => void;
   reset: () => void;
+  burst: (col: number, row: number, wCells: number, hCells: number) => void;
+  getCanvas: () => HTMLCanvasElement | null;
+}
+
+interface DragState {
+  idx: number;
+  row: number;
+  col: number;
+  valid: boolean;
 }
 
 const FURNITURE_KINDS = ["plant", "rug", "lamp", "chair", "table"];
@@ -148,17 +157,20 @@ const BoardCanvas = forwardRef<BoardHandle, {
   engine: ZenEngine;
   palette: Palette;
   selectedIdx: number | null;
-  onPlace: (row: number, col: number) => void;
-}>(({ engine, palette, selectedIdx, onPlace }, ref) => {
+  onPlace: () => void;
+  drag: DragState | null;
+}>(({ engine, palette, selectedIdx, onPlace, drag }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const selRef = useRef(selectedIdx);
   const palRef = useRef(palette);
   const onPlaceRef = useRef(onPlace);
   const engRef = useRef(engine);
+  const dragRef = useRef<DragState | null>(null);
   selRef.current = selectedIdx;
   palRef.current = palette;
   onPlaceRef.current = onPlace;
   engRef.current = engine;
+  dragRef.current = drag;
 
   const partsRef = useRef<Particle[]>([]);
   const motesRef = useRef<Particle[]>([]);
@@ -194,6 +206,26 @@ const BoardCanvas = forwardRef<BoardHandle, {
       sheenRef.current = null;
       refillPulseRef.current = 0;
       hoverRef.current = null;
+    },
+    burst(col: number, row: number, wCells: number, hCells: number) {
+      const pal = palRef.current;
+      const cx = (col + wCells / 2) * CELL;
+      const cy = (row + hCells / 2) * CELL;
+      for (let i = 0; i < 10; i++) {
+        partsRef.current.push({
+          x: cx + (Math.random() - 0.5) * wCells * CELL * 0.6,
+          y: cy + (Math.random() - 0.5) * hCells * CELL * 0.6,
+          vx: (Math.random() - 0.5) * 26,
+          vy: -Math.random() * 22 - 4,
+          life: 0.45 + Math.random() * 0.3,
+          t: 0,
+          size: 1.2 + Math.random() * 2,
+          color: Math.random() < 0.5 ? pal.tileA : pal.tileB,
+        });
+      }
+    },
+    getCanvas() {
+      return canvasRef.current;
     },
   }), []);
 
@@ -297,6 +329,31 @@ const BoardCanvas = forwardRef<BoardHandle, {
         ctx.fillRect(x + 3, y + h - 4, Math.max(2, w - 6), 1);
       }
       ctx.restore();
+
+      const dg = dragRef.current;
+      if (dg) {
+        const p = eng.pieces[dg.idx];
+        if (p) {
+          const gw = p.cellsW * CELL;
+          const gh = p.cellsH * CELL;
+          const gx = dg.col * CELL;
+          const gy = dg.row * CELL;
+          ctx.save();
+          ctx.shadowBlur = 0;
+          ctx.globalAlpha = 0.9;
+          const gg = ctx.createLinearGradient(gx, gy, gx + gw, gy + gh);
+          gg.addColorStop(0, pal.tileA);
+          gg.addColorStop(0.5, pal.tileB);
+          gg.addColorStop(1, pal.tileA);
+          ctx.fillStyle = dg.valid ? gg : "rgba(214,98,98,0.88)";
+          ctx.fillRect(gx + 1, gy + 1, gw - 2, gh - 2);
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = dg.valid ? pal.accent : "#c25b5b";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(gx + 1, gy + 1, gw - 2, gh - 2);
+          ctx.restore();
+        }
+      }
 
       if (sheenRef.current) {
         const s = sheenRef.current;
@@ -413,7 +470,7 @@ const BoardCanvas = forwardRef<BoardHandle, {
         color: Math.random() < 0.5 ? pal.tileA : pal.tileB,
       });
     }
-    onPlaceRef.current(row, col);
+    onPlaceRef.current();
   };
 
   return (
@@ -437,13 +494,14 @@ const BoardCanvas = forwardRef<BoardHandle, {
 });
 BoardCanvas.displayName = "BoardCanvas";
 
-function PiecePill({ p, pal, selected, cutPct, onPointerDown, onPointerMove }: {
+function PiecePill({ p, pal, selected, cutPct, onPointerDown, onPointerMove, onPointerUp }: {
   p: Piece;
   pal: Palette;
   selected: boolean;
   cutPct: number | null;
-  onPointerDown: () => void;
+  onPointerDown: (e: React.PointerEvent) => void;
   onPointerMove: (e: React.PointerEvent) => void;
+  onPointerUp: (e: React.PointerEvent) => void;
 }) {
   const w = Math.max(p.cellsW * 18, 30);
   const h = Math.max(p.cellsH * 18, 30);
@@ -452,18 +510,20 @@ function PiecePill({ p, pal, selected, cutPct, onPointerDown, onPointerMove }: {
 
   return (
     <div
-      className="relative shrink-0 rounded-md cursor-pointer transition-transform duration-150"
+      className="relative shrink-0 rounded-md cursor-grab transition-transform duration-150"
       style={{
         width: w,
         height: h,
         background: gr,
+        touchAction: "none",
         boxShadow: selected
           ? `0 0 0 2px ${pal.accent}, 0 4px 10px ${pal.shadow}`
           : `0 2px 6px ${pal.shadow}`,
         transform: selected ? "translateY(-3px)" : undefined,
       }}
-      onPointerDown={onPointerDown}
+      onPointerDown={(e) => onPointerDown(e)}
       onPointerMove={(e) => onPointerMove(e)}
+      onPointerUp={(e) => onPointerUp(e)}
       title={`${p.cellsW * 5}×${p.cellsH * 5}`}
     >
       {selected && cutPct !== null && !p.cut ? (
@@ -523,9 +583,12 @@ export default function App() {
 
   const [selected, setSelected] = useState<number | null>(null);
   const [cutPct, setCutPct] = useState<number | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
   const [paletteIdx, setPaletteIdx] = useState(0);
   const [musicOn, setMusicOn] = useState(false);
   const [toast, setToast] = useState<{ msg: string; next: boolean } | null>(null);
+
+  const dragRef = useRef<{ idx: number; sx: number; sy: number; sxr: number; syr: number; w: number; h: number; wasSel: boolean; mode: "idle" | "cut" | "drag" } | null>(null);
 
   const audioRef = useRef(new ZenAudio());
   const boardRef = useRef<BoardHandle>(null);
@@ -539,57 +602,116 @@ export default function App() {
     engRef.current = new ZenEngine(ROOMS[idx]);
     setSelected(null);
     setCutPct(null);
+    setDrag(null);
+    dragRef.current = null;
     setToast(null);
     doneRef.current = false;
     boardRef.current?.reset();
     tick();
   };
 
-  const handlePlace = useCallback(() => {
+  const onPlaced = useCallback(() => {
     audioRef.current.place();
     setSelected(null);
     setCutPct(null);
+    setDrag(null);
     tick();
     const e = engRef.current;
     if (e.percent === 100 && !doneRef.current) {
       doneRef.current = true;
-      setSelected(null);
       audioRef.current.complete();
       boardRef.current?.celebrate();
       setToast({ msg: `${e.room.name} hazır!`, next: roomIdx < ROOMS.length - 1 });
     }
   }, [roomIdx, tick]);
 
-  const handlePieceDown = (idx: number) => {
+  const handlePieceDown = (e: React.PointerEvent, idx: number) => {
+    e.stopPropagation();
     audioRef.current.unlock();
-    if (selected === idx) {
-      const pct = cutPct ?? 50;
-      const cells = Math.round((pct / 100) * engine.cutRange(idx));
-      if (engine.cutPiece(idx, cells)) {
-        audioRef.current.cut();
-        setCutPct(null);
-        setSelected(null);
-        tick();
-      }
-    } else {
-      setSelected(idx);
-      const p = engine.pieces[idx];
-      setCutPct(p && !p.cut ? 50 : null);
+    const eng = engRef.current;
+    if (eng.placements[idx] !== null) return;
+    setSelected(idx);
+    const p = eng.pieces[idx];
+    setCutPct(p && !p.cut ? 50 : null);
+    setDrag(null);
+    const el = e.currentTarget as HTMLElement;
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
     }
+    const r = el.getBoundingClientRect();
+    dragRef.current = { idx, sx: e.clientX, sy: e.clientY, sxr: r.left, syr: r.top, w: r.width, h: r.height, wasSel: selected === idx, mode: "idle" };
+  };
+
+  const dropCell = (e: { clientX: number; clientY: number }, idx: number): DragState | null => {
+    const canvas = boardRef.current?.getCanvas();
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const col = Math.floor((e.clientX - rect.left) / CELL);
+    const row = Math.floor((e.clientY - rect.top) / CELL);
+    const eng = engRef.current;
+    if (row < 0 || row >= eng.room.gridRows || col < 0 || col >= eng.room.gridCols) return null;
+    return { idx, row, col, valid: eng.canPlace(idx, row, col) };
   };
 
   const handlePieceMove = (e: React.PointerEvent, idx: number) => {
-    if (selected !== idx) return;
-    const el = e.currentTarget as HTMLElement;
-    const rect = el.getBoundingClientRect();
-    const horizontal = engine.pieces[idx].cellsW >= engine.pieces[idx].cellsH;
-    if (horizontal) {
-      const pct = ((e.clientX - rect.left) / rect.width) * 100;
-      setCutPct(Math.max(8, Math.min(92, pct)));
-    } else {
-      const pct = ((e.clientY - rect.top) / rect.height) * 100;
-      setCutPct(Math.max(8, Math.min(92, pct)));
+    const d = dragRef.current;
+    if (!d || d.idx !== idx) return;
+    const eng = engRef.current;
+    if (d.mode === "idle") {
+      const inPill = e.clientX >= d.sxr - 8 && e.clientX <= d.sxr + d.w + 8 &&
+        e.clientY >= d.syr - 8 && e.clientY <= d.syr + d.h + 8;
+      d.mode = inPill ? "cut" : "drag";
     }
+    if (d.mode === "cut") {
+      const p = eng.pieces[idx];
+      if (!p.cut) {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const horizontal = p.cellsW >= p.cellsH;
+        const pct = horizontal
+          ? ((e.clientX - rect.left) / rect.width) * 100
+          : ((e.clientY - rect.top) / rect.height) * 100;
+        setCutPct(Math.max(8, Math.min(92, pct)));
+      }
+    } else if (d.mode === "drag") {
+      setDrag(dropCell(e, idx));
+    }
+  };
+
+  const handlePieceUp = (e: React.PointerEvent, idx: number) => {
+    const d = dragRef.current;
+    if (!d || d.idx !== idx) return;
+    const eng = engRef.current;
+    const p = eng.pieces[idx];
+    if (d.mode === "drag") {
+      const dr = dropCell(e, idx);
+      if (dr && dr.valid) {
+        placeFromDrop(idx, dr.row, dr.col);
+      } else {
+        setDrag(null);
+      }
+    } else if ((d.wasSel || d.mode === "cut") && p && !p.cut) {
+      const pct = cutPct ?? 50;
+      const cells = Math.round((pct / 100) * eng.cutRange(idx));
+      if (eng.cutPiece(idx, cells)) {
+        audioRef.current.cut();
+        setCutPct(null);
+        setSelected(null);
+        setDrag(null);
+        tick();
+      }
+    }
+    dragRef.current = null;
+  };
+
+  const placeFromDrop = (idx: number, row: number, col: number) => {
+    const eng = engRef.current;
+    if (!eng.canPlace(idx, row, col)) return;
+    const p = eng.pieces[idx];
+    eng.place(idx, row, col);
+    boardRef.current?.burst(col, row, p.cellsW, p.cellsH);
+    onPlaced();
   };
 
   const handleRotate = () => {
@@ -686,7 +808,7 @@ export default function App() {
           </div>
         ) : null}
 
-        <BoardCanvas ref={boardRef} engine={engine} palette={pal} selectedIdx={selected} onPlace={handlePlace} />
+        <BoardCanvas ref={boardRef} engine={engine} palette={pal} selectedIdx={selected} onPlace={onPlaced} drag={drag} />
       </main>
 
       <footer className="px-4 pb-4 pt-2 flex flex-col gap-2"
@@ -711,7 +833,7 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <span className="text-[11px] opacity-40">bir fayans seç, sürükle-kes, zemine dokun</span>
+            <span className="text-[11px] opacity-40">fayansı tut, tahtaya sürükle &amp; bırak · üzerinde iki kez dokun = kes</span>
           )}
         </div>
         <div className="flex gap-2 items-end overflow-x-auto pb-1" style={{ maxHeight: 150 }}>
@@ -723,8 +845,9 @@ export default function App() {
                 pal={pal}
                 selected={selected === idx}
                 cutPct={selected === idx ? cutPct : null}
-                onPointerDown={() => handlePieceDown(idx)}
+                onPointerDown={(e) => handlePieceDown(e, idx)}
                 onPointerMove={(e) => handlePieceMove(e, idx)}
+                onPointerUp={(e) => handlePieceUp(e, idx)}
               />
             ))}
           </div>
