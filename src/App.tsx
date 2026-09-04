@@ -276,28 +276,25 @@ const BoardCanvas = forwardRef<BoardHandle, {
         ctx.fillStyle = gr;
         ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
 
-        ctx.fillStyle = pal.seam;
+        ctx.fillStyle = pal.grout;
         ctx.fillRect(x, y, w, 2);
         ctx.fillRect(x, y + h - 2, w, 2);
         ctx.fillRect(x, y, 2, h);
         ctx.fillRect(x + w - 2, y, 2, h);
 
-        ctx.strokeStyle = "rgba(255,255,255,0.25)";
-        ctx.lineWidth = 1;
-        const step = horizontal ? 12 : 22;
-        for (let k = 1; k < (horizontal ? drawW : drawH); k++) {
-          const gx = horizontal ? x + k * CELL : x + 4;
-          const gy = horizontal ? y + 4 : y + k * CELL;
-          ctx.beginPath();
-          if (horizontal) {
-            ctx.moveTo(gx + 2, gy);
-            ctx.lineTo(gx + 2 + step, gy);
-          } else {
-            ctx.moveTo(gy, gx + 2);
-            ctx.lineTo(gy, gx + 2 + step);
-          }
-          ctx.stroke();
-        }
+        const band = Math.min(w, h);
+        const gl = ctx.createLinearGradient(0, y, 0, y + band * 0.9);
+        gl.addColorStop(0, "rgba(255,255,255,0.35)");
+        gl.addColorStop(0.4, "rgba(255,255,255,0.06)");
+        gl.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = gl;
+        ctx.fillRect(x + 3, y + 3, Math.max(2, w - 6), band * 0.5);
+
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.fillRect(x + 6, y + 4, Math.max(6, w - 12), 1.5);
+
+        ctx.fillStyle = "rgba(255,255,255,0.22)";
+        ctx.fillRect(x + 3, y + h - 4, Math.max(2, w - 6), 1);
       }
       ctx.restore();
 
@@ -498,7 +495,7 @@ function RecycleBin({ pal, fill, onDrop }: { pal: Palette; fill: number; onDrop:
   const r = 26;
   const circ = 2 * Math.PI * r;
   return (
-    <div className="flex flex-col items-center gap-1 px-2" title="Geri dönüştür (35 hücre = yeni parke)">
+    <div className="flex flex-col items-center gap-1 px-2" title="Geri dönüştür (35 hücre = yeni fayans)">
       <div className="relative w-16 h-16 flex items-center justify-center rounded-xl border"
         style={{ borderColor: pal.seam, background: "rgba(255,255,255,0.35)" }}
         onClick={onDrop}>
@@ -635,7 +632,7 @@ export default function App() {
           <h1 className="text-lg font-semibold tracking-wide truncate">
             {engine.room.name}
           </h1>
-          <p className="text-[11px] opacity-60">Zen Paving — Paved &amp; Peaceful</p>
+          <p className="text-[11px] opacity-60">Zen Fayans — Pürüzsüz &amp; Huzurlu</p>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
           <div className="flex flex-col items-center">
@@ -714,7 +711,7 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <span className="text-[11px] opacity-40">bir parke seç, sürükle-kes, zemine dokun</span>
+            <span className="text-[11px] opacity-40">bir fayans seç, sürükle-kes, zemine dokun</span>
           )}
         </div>
         <div className="flex gap-2 items-end overflow-x-auto pb-1" style={{ maxHeight: 150 }}>
@@ -734,7 +731,7 @@ export default function App() {
           <RecycleBin pal={pal} fill={engine.recyclePercent} onDrop={handleRecycle} />
         </div>
         <p className="text-[10px] opacity-40 italic text-center">
-          hiçbir parça israf olmaz — sevmediklerini geri dönüştür, kereste birleşir, yeni parke doğar.
+          hiçbir parça israf olmaz — sevmediklerini geri dönüştür, seramik hamuru birleşir, yeni fayans doğar.
         </p>
       </footer>
     </div>
