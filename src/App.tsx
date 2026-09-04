@@ -555,7 +555,7 @@ function RecycleBin({ pal, fill, onDrop }: { pal: Palette; fill: number; onDrop:
   const r = 26;
   const circ = 2 * Math.PI * r;
   return (
-    <div className="flex flex-col items-center gap-1 px-2" title="Geri dönüştür (35 hücre = yeni fayans)">
+    <div className="flex flex-col items-center gap-1 px-2" title="Geri dönüştür (35 cm = yeni taş)">
       <div className="relative w-16 h-16 flex items-center justify-center rounded-xl border"
         style={{ borderColor: pal.seam, background: "rgba(255,255,255,0.35)" }}
         onClick={onDrop}>
@@ -583,6 +583,7 @@ export default function App() {
 
   const [selected, setSelected] = useState<number | null>(null);
   const [cutPct, setCutPct] = useState<number | null>(null);
+  const [cutCm, setCutCm] = useState(15);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [paletteIdx, setPaletteIdx] = useState(0);
   const [musicOn, setMusicOn] = useState(false);
@@ -602,6 +603,7 @@ export default function App() {
     engRef.current = new ZenEngine(ROOMS[idx]);
     setSelected(null);
     setCutPct(null);
+    setCutCm(15);
     setDrag(null);
     dragRef.current = null;
     setToast(null);
@@ -633,6 +635,7 @@ export default function App() {
     setSelected(idx);
     const p = eng.pieces[idx];
     setCutPct(p && !p.cut ? 50 : null);
+    setCutCm(15);
     setDrag(null);
     const el = e.currentTarget as HTMLElement;
     try {
@@ -720,6 +723,23 @@ export default function App() {
     tick();
   };
 
+  const handleCutBtn = () => {
+    if (selected === null) return;
+    const eng = engRef.current;
+    const p = eng.pieces[selected];
+    if (!p || p.cut) return;
+    const maxCells = Math.max(p.cellsW, p.cellsH);
+    const cells = Math.max(1, Math.min(maxCells - 1, Math.round(cutCm / 5)));
+    if (eng.cutPiece(selected, cells)) {
+      audioRef.current.cut();
+      setCutPct(null);
+      setCutCm(15);
+      setSelected(null);
+      setDrag(null);
+      tick();
+    }
+  };
+
   const handleRecycle = () => {
     if (selected === null) return;
     if (engine.placements[selected] !== null) return;
@@ -745,6 +765,11 @@ export default function App() {
 
   const pct = engine.percent;
 
+  const selPiece = selected !== null ? engine.pieces[selected] : null;
+  const selMaxCells = selPiece ? Math.max(selPiece.cellsW, selPiece.cellsH) : 7;
+  const selMaxCm = Math.max(5, Math.min(30, (selMaxCells - 1) * 5));
+  const sliderCm = Math.min(cutCm, selMaxCm);
+
   return (
     <div className="h-full flex flex-col transition-colors duration-500"
       style={{ background: `${pal.bg1}`, color: pal.text }}>
@@ -754,7 +779,7 @@ export default function App() {
           <h1 className="text-lg font-semibold tracking-wide truncate">
             {engine.room.name}
           </h1>
-          <p className="text-[11px] opacity-60">Zen Fayans — Pürüzsüz &amp; Huzurlu</p>
+          <p className="text-[11px] opacity-60">Zen Paving — Kafa Dağıtma &amp; Taş Döşeme</p>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
           <div className="flex flex-col items-center">
@@ -813,13 +838,35 @@ export default function App() {
 
       <footer className="px-4 pb-4 pt-2 flex flex-col gap-2"
         style={{ borderTop: `1px solid ${pal.seam}` }}>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-2 flex-wrap">
           <span className="text-[10px] uppercase tracking-widest opacity-50">Envanter</span>
           {selected !== null ? (
-            <div className="flex items-center gap-2 text-[11px]"
+            <div className="flex items-center gap-2.5 text-[11px] flex-wrap justify-end"
               style={{ color: pal.accent }}>
-              <span>{engine.pieces[selected]?.cut ? "kesilmiş parça" : "kaydırıp tıkla → kes"}</span>
-              {!engine.pieces[selected]?.cut && (
+              {!selPiece?.cut ? (
+                <div className="flex items-center gap-2 bg-white/40 rounded-full px-3 py-1 border"
+                  style={{ borderColor: pal.seam }}>
+                  <span className="text-[10px] font-semibold opacity-70">Kırma Boyutu:</span>
+                  <input
+                    type="range"
+                    min={5}
+                    max={selMaxCm}
+                    step={5}
+                    value={sliderCm}
+                    onChange={(e) => setCutCm(Number(e.target.value))}
+                    className="accent-stone-600 cursor-pointer"
+                    style={{ width: 110 }}
+                  />
+                  <span className="text-[10px] font-mono font-bold">{sliderCm} cm</span>
+                  <button onClick={handleCutBtn}
+                    className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-amber-700 hover:bg-amber-800 text-white transition">
+                    KIR (ÇIT!)
+                  </button>
+                </div>
+              ) : (
+                <span>kesilmiş parça</span>
+              )}
+              {!selPiece?.cut && (
                 <button onClick={handleRotate}
                   className="px-2.5 py-1 rounded-full text-[10px] font-semibold border"
                   style={{ borderColor: pal.seam }}>
@@ -833,7 +880,7 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <span className="text-[11px] opacity-40">fayansı tut, tahtaya sürükle &amp; bırak · üzerinde iki kez dokun = kes</span>
+            <span className="text-[11px] opacity-40">taşı tut, tahtaya sürükle &amp; bırak · kırma için Kırma Boyutu + KIR</span>
           )}
         </div>
         <div className="flex gap-2 items-end overflow-x-auto pb-1" style={{ maxHeight: 150 }}>
@@ -854,7 +901,7 @@ export default function App() {
           <RecycleBin pal={pal} fill={engine.recyclePercent} onDrop={handleRecycle} />
         </div>
         <p className="text-[10px] opacity-40 italic text-center">
-          hiçbir parça israf olmaz — sevmediklerini geri dönüştür, seramik hamuru birleşir, yeni fayans doğar.
+          hiçbir parça israf olmaz — sevmediklerini geri dönüştür, taş tozu birleşir, yeni taş doğar.
         </p>
       </footer>
     </div>

@@ -17,11 +17,11 @@ export interface Room {
 }
 
 export const ROOMS: Room[] = [
-  { name: "Banyo Duvarı", gridRows: 7, gridCols: 7 },
-  { name: "Mutfak Duvarı", gridRows: 7, gridCols: 14 },
-  { name: "Koridor Zemini", gridRows: 14, gridCols: 7 },
-  { name: "Duş Odası", gridRows: 14, gridCols: 14 },
-  { name: "WC Duvarı", gridRows: 7, gridCols: 21 },
+  { name: "Teras", gridRows: 7, gridCols: 7 },
+  { name: "Bahçe Yolu", gridRows: 7, gridCols: 14 },
+  { name: "Veranda", gridRows: 14, gridCols: 7 },
+  { name: "Avlu", gridRows: 14, gridCols: 14 },
+  { name: "Merdiven Yolu", gridRows: 7, gridCols: 21 },
   { name: "Balkon Zemini", gridRows: 14, gridCols: 21 },
 ];
 
@@ -44,7 +44,7 @@ export interface Palette {
 export const PALETTES: Palette[] = [
   {
     id: "beyaz",
-    name: "Beyaz",
+    name: "Beyaz Mermer",
     bg1: "#f4f4f0",
     bg2: "#ecebe4",
     empty: "#deddd5",
@@ -59,7 +59,7 @@ export const PALETTES: Palette[] = [
   },
   {
     id: "tozmavi",
-    name: "Toz Mavi",
+    name: "Toz Mavi Taş",
     bg1: "#edf2f3",
     bg2: "#e3eaec",
     empty: "#d5dfe2",
@@ -74,7 +74,7 @@ export const PALETTES: Palette[] = [
   },
   {
     id: "fildisi",
-    name: "Fildişi",
+    name: "Fildişi Traverten",
     bg1: "#f5efe7",
     bg2: "#ede3d5",
     empty: "#e0d6c6",
@@ -89,7 +89,7 @@ export const PALETTES: Palette[] = [
   },
   {
     id: "adacayi",
-    name: "Adaçayı",
+    name: "Adaçayı Bazalt",
     bg1: "#eaf0e5",
     bg2: "#e0e9d8",
     empty: "#d8e2cf",
@@ -104,7 +104,7 @@ export const PALETTES: Palette[] = [
   },
   {
     id: "terra",
-    name: "Terracotta",
+    name: "Terracotta Tuğla",
     bg1: "#f2e6da",
     bg2: "#ebd9c8",
     empty: "#e3d0bc",
