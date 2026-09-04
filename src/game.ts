@@ -2,295 +2,238 @@ export interface Piece {
   id: string;
   cellsW: number;
   cellsH: number;
-  type: "uncut" | "cut";
-  originalId?: string;
+  cut: boolean;
 }
 
-export interface PlacedPiece {
+export interface Placed {
   row: number;
   col: number;
 }
 
-export interface Level {
+export interface Room {
   name: string;
-  description: string;
   gridRows: number;
   gridCols: number;
-  startingTiles: { w: number; h: number }[];
 }
 
-export const LEVELS: Level[] = [
+export const ROOMS: Room[] = [
+  { name: "Cozy Reading Nook", gridRows: 7, gridCols: 7 },
+  { name: "Morning Coffee Corner", gridRows: 7, gridCols: 14 },
+  { name: "Warm Hallway", gridRows: 14, gridCols: 7 },
+  { name: "Sunlit Studio", gridRows: 14, gridCols: 14 },
+  { name: "Quiet Bedroom", gridRows: 7, gridCols: 21 },
+  { name: "Serenity Garden", gridRows: 14, gridCols: 21 },
+];
+
+export interface Palette {
+  id: string;
+  name: string;
+  bg1: string;
+  bg2: string;
+  empty: string;
+  grid: string;
+  tileA: string;
+  tileB: string;
+  seam: string;
+  accent: string;
+  text: string;
+  shadow: string;
+}
+
+export const PALETTES: Palette[] = [
   {
-    name: "Tek Sıra",
-    description: "Tek bir parkeyi yerleştir",
-    gridRows: 1,
-    gridCols: 7,
-    startingTiles: [{ w: 7, h: 1 }],
+    id: "nordic",
+    name: "Nordik",
+    bg1: "#f6f2ea",
+    bg2: "#efe7d7",
+    empty: "#e8e1d1",
+    grid: "rgba(120,100,70,0.14)",
+    tileA: "#dcc19b",
+    tileB: "#cfa97b",
+    seam: "rgba(110,82,54,0.45)",
+    accent: "#b98a5e",
+    text: "#4a4438",
+    shadow: "rgba(90,60,30,0.28)",
   },
   {
-    name: "Çift Sıra",
-    description: "İki sırayı doldur",
-    gridRows: 2,
-    gridCols: 7,
-    startingTiles: [{ w: 7, h: 1 }, { w: 7, h: 1 }],
+    id: "japandi",
+    name: "Japandi",
+    bg1: "#efe9df",
+    bg2: "#e6ddcd",
+    empty: "#dfd6c3",
+    grid: "rgba(110,95,70,0.15)",
+    tileA: "#c9a66b",
+    tileB: "#a8864e",
+    seam: "rgba(90,66,30,0.5)",
+    accent: "#8a6a3d",
+    text: "#3e392f",
+    shadow: "rgba(70,50,20,0.3)",
   },
   {
-    name: "Geniş Oda",
-    description: "Geniş odada derz kuralına dikkat",
-    gridRows: 2,
-    gridCols: 14,
-    startingTiles: [
-      { w: 7, h: 1 },
-      { w: 7, h: 1 },
-      { w: 7, h: 1 },
-      { w: 7, h: 1 },
-    ],
+    id: "terracotta",
+    name: "Terracotta",
+    bg1: "#f2e6da",
+    bg2: "#ebd9c8",
+    empty: "#e3d0bc",
+    grid: "rgba(140,90,60,0.15)",
+    tileA: "#c96f4a",
+    tileB: "#b25e3e",
+    seam: "rgba(100,55,30,0.5)",
+    accent: "#a55336",
+    text: "#3f2a20",
+    shadow: "rgba(92,50,25,0.3)",
   },
   {
-    name: "Üçlü Sıra",
-    description: "Üç sırayı kuralına göre doldur",
-    gridRows: 3,
-    gridCols: 14,
-    startingTiles: [
-      { w: 7, h: 1 },
-      { w: 7, h: 1 },
-      { w: 7, h: 1 },
-      { w: 7, h: 1 },
-      { w: 7, h: 1 },
-      { w: 7, h: 1 },
-    ],
-  },
-  {
-    name: "Kare Oda",
-    description: "Kare odada stratejik yerleştirme",
-    gridRows: 7,
-    gridCols: 7,
-    startingTiles: [
-      { w: 7, h: 1 }, { w: 7, h: 1 }, { w: 7, h: 1 },
-      { w: 7, h: 1 }, { w: 7, h: 1 }, { w: 7, h: 1 },
-      { w: 7, h: 1 },
-    ],
+    id: "sage",
+    name: "Adaçayı",
+    bg1: "#eaf0e5",
+    bg2: "#e0e9d8",
+    empty: "#d8e2cf",
+    grid: "rgba(100,120,90,0.16)",
+    tileA: "#9caf88",
+    tileB: "#7e9270",
+    seam: "rgba(70,90,60,0.5)",
+    accent: "#6d825f",
+    text: "#37422f",
+    shadow: "rgba(55,75,45,0.3)",
   },
 ];
 
-export type ValidationResult = { ok: true } | { ok: false; reason: string };
-
-export class GameEngine {
+export class ZenEngine {
   grid: number[][];
   pieces: Piece[];
-  placements: (PlacedPiece | null)[];
-  level: Level;
+  placements: (Placed | null)[];
+  room: Room;
+  recycleCells = 0;
+  private idc = 0;
 
-  constructor(level: Level) {
-    this.level = level;
-    this.grid = Array.from({ length: level.gridRows }, () =>
-      new Array<number>(level.gridCols).fill(-1)
+  constructor(room: Room) {
+    this.room = room;
+    this.grid = Array.from({ length: room.gridRows }, () =>
+      new Array<number>(room.gridCols).fill(-1)
     );
-    this.pieces = level.startingTiles.map((t, i) => ({
-      id: `tile-${i}`,
-      cellsW: t.w,
-      cellsH: t.h,
-      type: "uncut" as const,
-    }));
-    this.placements = new Array<PlacedPiece | null>(this.pieces.length).fill(null);
+    this.pieces = [];
+    this.placements = [];
+    this.fillFresh();
   }
 
-  selectPiece(_idx: number): void {}
+  private newPiece(): Piece {
+    return { id: `T${this.idc++}`, cellsW: 7, cellsH: 1, cut: false };
+  }
 
-  rotatePiece(idx: number): boolean {
+  private fillFresh(): void {
+    while (this.pieces.filter((p) => !p.cut).length < 2) {
+      this.pieces.push(this.newPiece());
+      this.placements.push(null);
+    }
+  }
+
+  rotate(idx: number): boolean {
+    const p = this.pieces[idx];
+    if (!p || this.placements[idx] !== null) return false;
+    const t = p.cellsW;
+    p.cellsW = p.cellsH;
+    p.cellsH = t;
+    return true;
+  }
+
+  cutRange(idx: number): number {
+    const p = this.pieces[idx];
+    if (!p) return 0;
+    return Math.max(p.cellsW, p.cellsH) - 1;
+  }
+
+  cutPiece(idx: number, cells: number): boolean {
+    const p = this.pieces[idx];
+    if (!p || p.cut || this.placements[idx] !== null) return false;
+    const max = Math.max(p.cellsW, p.cellsH);
+    if (cells < 1 || cells >= max) return false;
+
+    const horizontal = p.cellsW >= p.cellsH;
+    let w1 = p.cellsW, h1 = p.cellsH, w2 = p.cellsW, h2 = p.cellsH;
+    if (horizontal) { w1 = cells; w2 = p.cellsW - cells; }
+    else { h1 = cells; h2 = p.cellsH - cells; }
+
+    this.pieces[idx] = { id: `${p.id}A`, cellsW: w1, cellsH: h1, cut: true };
+    this.pieces.push({ id: `${p.id}B`, cellsW: w2, cellsH: h2, cut: true });
+    this.placements.push(null);
+
+    this.fillFresh();
+    return true;
+  }
+
+  canPlace(idx: number, row: number, col: number): boolean {
+    const p = this.pieces[idx];
+    if (!p || this.placements[idx] !== null) return false;
+    if (row < 0 || col < 0) return false;
+    if (row + p.cellsH > this.room.gridRows) return false;
+    if (col + p.cellsW > this.room.gridCols) return false;
+    for (let r = row; r < row + p.cellsH; r++) {
+      for (let c = col; c < col + p.cellsW; c++) {
+        if (this.grid[r][c] !== -1) return false;
+      }
+    }
+    return true;
+  }
+
+  place(idx: number, row: number, col: number): boolean {
+    if (!this.canPlace(idx, row, col)) return false;
+    const p = this.pieces[idx];
+    for (let r = row; r < row + p.cellsH; r++) {
+      for (let c = col; c < col + p.cellsW; c++) {
+        this.grid[r][c] = idx;
+      }
+    }
+    this.placements[idx] = { row, col };
+    this.fillFresh();
+    return true;
+  }
+
+  matrixOf(idx: number): Placed | null {
+    return this.placements[idx];
+  }
+
+  recycle(idx: number): boolean {
     const p = this.pieces[idx];
     if (!p) return false;
     if (this.placements[idx] !== null) return false;
-    const tmp = p.cellsW;
-    p.cellsW = p.cellsH;
-    p.cellsH = tmp;
+    const cells = p.cellsW * p.cellsH;
+    this.pieces.splice(idx, 1);
+    this.placements.splice(idx, 1);
+    this.recycleCells += cells;
+    this.fillFresh();
     return true;
   }
 
-  cutPiece(idx: number, cutPos: number): boolean {
-    const p = this.pieces[idx];
-    if (!p || p.type !== "uncut") return false;
-    if (this.placements[idx] !== null) return false;
-
-    const isH = p.cellsW >= p.cellsH;
-    let w1: number, h1: number, w2: number, h2: number;
-    if (isH) {
-      if (cutPos < 1 || cutPos >= p.cellsW) return false;
-      w1 = cutPos; h1 = p.cellsH;
-      w2 = p.cellsW - cutPos; h2 = p.cellsH;
-    } else {
-      if (cutPos < 1 || cutPos >= p.cellsH) return false;
-      w1 = p.cellsW; h1 = cutPos;
-      w2 = p.cellsW; h2 = p.cellsH - cutPos;
+  collectNewTile(): boolean {
+    if (this.recycleCells >= 35) {
+      this.recycleCells -= 35;
+      this.pieces.push(this.newPiece());
+      this.placements.push(null);
+      return true;
     }
-
-    this.pieces[idx] = {
-      id: `${p.id}-L`,
-      cellsW: w1,
-      cellsH: h1,
-      type: "cut",
-      originalId: p.id,
-    };
-    this.placements[idx] = null;
-
-    this.pieces.push({
-      id: `${p.id}-R`,
-      cellsW: w2,
-      cellsH: h2,
-      type: "cut",
-      originalId: p.id,
-    });
-    this.placements.push(null);
-
-    return true;
+    return false;
   }
 
-  canPlace(pieceIdx: number, row: number, col: number): ValidationResult {
-    const p = this.pieces[pieceIdx];
-    if (!p) return { ok: false, reason: "Parça bulunamadı" };
-    if (this.placements[pieceIdx] !== null) return { ok: false, reason: "Parça zaten yerleştirilmiş" };
-
-    if (row < 0 || col < 0)
-      return { ok: false, reason: "Geçersiz konum" };
-    if (row + p.cellsH > this.level.gridRows)
-      return { ok: false, reason: "Odanın dışına taşıyor" };
-    if (col + p.cellsW > this.level.gridCols)
-      return { ok: false, reason: "Odanın dışına taşıyor" };
-
-    for (let r = row; r < row + p.cellsH; r++) {
-      for (let c = col; c < col + p.cellsW; c++) {
-        if (this.grid[r][c] !== -1)
-          return { ok: false, reason: "Başka bir parçayla çakışıyor" };
+  get filledCells(): number {
+    let n = 0;
+    for (let r = 0; r < this.room.gridRows; r++) {
+      for (let c = 0; c < this.room.gridCols; c++) {
+        if (this.grid[r][c] !== -1) n++;
       }
     }
-
-    if (!this.checkJointForPlacement(pieceIdx, row, col))
-      return { ok: false, reason: "Derz kuralı ihlali! Komşu sıralarda aynı hizada dikiş var" };
-
-    return { ok: true };
+    return n;
   }
 
-  placePiece(pieceIdx: number, row: number, col: number): void {
-    const p = this.pieces[pieceIdx];
-    if (!p) return;
-
-    for (let r = row; r < row + p.cellsH; r++) {
-      for (let c = col; c < col + p.cellsW; c++) {
-        this.grid[r][c] = pieceIdx;
-      }
-    }
-    this.placements[pieceIdx] = { row, col };
+  get totalCells(): number {
+    return this.room.gridRows * this.room.gridCols;
   }
 
-  removePiece(pieceIdx: number): void {
-    for (let r = 0; r < this.level.gridRows; r++) {
-      for (let c = 0; c < this.level.gridCols; c++) {
-        if (this.grid[r][c] === pieceIdx) {
-          this.grid[r][c] = -1;
-        }
-      }
-    }
-    this.placements[pieceIdx] = null;
+  get percent(): number {
+    return this.totalCells > 0 ? Math.round((this.filledCells / this.totalCells) * 100) : 0;
   }
 
-  getJointsInRow(row: number, grid?: number[][]): Set<number> {
-    const g = grid ?? this.grid;
-    const joints = new Set<number>();
-    for (let c = 0; c < this.level.gridCols - 1; c++) {
-      if (g[row][c] !== -1 && g[row][c + 1] !== -1 && g[row][c] !== g[row][c + 1]) {
-        joints.add(c + 1);
-      }
-    }
-    return joints;
-  }
-
-  checkJointRule(): boolean {
-    for (let row = 0; row < this.level.gridRows - 1; row++) {
-      const j1 = this.getJointsInRow(row);
-      const j2 = this.getJointsInRow(row + 1);
-      for (const j of j1) {
-        if (j2.has(j)) return false;
-      }
-    }
-    return true;
-  }
-
-  private checkJointForPlacement(pieceIdx: number, row: number, col: number): boolean {
-    const p = this.pieces[pieceIdx];
-    const temp = this.grid.map((r) => [...r]);
-    for (let r = row; r < row + p.cellsH; r++) {
-      for (let c = col; c < col + p.cellsW; c++) {
-        temp[r][c] = pieceIdx;
-      }
-    }
-
-    const rows = new Set<number>();
-    for (let r = row; r < row + p.cellsH; r++) {
-      rows.add(r);
-      if (r > 0) rows.add(r - 1);
-      if (r < this.level.gridRows - 1) rows.add(r + 1);
-    }
-
-    for (const r of rows) {
-      if (r < 0 || r >= this.level.gridRows) continue;
-      for (let rr = r; rr < this.level.gridRows - 1; rr++) {
-        if (!rows.has(rr) && !rows.has(rr + 1)) continue;
-        const j1 = this.getJointsInRow(rr, temp);
-        const j2 = this.getJointsInRow(rr + 1, temp);
-        for (const j of j1) {
-          if (j2.has(j)) return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  checkVictory(): ValidationResult {
-    for (let r = 0; r < this.level.gridRows; r++) {
-      for (let c = 0; c < this.level.gridCols; c++) {
-        if (this.grid[r][c] === -1)
-          return { ok: false, reason: "Tüm hücreler dolmadı" };
-      }
-    }
-    for (let i = 0; i < this.pieces.length; i++) {
-      if (this.placements[i] === null)
-        return { ok: false, reason: "Envanterde parça kaldı" };
-    }
-    if (!this.checkJointRule())
-      return { ok: false, reason: "Derz kuralı ihlali" };
-    return { ok: true };
-  }
-
-  getUnplacedCount(): number {
-    return this.placements.filter((p) => p === null).length;
-  }
-
-  getTotalCells(): number {
-    return this.level.gridRows * this.level.gridCols;
-  }
-
-  getFilledCells(): number {
-    let count = 0;
-    for (let r = 0; r < this.level.gridRows; r++) {
-      for (let c = 0; c < this.level.gridCols; c++) {
-        if (this.grid[r][c] !== -1) count++;
-      }
-    }
-    return count;
-  }
-
-  getViolationRows(): number[] {
-    const violations: number[] = [];
-    for (let row = 0; row < this.level.gridRows - 1; row++) {
-      const j1 = this.getJointsInRow(row);
-      const j2 = this.getJointsInRow(row + 1);
-      for (const j of j1) {
-        if (j2.has(j)) {
-          violations.push(row);
-          violations.push(row + 1);
-        }
-      }
-    }
-    return [...new Set(violations)];
+  get recyclePercent(): number {
+    return Math.min(100, Math.round((this.recycleCells / 35) * 100));
   }
 }
