@@ -125,6 +125,7 @@ export class ZenEngine {
   placements: (Placed | null)[];
   room: Room;
   recycleCells = 0;
+  grouted = false;
   private idc = 0;
 
   constructor(room: Room) {
@@ -251,6 +252,12 @@ export class ZenEngine {
 
   get percent(): number {
     return this.totalCells > 0 ? Math.round((this.filledCells / this.totalCells) * 100) : 0;
+  }
+
+  groutAll(): boolean {
+    if (this.percent !== 100) return false;
+    this.grouted = true;
+    return true;
   }
 
   get recyclePercent(): number {

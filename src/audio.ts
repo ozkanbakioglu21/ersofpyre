@@ -216,6 +216,11 @@ export class ZenAudio {
     this.hit(784, 0.2, 0.08, "triangle", undefined, );
   }
 
+  grout(): void {
+    this.hit(180, 0.22, 0.14, "sine", 70);
+    this.noise(0.5, 0.06, 900, "bandpass");
+  }
+
   complete(): void {
     const c = this.ctx;
     if (!c || !this.master) return;

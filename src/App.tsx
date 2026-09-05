@@ -25,6 +25,7 @@ interface BoardHandle {
   celebrate: () => void;
   refill: () => void;
   reset: () => void;
+  groutSweep: () => void;
   burst: (col: number, row: number, wCells: number, hCells: number) => void;
   getCanvas: () => HTMLCanvasElement | null;
 }
@@ -178,6 +179,7 @@ const BoardCanvas = forwardRef<BoardHandle, {
   const sheenRef = useRef<{ t: number; sparkles: { x: number; y: number; d: number }[] } | null>(null);
   const refillPulseRef = useRef<number>(0);
   const hoverRef = useRef<{ row: number; col: number } | null>(null);
+  const sweepRef = useRef<number | null>(null);
 
   useImperativeHandle(ref, () => ({
     celebrate() {
@@ -206,6 +208,10 @@ const BoardCanvas = forwardRef<BoardHandle, {
       sheenRef.current = null;
       refillPulseRef.current = 0;
       hoverRef.current = null;
+      sweepRef.current = null;
+    },
+    groutSweep() {
+      sweepRef.current = 0;
     },
     burst(col: number, row: number, wCells: number, hCells: number) {
       const pal = palRef.current;
@@ -301,6 +307,8 @@ const BoardCanvas = forwardRef<BoardHandle, {
         const w = drawW * CELL;
         const h = drawH * CELL;
         const horizontal = drawW >= drawH;
+        const seamC = eng.grouted ? pal.grout : "rgba(60,60,60,0.28)";
+        const glossOn = eng.grouted;
         const gr = ctx.createLinearGradient(horizontal ? 0 : 0, horizontal ? 0 : 0, horizontal ? w : 0, horizontal ? 0 : h);
         gr.addColorStop(0, pal.tileA);
         gr.addColorStop(0.5, pal.tileB);
@@ -308,25 +316,27 @@ const BoardCanvas = forwardRef<BoardHandle, {
         ctx.fillStyle = gr;
         ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
 
-        ctx.fillStyle = pal.grout;
+        ctx.fillStyle = seamC;
         ctx.fillRect(x, y, w, 2);
         ctx.fillRect(x, y + h - 2, w, 2);
         ctx.fillRect(x, y, 2, h);
         ctx.fillRect(x + w - 2, y, 2, h);
 
-        const band = Math.min(w, h);
-        const gl = ctx.createLinearGradient(0, y, 0, y + band * 0.9);
-        gl.addColorStop(0, "rgba(255,255,255,0.35)");
-        gl.addColorStop(0.4, "rgba(255,255,255,0.06)");
-        gl.addColorStop(1, "rgba(255,255,255,0)");
-        ctx.fillStyle = gl;
-        ctx.fillRect(x + 3, y + 3, Math.max(2, w - 6), band * 0.5);
+        if (glossOn) {
+          const band = Math.min(w, h);
+          const gl = ctx.createLinearGradient(0, y, 0, y + band * 0.9);
+          gl.addColorStop(0, "rgba(255,255,255,0.35)");
+          gl.addColorStop(0.4, "rgba(255,255,255,0.06)");
+          gl.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.fillStyle = gl;
+          ctx.fillRect(x + 3, y + 3, Math.max(2, w - 6), band * 0.5);
 
-        ctx.fillStyle = "rgba(255,255,255,0.55)";
-        ctx.fillRect(x + 6, y + 4, Math.max(6, w - 12), 1.5);
+          ctx.fillStyle = "rgba(255,255,255,0.55)";
+          ctx.fillRect(x + 6, y + 4, Math.max(6, w - 12), 1.5);
 
-        ctx.fillStyle = "rgba(255,255,255,0.22)";
-        ctx.fillRect(x + 3, y + h - 4, Math.max(2, w - 6), 1);
+          ctx.fillStyle = "rgba(255,255,255,0.22)";
+          ctx.fillRect(x + 3, y + h - 4, Math.max(2, w - 6), 1);
+        }
       }
       ctx.restore();
 
@@ -352,6 +362,24 @@ const BoardCanvas = forwardRef<BoardHandle, {
           ctx.lineWidth = 2;
           ctx.strokeRect(gx + 1, gy + 1, gw - 2, gh - 2);
           ctx.restore();
+        }
+      }
+
+      if (sweepRef.current !== null) {
+        sweepRef.current += dt;
+        const st = sweepRef.current;
+        if (st > 1.6) {
+          sweepRef.current = null;
+        } else {
+          const k = Math.min(1, st / 1.6);
+          const sy = k * H;
+          const band = ctx.createLinearGradient(0, sy - 44, 0, sy);
+          band.addColorStop(0, "rgba(240,231,214,0)");
+          band.addColorStop(1, "rgba(240,231,214,0.6)");
+          ctx.fillStyle = band;
+          ctx.fillRect(0, sy - 44, W, 44);
+          ctx.fillStyle = "rgba(255,255,255,0.55)";
+          ctx.fillRect(0, sy, W, 2);
         }
       }
 
@@ -575,6 +603,27 @@ function RecycleBin({ pal, fill, onDrop }: { pal: Palette; fill: number; onDrop:
   );
 }
 
+function GroutBin({ pal, fill, ready, onGrout }: { pal: Palette; fill: number; ready: boolean; onGrout: () => void }) {
+  const r = 26;
+  const circ = 2 * Math.PI * r;
+  return (
+    <div className="flex flex-col items-center gap-1 px-2" title={ready ? "Harçla!" : "Harç"} onClick={() => { if (ready) onGrout(); }}>
+      <div className={`relative w-16 h-16 flex items-center justify-center rounded-xl border ${ready ? "animate-pulse" : ""}`}
+        style={{ borderColor: ready ? pal.accent : pal.seam, background: "rgba(255,255,255,0.35)" }}>
+        <span className="text-2xl">🪣</span>
+        <svg viewBox="0 0 64 64" className="absolute inset-0 w-full h-full -rotate-90">
+          <circle cx="32" cy="32" r={r} fill="none" stroke={pal.seam} strokeWidth="4" />
+          <circle cx="32" cy="32" r={r} fill="none" stroke={pal.accent} strokeWidth="4"
+            strokeDasharray={circ} strokeDashoffset={circ - (fill / 100) * circ} strokeLinecap="round" />
+        </svg>
+      </div>
+      <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: pal.accent }}>
+        Harç {fill}%
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
   const [roomIdx, setRoomIdx] = useState(0);
   const engRef = useRef(new ZenEngine(ROOMS[0]));
@@ -587,13 +636,14 @@ export default function App() {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [paletteIdx, setPaletteIdx] = useState(0);
   const [musicOn, setMusicOn] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; next: boolean } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; next: boolean; grout?: boolean } | null>(null);
 
   const dragRef = useRef<{ idx: number; sx: number; sy: number; sxr: number; syr: number; w: number; h: number; wasSel: boolean; mode: "idle" | "cut" | "drag" } | null>(null);
 
   const audioRef = useRef(new ZenAudio());
   const boardRef = useRef<BoardHandle>(null);
   const doneRef = useRef(false);
+  const pavedRef = useRef(false);
 
   const engine = engRef.current;
   const pal = PALETTES[paletteIdx];
@@ -608,6 +658,7 @@ export default function App() {
     dragRef.current = null;
     setToast(null);
     doneRef.current = false;
+    pavedRef.current = false;
     boardRef.current?.reset();
     tick();
   };
@@ -619,13 +670,11 @@ export default function App() {
     setDrag(null);
     tick();
     const e = engRef.current;
-    if (e.percent === 100 && !doneRef.current) {
-      doneRef.current = true;
-      audioRef.current.complete();
-      boardRef.current?.celebrate();
-      setToast({ msg: `${e.room.name} hazır!`, next: roomIdx < ROOMS.length - 1 });
+    if (e.percent === 100 && !e.grouted && !pavedRef.current) {
+      pavedRef.current = true;
+      setToast({ msg: "Zemin tamamen döşendi — harçla! 🪣", next: false, grout: true });
     }
-  }, [roomIdx, tick]);
+  }, [tick]);
 
   const handlePieceDown = (e: React.PointerEvent, idx: number) => {
     e.stopPropagation();
@@ -754,6 +803,27 @@ export default function App() {
     }
   };
 
+  const handleGrout = () => {
+    const eng = engRef.current;
+    if (eng.percent !== 100 || eng.grouted || doneRef.current) return;
+    eng.groutAll();
+    audioRef.current.grout();
+    boardRef.current?.groutSweep();
+    setToast(null);
+    setSelected(null);
+    setCutPct(null);
+    setDrag(null);
+    tick();
+    setTimeout(() => {
+      if (!doneRef.current) {
+        doneRef.current = true;
+        audioRef.current.complete();
+        boardRef.current?.celebrate();
+        setToast({ msg: `${eng.room.name} hazır! 🌿`, next: roomIdx < ROOMS.length - 1 });
+      }
+    }, 1600);
+  };
+
   const flipPalette = () => {
     setPaletteIdx((i) => (i + 1) % PALETTES.length);
   };
@@ -815,6 +885,14 @@ export default function App() {
             style={{ background: pal.bg2, border: `1px solid ${pal.seam}` }}>
             <span className="text-sm font-semibold">{toast.msg} 🌿</span>
             <div className="flex gap-2">
+              {toast.grout && (
+                <button
+                  className="px-4 py-1.5 rounded-full text-sm font-semibold transition-transform active:scale-95"
+                  style={{ background: "#a16a33", color: "#fff" }}
+                  onClick={handleGrout}>
+                  Harçla 🪣
+                </button>
+              )}
               {toast.next && (
                 <button
                   className="px-4 py-1.5 rounded-full text-sm font-semibold transition-transform active:scale-95"
@@ -899,6 +977,12 @@ export default function App() {
             ))}
           </div>
           <RecycleBin pal={pal} fill={engine.recyclePercent} onDrop={handleRecycle} />
+          <GroutBin
+            pal={pal}
+            fill={engine.grouted ? 100 : engine.percent}
+            ready={engine.percent === 100 && !engine.grouted}
+            onGrout={handleGrout}
+          />
         </div>
         <p className="text-[10px] opacity-40 italic text-center">
           hiçbir parça israf olmaz — sevmediklerini geri dönüştür, taş tozu birleşir, yeni taş doğar.
