@@ -522,14 +522,12 @@ const BoardCanvas = forwardRef<BoardHandle, {
 });
 BoardCanvas.displayName = "BoardCanvas";
 
-function PiecePill({ p, pal, selected, cutPct, onPointerDown, onPointerMove, onPointerUp }: {
+function PiecePill({ p, pal, selected, cutPct, onPointerDown }: {
   p: Piece;
   pal: Palette;
   selected: boolean;
   cutPct: number | null;
   onPointerDown: (e: React.PointerEvent) => void;
-  onPointerMove: (e: React.PointerEvent) => void;
-  onPointerUp: (e: React.PointerEvent) => void;
 }) {
   const w = Math.max(p.cellsW * 18, 30);
   const h = Math.max(p.cellsH * 18, 30);
@@ -550,8 +548,6 @@ function PiecePill({ p, pal, selected, cutPct, onPointerDown, onPointerMove, onP
         transform: selected ? "translateY(-3px)" : undefined,
       }}
       onPointerDown={(e) => onPointerDown(e)}
-      onPointerMove={(e) => onPointerMove(e)}
-      onPointerUp={(e) => onPointerUp(e)}
       title={`${p.cellsW * 5}×${p.cellsH * 5}`}
     >
       {selected && cutPct !== null && !p.cut ? (
@@ -638,7 +634,9 @@ export default function App() {
   const [musicOn, setMusicOn] = useState(false);
   const [toast, setToast] = useState<{ msg: string; next: boolean; grout?: boolean } | null>(null);
 
-  const dragRef = useRef<{ idx: number; sx: number; sy: number; sxr: number; syr: number; w: number; h: number; wasSel: boolean; mode: "idle" | "cut" | "drag" } | null>(null);
+  const dragRef = useRef<{ idx: number; sx: number; sy: number; sxr: number; syr: number; w: number; h: number; wasSel: boolean } | null>(null);
+  const cutPctRef = useRef<number | null>(null);
+  cutPctRef.current = cutPct;
 
   const audioRef = useRef(new ZenAudio());
   const boardRef = useRef<BoardHandle>(null);
@@ -687,16 +685,20 @@ export default function App() {
     setCutCm(15);
     setDrag(null);
     const el = e.currentTarget as HTMLElement;
-    try {
-      el.setPointerCapture(e.pointerId);
-    } catch {
-      /* ignore */
-    }
     const r = el.getBoundingClientRect();
-    dragRef.current = { idx, sx: e.clientX, sy: e.clientY, sxr: r.left, syr: r.top, w: r.width, h: r.height, wasSel: selected === idx, mode: "idle" };
+    dragRef.current = {
+      idx,
+      sx: e.clientX,
+      sy: e.clientY,
+      sxr: r.left,
+      syr: r.top,
+      w: r.width,
+      h: r.height,
+      wasSel: selected === idx,
+    };
   };
 
-  const dropCell = (e: { clientX: number; clientY: number }, idx: number): DragState | null => {
+  const dropCell = useCallback((e: { clientX: number; clientY: number }, idx: number): DragState | null => {
     const canvas = boardRef.current?.getCanvas();
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
@@ -705,66 +707,80 @@ export default function App() {
     const eng = engRef.current;
     if (row < 0 || row >= eng.room.gridRows || col < 0 || col >= eng.room.gridCols) return null;
     return { idx, row, col, valid: eng.canPlace(idx, row, col) };
-  };
+  }, []);
 
-  const handlePieceMove = (e: React.PointerEvent, idx: number) => {
-    const d = dragRef.current;
-    if (!d || d.idx !== idx) return;
-    const eng = engRef.current;
-    if (d.mode === "idle") {
-      const inPill = e.clientX >= d.sxr - 8 && e.clientX <= d.sxr + d.w + 8 &&
-        e.clientY >= d.syr - 8 && e.clientY <= d.syr + d.h + 8;
-      d.mode = inPill ? "cut" : "drag";
-    }
-    if (d.mode === "cut") {
-      const p = eng.pieces[idx];
-      if (!p.cut) {
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        const horizontal = p.cellsW >= p.cellsH;
-        const pct = horizontal
-          ? ((e.clientX - rect.left) / rect.width) * 100
-          : ((e.clientY - rect.top) / rect.height) * 100;
-        setCutPct(Math.max(8, Math.min(92, pct)));
-      }
-    } else if (d.mode === "drag") {
-      setDrag(dropCell(e, idx));
-    }
-  };
-
-  const handlePieceUp = (e: React.PointerEvent, idx: number) => {
-    const d = dragRef.current;
-    if (!d || d.idx !== idx) return;
-    const eng = engRef.current;
-    const p = eng.pieces[idx];
-    if (d.mode === "drag") {
-      const dr = dropCell(e, idx);
-      if (dr && dr.valid) {
-        placeFromDrop(idx, dr.row, dr.col);
-      } else {
-        setDrag(null);
-      }
-    } else if ((d.wasSel || d.mode === "cut") && p && !p.cut) {
-      const pct = cutPct ?? 50;
-      const cells = Math.round((pct / 100) * eng.cutRange(idx));
-      if (eng.cutPiece(idx, cells)) {
-        audioRef.current.cut();
-        setCutPct(null);
-        setSelected(null);
-        setDrag(null);
-        tick();
-      }
-    }
-    dragRef.current = null;
-  };
-
-  const placeFromDrop = (idx: number, row: number, col: number) => {
+  const placeFromDrop = useCallback((idx: number, row: number, col: number) => {
     const eng = engRef.current;
     if (!eng.canPlace(idx, row, col)) return;
     const p = eng.pieces[idx];
     eng.place(idx, row, col);
     boardRef.current?.burst(col, row, p.cellsW, p.cellsH);
     onPlaced();
-  };
+  }, [onPlaced]);
+
+  useEffect(() => {
+    const inPill = (d: NonNullable<typeof dragRef.current>, x: number, y: number) =>
+      x >= d.sxr - 10 && x <= d.sxr + d.w + 10 && y >= d.syr - 10 && y <= d.syr + d.h + 10;
+
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const eng = engRef.current;
+      const p = eng.pieces[d.idx];
+      if (!p) return;
+      if (inPill(d, e.clientX, e.clientY)) {
+        setDrag(null);
+        if (!p.cut) {
+          const horizontal = p.cellsW >= p.cellsH;
+          const pct = horizontal
+            ? ((e.clientX - d.sxr) / d.w) * 100
+            : ((e.clientY - d.syr) / d.h) * 100;
+          setCutPct(Math.max(8, Math.min(92, pct)));
+        }
+      } else {
+        setDrag(dropCell(e, d.idx));
+      }
+    };
+
+    const onUp = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      dragRef.current = null;
+      const eng = engRef.current;
+      const p = eng.pieces[d.idx];
+      if (!p) return;
+      if (inPill(d, e.clientX, e.clientY)) {
+        const moved = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 6;
+        if (!p.cut && (d.wasSel || moved)) {
+          const pct = cutPctRef.current ?? 50;
+          const cells = Math.round((pct / 100) * eng.cutRange(d.idx));
+          if (eng.cutPiece(d.idx, cells)) {
+            audioRef.current.cut();
+            setCutPct(null);
+            setSelected(null);
+            setDrag(null);
+            tick();
+          }
+        }
+      } else {
+        const c = dropCell(e, d.idx);
+        if (c && c.valid) {
+          placeFromDrop(d.idx, c.row, c.col);
+        } else {
+          setDrag(null);
+        }
+      }
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [dropCell, placeFromDrop]);
 
   const handleRotate = () => {
     if (selected === null) return;
@@ -971,8 +987,6 @@ export default function App() {
                 selected={selected === idx}
                 cutPct={selected === idx ? cutPct : null}
                 onPointerDown={(e) => handlePieceDown(e, idx)}
-                onPointerMove={(e) => handlePieceMove(e, idx)}
-                onPointerUp={(e) => handlePieceUp(e, idx)}
               />
             ))}
           </div>
