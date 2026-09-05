@@ -12,6 +12,8 @@ import { ZenAudio } from "./audio";
 
 const CELL = 30;
 
+type Tool = "tile" | "mala";
+
 interface Particle {
   x: number; y: number; vx: number; vy: number;
   life: number; t: number; size: number; color: string;
@@ -160,18 +162,25 @@ const BoardCanvas = forwardRef<BoardHandle, {
   selectedIdx: number | null;
   onPlace: () => void;
   drag: DragState | null;
-}>(({ engine, palette, selectedIdx, onPlace, drag }, ref) => {
+  tool: Tool;
+  onTile: (row: number, col: number) => void;
+}>(({ engine, palette, selectedIdx, onPlace, drag, tool, onTile }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const selRef = useRef(selectedIdx);
   const palRef = useRef(palette);
   const onPlaceRef = useRef(onPlace);
   const engRef = useRef(engine);
   const dragRef = useRef<DragState | null>(null);
+  const toolRef = useRef(tool);
+  const onTileRef = useRef(onTile);
+  const paintRef = useRef(false);
   selRef.current = selectedIdx;
   palRef.current = palette;
   onPlaceRef.current = onPlace;
   engRef.current = engine;
   dragRef.current = drag;
+  toolRef.current = tool;
+  onTileRef.current = onTile;
 
   const partsRef = useRef<Particle[]>([]);
   const motesRef = useRef<Particle[]>([]);
@@ -307,8 +316,8 @@ const BoardCanvas = forwardRef<BoardHandle, {
         const w = drawW * CELL;
         const h = drawH * CELL;
         const horizontal = drawW >= drawH;
-        const seamC = eng.grouted ? pal.grout : "rgba(60,60,60,0.28)";
-        const glossOn = eng.grouted;
+        const seamC = p.grouted ? pal.grout : "rgba(60,60,60,0.28)";
+        const glossOn = !!p.grouted;
         const gr = ctx.createLinearGradient(horizontal ? 0 : 0, horizontal ? 0 : 0, horizontal ? w : 0, horizontal ? 0 : h);
         gr.addColorStop(0, pal.tileA);
         gr.addColorStop(0.5, pal.tileB);
@@ -508,11 +517,23 @@ const BoardCanvas = forwardRef<BoardHandle, {
       style={{ boxShadow: "0 14px 40px rgba(0,0,0,0.18)" }}
       onPointerDown={(e) => {
         const c = cellAt(e);
-        if (c) placeAt(c.row, c.col);
+        if (!c) return;
+        if (toolRef.current === "mala") {
+          onTileRef.current(c.row, c.col);
+          paintRef.current = true;
+        } else {
+          placeAt(c.row, c.col);
+        }
       }}
       onPointerMove={(e) => {
         const c = cellAt(e);
         hoverRef.current = c;
+        if (toolRef.current === "mala" && paintRef.current && c) {
+          onTileRef.current(c.row, c.col);
+        }
+      }}
+      onPointerUp={() => {
+        paintRef.current = false;
       }}
       onPointerLeave={() => {
         hoverRef.current = null;
@@ -627,6 +648,7 @@ export default function App() {
   const tick = useCallback(() => force((n) => n + 1), []);
 
   const [selected, setSelected] = useState<number | null>(null);
+  const [tool, setTool] = useState<Tool>("tile");
   const [cutPct, setCutPct] = useState<number | null>(null);
   const [cutCm, setCutCm] = useState(15);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -662,6 +684,28 @@ export default function App() {
     tick();
   };
 
+  const checkComplete = useCallback(() => {
+    const eng = engRef.current;
+    if (eng.percent !== 100 || !eng.groutedAll || doneRef.current) return;
+    doneRef.current = true;
+    audioRef.current.complete();
+    boardRef.current?.celebrate();
+    setToast({ msg: `${eng.room.name} hazır! 🌿`, next: roomIdx < ROOMS.length - 1 });
+  }, [roomIdx]);
+
+  const groutAt = useCallback((row: number, col: number) => {
+    const eng = engRef.current;
+    const idx = eng.grid[row]?.[col];
+    if (idx === undefined || idx < 0) return;
+    const p = eng.pieces[idx];
+    if (!p || p.grouted) return;
+    eng.groutPiece(idx);
+    audioRef.current.grout();
+    boardRef.current?.burst(col, row, p.cellsW, p.cellsH);
+    tick();
+    checkComplete();
+  }, [checkComplete, tick]);
+
   const onPlaced = useCallback(() => {
     audioRef.current.place();
     setSelected(null);
@@ -669,16 +713,22 @@ export default function App() {
     setDrag(null);
     tick();
     const e = engRef.current;
-    if (e.percent === 100 && !e.grouted && !pavedRef.current) {
+    if (e.percent === 100 && !e.groutedAll && !pavedRef.current) {
       pavedRef.current = true;
-      setToast({ msg: "Zemin tamamen döşendi — harçla! 🪣", next: false, grout: true });
+      setToast({ msg: "Zemin döşendi! Malayla derzleri sıvayın. 🧰", next: false, grout: true });
+    } else if (e.percent === 100) {
+      checkComplete();
     }
-  }, [tick]);
+  }, [tick, checkComplete]);
 
   const handlePieceDown = (e: React.PointerEvent, idx: number) => {
     e.preventDefault();
     e.stopPropagation();
     audioRef.current.unlock();
+    if (tool !== "tile") {
+      setSelected(null);
+      return;
+    }
     const eng = engRef.current;
     if (eng.placements[idx] !== null) return;
     setSelected(idx);
@@ -853,7 +903,7 @@ export default function App() {
 
   const handleGrout = () => {
     const eng = engRef.current;
-    if (eng.percent !== 100 || eng.grouted || doneRef.current) return;
+    if (eng.groutedAll || doneRef.current) return;
     eng.groutAll();
     audioRef.current.grout();
     boardRef.current?.groutSweep();
@@ -862,14 +912,7 @@ export default function App() {
     setCutPct(null);
     setDrag(null);
     tick();
-    setTimeout(() => {
-      if (!doneRef.current) {
-        doneRef.current = true;
-        audioRef.current.complete();
-        boardRef.current?.celebrate();
-        setToast({ msg: `${eng.room.name} hazır! 🌿`, next: roomIdx < ROOMS.length - 1 });
-      }
-    }, 1600);
+    setTimeout(() => checkComplete(), 1600);
   };
 
   const flipPalette = () => {
@@ -938,7 +981,7 @@ export default function App() {
                   className="px-4 py-1.5 rounded-full text-sm font-semibold transition-transform active:scale-95"
                   style={{ background: "#a16a33", color: "#fff" }}
                   onClick={handleGrout}>
-                  Harçla 🪣
+                  Malayla 🧰
                 </button>
               )}
               {toast.next && (
@@ -959,11 +1002,39 @@ export default function App() {
           </div>
         ) : null}
 
-        <BoardCanvas ref={boardRef} engine={engine} palette={pal} selectedIdx={selected} onPlace={onPlaced} drag={drag} />
+        <BoardCanvas ref={boardRef} engine={engine} palette={pal} selectedIdx={selected} onPlace={onPlaced} drag={drag} tool={tool} onTile={groutAt} />
       </main>
 
       <footer className="px-4 pb-4 pt-2 flex flex-col gap-2"
         style={{ borderTop: `1px solid ${pal.seam}` }}>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-1.5 rounded-full bg-white/40 p-1 border"
+            style={{ borderColor: pal.seam }}>
+            <button
+              onClick={() => setTool("tile")}
+              className="px-3 py-1 rounded-full text-[11px] font-semibold transition-colors"
+              style={tool === "tile" ? { background: pal.accent, color: "#fff" } : undefined}>
+              🪨 Yerleştir
+            </button>
+            <button
+              onClick={() => setTool("mala")}
+              className="px-3 py-1 rounded-full text-[11px] font-semibold transition-colors flex items-center gap-1"
+              style={tool === "mala" ? { background: pal.accent, color: "#fff" } : undefined}
+              title="Mala — yerleştirilmiş fayansların derzini sıva">
+              <svg viewBox="0 0 64 64" width="14" height="14" className="shrink-0">
+                <rect x="28" y="4" width="8" height="26" rx="3" fill="currentColor" />
+                <rect x="24" y="30" width="16" height="8" rx="2" fill="currentColor" />
+                <path d="M8 38 h48 l-10 20 h-28 z" fill="currentColor" />
+              </svg>
+              Mala
+            </button>
+          </div>
+          {tool === "mala" ? (
+            <span className="text-[10px] opacity-50">fayansa dokun ya da üzerinden sür — derz sıvanır</span>
+          ) : (
+            <span className="text-[10px] opacity-50">taşları yerleştir; alet: 🪨 Yerleştir · derz sıvamak için Mala seç</span>
+          )}
+        </div>
         <div className="flex justify-between items-center gap-2 flex-wrap">
           <span className="text-[10px] uppercase tracking-widest opacity-50">Envanter</span>
           {selected !== null ? (
@@ -1025,8 +1096,8 @@ export default function App() {
           <RecycleBin pal={pal} fill={engine.recyclePercent} onDrop={handleRecycle} />
           <GroutBin
             pal={pal}
-            fill={engine.grouted ? 100 : engine.percent}
-            ready={engine.percent === 100 && !engine.grouted}
+            fill={engine.groutedAll ? 100 : engine.groutPercent}
+            ready={engine.filledCells > 0 && !engine.groutedAll}
             onGrout={handleGrout}
           />
         </div>

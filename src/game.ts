@@ -3,6 +3,7 @@ export interface Piece {
   cellsW: number;
   cellsH: number;
   cut: boolean;
+  grouted?: boolean;
 }
 
 export interface Placed {
@@ -125,7 +126,6 @@ export class ZenEngine {
   placements: (Placed | null)[];
   room: Room;
   recycleCells = 0;
-  grouted = false;
   private idc = 0;
 
   constructor(room: Room) {
@@ -139,7 +139,7 @@ export class ZenEngine {
   }
 
   private newPiece(): Piece {
-    return { id: `T${this.idc++}`, cellsW: 7, cellsH: 1, cut: false };
+    return { id: `T${this.idc++}`, cellsW: 7, cellsH: 1, cut: false, grouted: false };
   }
 
   private fillFresh(): void {
@@ -175,8 +175,8 @@ export class ZenEngine {
     if (horizontal) { w1 = cells; w2 = p.cellsW - cells; }
     else { h1 = cells; h2 = p.cellsH - cells; }
 
-    this.pieces[idx] = { id: `${p.id}A`, cellsW: w1, cellsH: h1, cut: true };
-    this.pieces.push({ id: `${p.id}B`, cellsW: w2, cellsH: h2, cut: true });
+    this.pieces[idx] = { id: `${p.id}A`, cellsW: w1, cellsH: h1, cut: true, grouted: false };
+    this.pieces.push({ id: `${p.id}B`, cellsW: w2, cellsH: h2, cut: true, grouted: false });
     this.placements.push(null);
 
     this.fillFresh();
@@ -255,9 +255,41 @@ export class ZenEngine {
   }
 
   groutAll(): boolean {
-    if (this.percent !== 100) return false;
-    this.grouted = true;
+    for (let i = 0; i < this.pieces.length; i++) {
+      if (this.placements[i] !== null && this.pieces[i]) {
+        this.pieces[i].grouted = true;
+      }
+    }
     return true;
+  }
+
+  groutPiece(idx: number): boolean {
+    const p = this.pieces[idx];
+    if (!p) return false;
+    if (this.placements[idx] === null) return false;
+    p.grouted = true;
+    return true;
+  }
+
+  get groutedCells(): number {
+    let n = 0;
+    for (let i = 0; i < this.pieces.length; i++) {
+      if (this.placements[i] !== null && this.pieces[i].grouted) {
+        n += this.pieces[i].cellsW * this.pieces[i].cellsH;
+      }
+    }
+    return n;
+  }
+
+  get groutedAll(): boolean {
+    for (let i = 0; i < this.pieces.length; i++) {
+      if (this.placements[i] !== null && !this.pieces[i].grouted) return false;
+    }
+    return true;
+  }
+
+  get groutPercent(): number {
+    return this.totalCells > 0 ? Math.round((this.groutedCells / this.totalCells) * 100) : 0;
   }
 
   get recyclePercent(): number {
