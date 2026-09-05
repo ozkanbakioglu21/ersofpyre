@@ -447,7 +447,7 @@ const BoardCanvas = forwardRef<BoardHandle, {
       ctx.globalAlpha = 1;
       partsRef.current = partsRef.current.filter((p) => p.t < p.life);
 
-      if (sel !== null) {
+      if (sel !== null && !dragRef.current) {
         const p = eng.pieces[sel];
         const hov = hoverRef.current;
         if (p && hov && eng.canPlace(sel, hov.row, hov.col)) {
@@ -635,6 +635,7 @@ export default function App() {
   const [toast, setToast] = useState<{ msg: string; next: boolean; grout?: boolean } | null>(null);
 
   const dragRef = useRef<{ idx: number; sx: number; sy: number; sxr: number; syr: number; w: number; h: number; wasSel: boolean } | null>(null);
+  const lastDropRef = useRef<DragState | null>(null);
   const cutPctRef = useRef<number | null>(null);
   cutPctRef.current = cutPct;
 
@@ -675,6 +676,7 @@ export default function App() {
   }, [tick]);
 
   const handlePieceDown = (e: React.PointerEvent, idx: number) => {
+    e.preventDefault();
     e.stopPropagation();
     audioRef.current.unlock();
     const eng = engRef.current;
@@ -684,6 +686,7 @@ export default function App() {
     setCutPct(p && !p.cut ? 50 : null);
     setCutCm(15);
     setDrag(null);
+    lastDropRef.current = null;
     const el = e.currentTarget as HTMLElement;
     const r = el.getBoundingClientRect();
     dragRef.current = {
@@ -696,6 +699,7 @@ export default function App() {
       h: r.height,
       wasSel: selected === idx,
     };
+    document.body.classList.add("zen-dragging");
   };
 
   const dropCell = useCallback((e: { clientX: number; clientY: number }, idx: number): DragState | null => {
@@ -722,30 +726,11 @@ export default function App() {
     const inPill = (d: NonNullable<typeof dragRef.current>, x: number, y: number) =>
       x >= d.sxr - 10 && x <= d.sxr + d.w + 10 && y >= d.syr - 10 && y <= d.syr + d.h + 10;
 
-    const onMove = (e: PointerEvent) => {
-      const d = dragRef.current;
-      if (!d) return;
-      const eng = engRef.current;
-      const p = eng.pieces[d.idx];
-      if (!p) return;
-      if (inPill(d, e.clientX, e.clientY)) {
-        setDrag(null);
-        if (!p.cut) {
-          const horizontal = p.cellsW >= p.cellsH;
-          const pct = horizontal
-            ? ((e.clientX - d.sxr) / d.w) * 100
-            : ((e.clientY - d.syr) / d.h) * 100;
-          setCutPct(Math.max(8, Math.min(92, pct)));
-        }
-      } else {
-        setDrag(dropCell(e, d.idx));
-      }
-    };
-
-    const onUp = (e: PointerEvent) => {
+    const finishUp = (e: PointerEvent) => {
       const d = dragRef.current;
       if (!d) return;
       dragRef.current = null;
+      document.body.classList.remove("zen-dragging");
       const eng = engRef.current;
       const p = eng.pieces[d.idx];
       if (!p) return;
@@ -770,15 +755,62 @@ export default function App() {
           setDrag(null);
         }
       }
+      lastDropRef.current = null;
     };
 
-    window.addEventListener("pointermove", onMove);
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      e.preventDefault();
+      const eng = engRef.current;
+      const p = eng.pieces[d.idx];
+      if (!p) return;
+      if (inPill(d, e.clientX, e.clientY)) {
+        setDrag(null);
+        if (!p.cut) {
+          const horizontal = p.cellsW >= p.cellsH;
+          const pct = horizontal
+            ? ((e.clientX - d.sxr) / d.w) * 100
+            : ((e.clientY - d.syr) / d.h) * 100;
+          setCutPct(Math.max(8, Math.min(92, pct)));
+        }
+      } else {
+        const hover = dropCell(e, d.idx);
+        lastDropRef.current = hover;
+        setDrag(hover);
+      }
+    };
+
+    const onUp = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      e.preventDefault();
+      finishUp(e);
+    };
+
+    const onCancel = () => {
+      const d = dragRef.current;
+      if (!d) return;
+      dragRef.current = null;
+      document.body.classList.remove("zen-dragging");
+      const hover = lastDropRef.current;
+      if (hover && hover.valid) {
+        placeFromDrop(d.idx, hover.row, hover.col);
+      } else {
+        setDrag(null);
+      }
+      lastDropRef.current = null;
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("blur", onCancel);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("blur", onCancel);
     };
   }, [dropCell, placeFromDrop]);
 

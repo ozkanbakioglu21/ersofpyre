@@ -29,6 +29,12 @@ canvas {
   touch-action: none;
 }
 
+body.zen-dragging,
+body.zen-dragging * {
+  touch-action: none !important;
+  cursor: grabbing;
+}
+
 @keyframes pop-in {
   0% {
     transform: scale(0.85) translateY(8px);
